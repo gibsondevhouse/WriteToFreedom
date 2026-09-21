@@ -1,10 +1,11 @@
+import {locationCatalog} from './countries.js';
 import { cityRoute } from './city-routes.js';
 import { countryRoute } from './country-routes.js';
 import { locationRoute } from './location-routes.js';
 import { factionRoute } from './faction-routes.js';
 import { factionCatalog, attachFactionNames } from './factions.js';
 import { repository } from './db.js';
-import { blankCharacter, fieldNames, idPattern, nameFields, fullName, storyRoles, alignments } from '../public/characters/template.js';
+import { blankCharacter, fieldNames, idPattern, nameFields, fullName, storyRoles, alignments, humanChoices, hideableFields } from '../public/characters/template.js';
 import { characters as seeds } from '../public/characters/data.js';
 import { renderProfile } from './render-profile.js';
 import { sampleCharacter, characterCast } from './sample-characters.js';
@@ -30,6 +31,11 @@ function validate(input,current) {
   if(!r||typeof r.targetId!=='string'||!(idPattern.test(r.targetId)||seeds.some(s=>s.id===r.targetId))||typeof r.type!=='string'||r.type.length>160||typeof r.description!=='string'||r.description.length>10000) throw new Error('Please check the relationship details.');
   return {targetId:r.targetId,type:r.type,description:r.description};
  });
+ for(const [key,options] of Object.entries(humanChoices))if(output[key]&&!options.includes(output[key]))throw new Error('Choose a valid '+key+' option.');
+ for(const key of ['height','weight','age'])if(output[key]&&(!Number.isFinite(Number(output[key]))||Number(output[key])<0||(key==='age'&&!Number.isInteger(Number(output[key])))))throw new Error('Use a nonnegative number for age, height, and weight.');
+ const hidden=Object.hasOwn(input,'hiddenFields')?input.hiddenFields:current.hiddenFields||[];
+ if(!Array.isArray(hidden)||hidden.length>hideableFields.length||hidden.some(key=>!hideableFields.includes(key)))throw new Error('Invalid field visibility settings.');
+ output.hiddenFields=[...new Set(hidden)];
  return output;
 }
 export function createWorker(assets) { return {async fetch(request,env) {
@@ -57,7 +63,7 @@ export function createWorker(assets) { return {async fetch(request,env) {
     const factions=await factionCatalog(db,owner);
     const character=attachFactionNames([await db.get(owner,profile[1])||sampleCharacter(profile[1])].filter(Boolean),factions)[0];
     if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
-    return new Response(renderProfile(character,attachFactionNames(characterCast(await db.list(owner)),factions),factions),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    return new Response(renderProfile(character,attachFactionNames(characterCast(await db.list(owner)),factions),factions,await locationCatalog(db,owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
@@ -84,6 +90,8 @@ export function createWorker(assets) { return {async fetch(request,env) {
      if(!faction)return json({error:'Choose an existing faction or create one.'},400);
      document.affiliation=faction.name;
     }
+    const locations=await locationCatalog(db,owner);
+    for(const key of ['birthPlaceId','residenceId','citizenshipId'])if(document[key]&&!locations.some(l=>l.id===document[key]&&(key!=='citizenshipId'||l.type==='country')))return json({error:'Choose an existing location for birthplace or residence, and a country for citizenship.'},400);
     const allowed=new Set([...seeds.map(c=>c.id),...(await db.list(owner)).map(c=>c.id)]);
     if(document.relationships.some(r=>r.targetId===id||!allowed.has(r.targetId)))return json({error:'Choose another existing character for each relationship.'},400);
     if(!Number.isInteger(input.version))return json({error:'Reload this character before saving.'},400);

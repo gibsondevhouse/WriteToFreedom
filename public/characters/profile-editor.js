@@ -8,7 +8,7 @@ let factionSelect,factionPanel,factionName,factionFeedback,createFactionButton,c
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 function showError(message){error.textContent=message;error.hidden=false;}
 async function request(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Keep a copy of your changes before reloading to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save your character. Please try again.');return data;}
-function resize(input){if(input.tagName==='TEXTAREA'){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
+function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function populateFactions(selected=''){
  factionSelect.replaceChildren();const empty=node('option','No faction selected');empty.value='';factionSelect.append(empty);
  [...factions].sort((a,b)=>a.name.localeCompare(b.name)).forEach(faction=>{const option=node('option',faction.name||'Untitled faction');option.value=faction.id;factionSelect.append(option);});
@@ -41,10 +41,14 @@ function addRelationship(value={targetId:'',type:'',description:''}){
  const row=node('div',undefined,'relationship-row');
  const target=node('select');target.dataset.key='targetId';target.required=true;const placeholder=node('option','Choose a character');placeholder.value='';target.append(placeholder);
  cast.filter(c=>c.id!==id).forEach(c=>{const option=node('option',c.name?.trim()||'Untitled character');option.value=c.id;target.append(option);});target.value=value.targetId;
- const type=node('input');type.type='text';type.dataset.key='type';type.maxLength=160;type.value=value.type;
- const description=node('textarea');description.dataset.key='description';description.maxLength=10000;description.value=value.description;
- for(const [label,input] of [['Character',target],['Connection',type],['Relationship dynamic',description]]){const field=node('label',undefined,'editor-field');field.append(node('span',label),input);row.append(field);}
- const remove=node('button','Remove relationship','remove-relationship');remove.type='button';remove.addEventListener('click',()=>{row.remove();markDirty();document.querySelector('#add-relationship').focus();});const link=node('a','Open profile →','relationship-profile-link');function updateLink(){link.hidden=!target.value;link.href='/characters/'+target.value+'/';}target.addEventListener('change',updateLink);updateLink();row.append(link,remove);relationshipHost.append(row);resize(description);
+ const type=node('input');type.type='text';type.dataset.key='type';type.maxLength=160;type.value=value.type;type.placeholder='e.g. Friend, sibling, rival';
+ for(const [label,input] of [['Character',target],['Connection',type]]){const field=node('label',undefined,'editor-field');field.append(node('span',label),input);row.append(field);}
+ const actions=node('div',undefined,'relationship-actions');
+ const remove=node('button','×','remove-relationship');remove.type='button';remove.title='Remove relationship';remove.setAttribute('aria-label','Remove relationship');remove.addEventListener('click',()=>{row.remove();markDirty();document.querySelector('#add-relationship').focus();});
+ const link=node('a','↗','relationship-profile-link');link.title='Open character profile';link.setAttribute('aria-label','Open related character profile');function updateLink(){link.hidden=!target.value;link.href='/characters/'+target.value+'/';}target.addEventListener('change',updateLink);updateLink();actions.append(link,remove);row.append(actions);
+ const notes=node('details',undefined,'relationship-notes'),summary=node('summary'),caption=node('span',undefined,'relationship-preview');summary.append(node('span','Notes'),caption);notes.append(summary);
+ const description=node('textarea');description.dataset.key='description';description.rows=2;description.maxLength=10000;description.value=value.description;description.setAttribute('aria-label','Relationship dynamic');description.placeholder='Describe their relationship…';
+ function preview(){caption.textContent=description.value.trim()||'Add relationship details';}preview();description.addEventListener('input',preview);notes.append(description);notes.addEventListener('toggle',()=>{if(notes.open)resize(description);});row.append(notes);relationshipHost.append(row);
 }
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
@@ -59,7 +63,7 @@ document.querySelectorAll('textarea').forEach(resize);
 window.addEventListener('resize',()=>document.querySelectorAll('textarea').forEach(resize));
 form.addEventListener('submit',async event=>{
  event.preventDefault();if(saving||creatingFaction||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
- const payload=Object.fromEntries(fieldNames.map(key=>[key,form.elements.namedItem(key).value]));payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
+ const payload=Object.fromEntries(fieldNames.map(key=>[key,form.elements.namedItem(key).value]));payload.hiddenFields=[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility);payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
  try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();}
@@ -68,3 +72,12 @@ form.addEventListener('submit',async event=>{
 });
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(!save.disabled)form.requestSubmit();}});
+
+function applyVisibility(){
+ form.querySelectorAll('[data-visibility]').forEach(input=>{const field=form.querySelector('[data-profile-field="'+input.dataset.visibility+'"]');field.hidden=!input.checked;if(input.checked)field.querySelectorAll('textarea').forEach(resize);});
+}
+form.querySelectorAll('[data-visibility]').forEach(input=>input.addEventListener('change',applyVisibility));
+form.querySelectorAll('[data-visibility-all]').forEach(button=>button.addEventListener('click',()=>{button.closest('.field-menu').querySelectorAll('[data-visibility]').forEach(input=>input.checked=button.dataset.visibilityAll==='show');applyVisibility();markDirty();}));
+form.addEventListener('invalid',event=>{const field=event.target.closest('[data-profile-field]');if(field?.hidden){const toggle=form.querySelector('[data-visibility="'+field.dataset.profileField+'"]');if(toggle){toggle.checked=true;applyVisibility();markDirty();}}event.target.closest('.relationship-notes')?.setAttribute('open','');},true);
+document.addEventListener('click',event=>{document.querySelectorAll('.field-menu[open]').forEach(menu=>{if(!menu.contains(event.target))menu.open=false;});});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelectorAll('.field-menu[open]').forEach(menu=>{menu.open=false;menu.querySelector('summary').focus();});});

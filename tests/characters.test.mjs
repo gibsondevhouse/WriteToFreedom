@@ -113,3 +113,23 @@ test('blank and sample profiles expose the full editable template and redirect o
  const unauth=await request('/characters/claude/','GET',undefined,null);assert.equal(unauth.status,401);
  assert.equal((await request('/characters/claude/index.html')).headers.get('location'),origin+'/characters/claude/');
 });
+
+test('human details and hidden subsection settings persist without deleting hidden content',async()=>{
+ const request=setup(),original=await (await request('/api/characters/claude')).json();
+ const record={...original,birthDate:'14 Harvest, 112',age:'34',height:'178.5',heightUnit:'cm',weight:'72',weightUnit:'kg',gender:'Nonbinary',pronouns:'They/them',birthPlaceId:'sample-royal-archive',residenceId:'sample-capital',citizenshipId:'sample-kingdom',eyeColor:'Hazel',bloodType:'A+',lifeStatus:'Alive',health:'Uses a walking cane',hiddenFields:['earlyLife','biography','relationships']};
+ const saved=await request('/api/characters/claude','PUT',record);assert.equal(saved.status,200);const result=await saved.json();
+ for(const key of ['birthDate','age','height','heightUnit','weight','weightUnit','gender','pronouns','birthPlaceId','residenceId','citizenshipId','health'])assert.equal(result[key],record[key],key);
+ assert.deepEqual(result.hiddenFields,record.hiddenFields);assert.equal(result.biography,original.biography);assert.deepEqual(result.relationships,original.relationships);
+ const html=await (await request('/characters/claude/')).text();assert.ok(html.includes('data-profile-field="biography" hidden'));assert.ok(html.includes('data-profile-field="relationships" hidden'));assert.ok(html.includes(original.biography));
+ for(const key of fieldNames)assert.equal(html.split('name="'+key+'"').length-1,1,key);
+ const olderClient={...result,version:result.version};delete olderClient.hiddenFields;delete olderClient.birthDate;
+ const resaved=await (await request('/api/characters/claude','PUT',olderClient)).json();assert.deepEqual(resaved.hiddenFields,record.hiddenFields);assert.equal(resaved.birthDate,record.birthDate);
+ const revealed=await (await request('/api/characters/claude','PUT',{...resaved,hiddenFields:[]})).json();assert.equal(revealed.biography,original.biography);assert.deepEqual(revealed.relationships,original.relationships);
+ assert.equal((await (await request('/api/characters/claude','GET',undefined,'author-b')).json()).birthDate,'');
+});
+test('human location choices respect ownership and structured fields validate without losing prior data',async()=>{
+ const request=setup(),original=await (await request('/api/characters/claude')).json(),country=crypto.randomUUID();
+ await request('/api/locations','POST',{id:country,name:'Private homeland',type:'country',parentId:null},'author-b');
+ for(const change of [{birthPlaceId:country},{residenceId:country},{citizenshipId:'sample-capital'},{height:'-2'},{weight:'not a number'},{age:'4.5'},{lifeStatus:'Invalid'},{heightUnit:'mile'},{hiddenFields:['firstName']}])assert.equal((await request('/api/characters/claude','PUT',{...original,...change})).status,400,JSON.stringify(change));
+ assert.equal((await (await request('/api/characters/claude')).json()).version,0);
+});
