@@ -1,3 +1,4 @@
+import {createQuestionBanner} from './question-banner.js';
 const rows=document.querySelector('#dashboard-rows'),status=document.querySelector('#load-status'),errorBox=document.querySelector('#load-error');
 const tones=['clay','jade','blue','violet','gold'];
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
@@ -5,12 +6,6 @@ function tone(record){const seed={claude:0,gpt:1,deepseek:2,gemini:3};return ton
 function initial(record){return record.name.trim().charAt(0).toLocaleUpperCase()||'?';}
 function cover(record){const node=el('div','cover'),mark=el('span','monogram',initial(record));mark.setAttribute('aria-hidden','true');node.append(mark);if(record.image){try{const url=new URL(record.image);if(url.protocol==='https:'){const image=el('img');image.src=url.href;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove(),{once:true});node.append(image);}}catch{}}return node;}
 function cardLink(record,cls){const link=el('a',`card ${cls} ${tone(record)}`);link.href=record.href;return link;}
-function questionCard(record){
- const link=cardLink(record,'question-card'),body=el('div','question-body'),owner=el('div','owner'),avatar=el('span','owner-monogram',initial(record)),info=el('div');avatar.setAttribute('aria-hidden','true');
- info.append(el('p','owner-name',record.name),el('p','meta',record.label));owner.append(avatar,info);body.append(el('h3','',record.question),owner);
- const footer=el('div','card-footer');footer.append(el('span','',`${record.questionCount} open question${record.questionCount===1?'':'s'}`),el('span','','Open profile ↗'));
- link.append(cover(record),body,footer);return link;
-}
 function characterCard(record){const link=cardLink(record,'portrait-card'),body=el('div','card-copy');body.append(el('h3','',record.name),el('p','meta',record.roles.join(' · ')||record.storyRole||'Character'));link.append(cover(record),body);return link;}
 function factionCard(record){
  const link=cardLink(record,'faction-card'),art=cover(record),body=el('div','card-copy');
@@ -32,8 +27,8 @@ function rail(title,records,render,href,emptyText='Nothing here yet.'){
  prev.addEventListener('click',()=>list.scrollBy({left:-page()}));next.addEventListener('click',()=>list.scrollBy({left:page()}));list.addEventListener('scroll',update,{passive:true});
  const observer=new ResizeObserver(update);observer.observe(list);cleanup.push(()=>observer.disconnect());requestAnimationFrame(update);return section;
 }
-function render(data){cleanup.forEach(fn=>fn());cleanup=[];rows.replaceChildren(
- rail('Open questions',data.questions,questionCard,null,'Your profiles have no open questions. Add unresolved questions in a profile to keep them in view here.'),
+function render(data){cleanup.forEach(fn=>fn());cleanup=[];const questions=createQuestionBanner(data.questions,{el,tone,initial});cleanup.push(questions.destroy);rows.replaceChildren(
+ questions.element,
  rail('Characters',data.characters,characterCard,'/characters/','Your characters will appear here.'),
  rail('Factions',data.factions,factionCard,'/factions/','Your houses, families, and alliances will appear here.'),
  rail('Locations',data.locations,locationCard,'/locations/','Your places will appear here.'),

@@ -19,7 +19,7 @@ export function dashboardData({characters,factions,locations,countries,cities}){
  const profiles={character:cast,faction:factions,country:countryProfiles,city:cityProfiles};
  // A hidden question still belongs on the dashboard. Open its profile normally
  // instead of jumping to an invisible field or changing the author's preference.
- const questions=Object.entries(profiles).flatMap(([kind,records])=>records.filter(r=>r.questions?.trim()).map(r=>({...profileCard(r,kind),href:profileCard(r,kind).href+(r.hiddenFields?.includes('questions')?'':'#field-questions'),question:r.questions.trim().split(/\n+/)[0],questionCount:r.questions.trim().split(/\n+/).filter(Boolean).length})));
+ const questions=Object.entries(profiles).flatMap(([kind,records])=>records.filter(r=>r.questions?.trim()).map(r=>{const prompts=r.questions.split(/\n+/).map(text=>text.trim()).filter(Boolean);return {...profileCard(r,kind),href:profileCard(r,kind).href+(r.hiddenFields?.includes('questions')?'':'#field-questions'),question:prompts[0],questionCount:prompts.length,prompts};}));
  return {
   questions,
   characters:cast.map(r=>({...profileCard(r,'character'),roles:r.roles.split(/\s*[·,;]\s*/).filter(Boolean),storyRole:r.storyRole,affiliation:r.affiliation})),

@@ -27,7 +27,7 @@ test('dashboard follows saved names, questions, factions and dates while keeping
  ]){const current=await(await request(path)).json();assert.equal((await request(path,'PUT',{...current,...changes})).status,200);}
  const data=await(await request('/api/dashboard')).json();
  assert.equal(data.characters[0].name,'Shona');assert.equal(data.characters[0].affiliation,'River House');
- const question=data.questions.find(r=>r.id==='claude');assert.equal(question.question,'Who kept the letter?');assert.equal(question.questionCount,2);assert.equal(question.href,'/characters/claude/#field-questions');
+ const question=data.questions.find(r=>r.id==='claude');assert.equal(question.question,'Who kept the letter?');assert.equal(question.questionCount,2);assert.deepEqual(question.prompts,['Who kept the letter?','What happened next?']);assert.equal(question.href,'/characters/claude/#field-questions');
  assert.equal(data.factions.find(r=>r.id==='sample-lantern').members,2);assert.equal(data.factions.find(r=>r.id==='sample-ember').members,0);
  const city=data.locations.find(r=>r.id==='sample-capital');assert.equal(city.name,'Port City');assert.equal(city.parent,'Lakeside');assert.equal(city.image,'https://example.com/port.jpg');
  assert.equal(data.locations.find(r=>r.id==='sample-royal-archive').parent,'Lakeside / Port City');
