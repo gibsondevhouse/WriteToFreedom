@@ -1,4 +1,4 @@
-import { fieldNames, nameFields, fullName } from './template.js';
+import { fieldNames, nameFields, fullName } from './template.js?v=profile-controls-2';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
 const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');
@@ -50,6 +50,64 @@ function addRelationship(value={targetId:'',type:'',description:''}){
  const description=node('textarea');description.dataset.key='description';description.rows=2;description.maxLength=10000;description.value=value.description;description.setAttribute('aria-label','Relationship dynamic');description.placeholder='Describe their relationship…';
  function preview(){caption.textContent=description.value.trim()||'Add relationship details';}preview();description.addEventListener('input',preview);notes.append(description);notes.addEventListener('toggle',()=>{if(notes.open)resize(description);});row.append(notes);relationshipHost.append(row);
 }
+const pendingChoiceEditors=[],choiceValues=new Map();
+function buildChoiceControl(control){
+ const value=control.querySelector('input[type="hidden"]'),select=control.querySelector('[data-choice-select]'),list=control.querySelector('.choice-values');
+ const custom=control.querySelector('.choice-custom'),input=control.querySelector('[data-choice-custom-input]'),multiple=control.dataset.multiple==='true';
+ const key=control.dataset.choiceField;let current=initial.character[key]||'';choiceValues.set(key,current);
+ let chosen=multiple?current.split(/\s*·\s*/).filter(Boolean):[];
+ function storeChoice(text){current=text;choiceValues.set(key,text);value.value=text;}
+ function paint(){
+  if(!multiple){
+   if(current&&![...select.options].some(option=>option.value===current)){const option=node('option',current);option.value=current;select.insertBefore(option,select.lastElementChild);}
+   select.value=current;return;
+  }
+  list.replaceChildren();
+  chosen.forEach((item,index)=>{const chip=node('span',undefined,'choice-chip'),label=node('span',item),remove=node('button','×');remove.type='button';remove.setAttribute('aria-label','Remove '+item);remove.addEventListener('click',()=>{chosen.splice(index,1);storeChoice(chosen.join(' · '));paint();markDirty();select.focus();});chip.append(label,remove);list.append(chip);});
+  for(const option of select.options)option.disabled=chosen.includes(option.value);
+  select.value='';
+ }
+ function choose(text){
+  const next=multiple?[...chosen.filter(item=>item!==text),text].join(' · '):text;
+  if(next.length>10000){input.setCustomValidity('Keep this field under 10,000 characters.');revealAncestors(input);input.reportValidity();return false;}
+  if(multiple)chosen=chosen.includes(text)?chosen:[...chosen,text];
+  storeChoice(multiple?chosen.join(' · '):text);paint();markDirty();return true;
+ }
+ function closeCustom(){custom.hidden=true;input.value='';input.setCustomValidity('');}
+ function commitCustom(){const text=input.value.trim();if(!text)return true;if(!choose(text))return false;closeCustom();return true;}
+ pendingChoiceEditors.push(commitCustom);
+ select.addEventListener('change',()=>{
+  if(select.value==='__custom__'){paint();custom.hidden=false;input.focus();return;}
+  const selection=select.value;
+  if(multiple&&!selection)return;
+  choose(selection);closeCustom();
+ });
+ input.addEventListener('input',()=>input.setCustomValidity(''));
+ input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();control.querySelector('[data-choice-add]').click();}if(event.key==='Escape'){event.preventDefault();closeCustom();select.focus();}});
+ control.querySelector('[data-choice-add]').addEventListener('click',()=>{if(!input.value.trim()){input.setCustomValidity('Enter a value.');input.reportValidity();return;}if(commitCustom())select.focus();});
+ control.querySelector('[data-choice-cancel]').addEventListener('click',()=>{closeCustom();select.focus();});
+ paint();
+}
+function setExpanded(button,expanded){
+ const region=document.getElementById(button.dataset.collapseTarget);
+ button.setAttribute('aria-expanded',String(expanded));region.hidden=!expanded;
+ const section=button.closest('.profile-section');
+ if(section){const menu=section.querySelector('.field-menu');menu.hidden=!expanded;if(!expanded)menu.open=false;}
+ if(expanded)region.querySelectorAll('textarea').forEach(resize);
+}
+function revealAncestors(target){
+ let region=target.closest('.collapsible-region');
+ while(region){const button=document.querySelector('[data-collapse-target="'+region.id+'"]');if(button)setExpanded(button,true);region=region.parentElement.closest('.collapsible-region');}
+}
+form.querySelectorAll('[data-collapse-target]').forEach(button=>button.addEventListener('click',()=>setExpanded(button,button.getAttribute('aria-expanded')!=='true')));
+form.querySelectorAll('.choice-control').forEach(buildChoiceControl);
+function revealHash(){
+ let anchor;try{anchor=decodeURIComponent(location.hash.slice(1));}catch{return;}
+ const target=document.getElementById(anchor);
+ if(!target)return;
+ const button=target.querySelector('[data-collapse-target]');if(button)setExpanded(button,true);revealAncestors(target);
+}
+window.addEventListener('hashchange',revealHash);revealHash();
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
 form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});
@@ -58,12 +116,12 @@ buildFactionControl(document.querySelector('#field-factionId').parentElement,doc
 populateFactions(initial.character.factionId||'');
 initial.character.relationships.forEach(addRelationship);
 document.querySelector('#add-relationship').addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});
-document.querySelector('#edit-name').addEventListener('click',()=>{document.querySelector('#field-firstName').focus();});
+document.querySelector('#edit-name').addEventListener('click',()=>{const firstName=document.querySelector('#field-firstName');revealAncestors(firstName);firstName.focus();});
 document.querySelectorAll('textarea').forEach(resize);
 window.addEventListener('resize',()=>document.querySelectorAll('textarea').forEach(resize));
 form.addEventListener('submit',async event=>{
- event.preventDefault();if(saving||creatingFaction||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
- const payload=Object.fromEntries(fieldNames.map(key=>[key,form.elements.namedItem(key).value]));payload.hiddenFields=[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility);payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
+ event.preventDefault();if(saving||creatingFaction)return;if(!pendingChoiceEditors.every(commit=>commit())||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
+ const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.hiddenFields=[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility);payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
  try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();}
@@ -78,6 +136,6 @@ function applyVisibility(){
 }
 form.querySelectorAll('[data-visibility]').forEach(input=>input.addEventListener('change',applyVisibility));
 form.querySelectorAll('[data-visibility-all]').forEach(button=>button.addEventListener('click',()=>{button.closest('.field-menu').querySelectorAll('[data-visibility]').forEach(input=>input.checked=button.dataset.visibilityAll==='show');applyVisibility();markDirty();}));
-form.addEventListener('invalid',event=>{const field=event.target.closest('[data-profile-field]');if(field?.hidden){const toggle=form.querySelector('[data-visibility="'+field.dataset.profileField+'"]');if(toggle){toggle.checked=true;applyVisibility();markDirty();}}event.target.closest('.relationship-notes')?.setAttribute('open','');},true);
+form.addEventListener('invalid',event=>{revealAncestors(event.target);const field=event.target.closest('[data-profile-field]');if(field?.hidden){const toggle=form.querySelector('[data-visibility="'+field.dataset.profileField+'"]');if(toggle){toggle.checked=true;applyVisibility();markDirty();}}event.target.closest('.relationship-notes')?.setAttribute('open','');},true);
 document.addEventListener('click',event=>{document.querySelectorAll('.field-menu[open]').forEach(menu=>{if(!menu.contains(event.target))menu.open=false;});});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelectorAll('.field-menu[open]').forEach(menu=>{menu.open=false;menu.querySelector('summary').focus();});});
