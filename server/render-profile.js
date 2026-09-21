@@ -5,7 +5,7 @@ export function renderProfile(character, cast) {
  const name=escape(character.name.trim() || 'Untitled character');
  const initials=escape(character.name.trim().split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?');
  const contents=templateSections.map(s=>`<li><a href="#${s.id}">${escape(s.title)}</a></li>`).join('');
- const facts=[['Name',character.name],['Known as',character.title],['Story role',character.storyRole],['Occupation',character.roles],['Affiliation',character.affiliation]];
+ const facts=[['Name',character.name],['Known as',character.title],['Story role',character.storyRole],['Moral alignment',character.alignment],['Occupation',character.roles],['Faction',character.affiliation]];
  const body=templateSections.map(section=>{
   if(section.id==='identity') return '';
   if(section.id==='relationships') return `<section id="relationships"><h2>Relationships</h2>${character.relationships.length ? `<ul>${character.relationships.map(r=>{const target=cast.find(c=>c.id===r.targetId);return `<li><a href="/characters/${escape(r.targetId)}/">${escape(target?.name||'Untitled character')}</a>${r.type ? ' — '+escape(r.type) : ''}${value(r.description)}</li>`;}).join('')}</ul>` : value('')}</section>`;
