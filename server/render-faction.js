@@ -1,21 +1,17 @@
-import { escape } from './render-profile.js';
+import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import { factionSections, factionTypes, factionStatuses } from '../public/factions/template.js';
 export function renderFaction(faction,cast){
- const name=escape(faction.name||'Untitled faction'),initials=escape((faction.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(n=>n[0]).join('').toUpperCase());
- const contents=factionSections.map(s=>`<li><a href="#${s.id}">${s.title}</a></li>`).join('');
- const field=([key,label,type])=>{
-  const value=faction[key]||'',attrs=`id="field-${key}" name="${key}" aria-label="${label}"`;
-  let control;
-  if(type==='select'||type==='character'){
-   const options=type==='character'?cast.map(c=>[c.id,c.name||'Untitled character']):(key==='type'?factionTypes:factionStatuses).map(v=>[v,v]);
-   control=`<select ${attrs}><option value="">Not yet chosen</option>${options.map(([v,l])=>`<option value="${escape(v)}"${v===value?' selected':''}>${escape(l)}</option>`).join('')}</select>`;
-   if(type==='character')control+=`<a class="person-link" data-for="${key}" href="/characters/${escape(value)}/"${!value?' hidden':''}>Open profile →</a>`;
-  }else if(type==='input')control=`<input ${attrs} type="text" autocomplete="off" maxlength="${key==='name'?160:10000}" value="${escape(value)}" placeholder="Add ${label.toLowerCase()}…">`;
-  else control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="Add ${label.toLowerCase()}…">${escape(value)}</textarea>`;
-  return `<div class="inline-field${type==='textarea'?' prose-field':''}"><label for="field-${key}">${label}</label>${control}</div>`;
- };
+ const initials=escape((faction.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(n=>n[0]).join('').toUpperCase());
+ const field=createFieldRenderer(faction,{options:(key,type)=>type==='character'?cast.map(c=>[c.id,c.name||'Untitled character']):type==='select'?(key==='type'?factionTypes:factionStatuses).map(v=>[v,v]):null,links:{founderId:'/characters/',leaderId:'/characters/'}});
  const members=cast.filter(c=>c.factionId===faction.id);
  const roster=members.length?`<ul class="member-list">${members.map(c=>`<li><a href="/characters/${escape(c.id)}/">${escape(c.name||'Untitled character')}</a><span>${escape(c.roles||c.title||'')}</span></li>`).join('')}</ul>`:'<p class="section-note">No characters are affiliated yet.</p>';
- const body=factionSections.filter(s=>s.id!=='identity').map(s=>`<section id="${s.id}" class="profile-section${s.id==='ideology'?' full-width':''}">${s.id==='overview'?'':`<h2>${s.title}</h2>`}${s.id==='members'?roster+'<p class="section-note">Choose this faction on a character’s profile to add them here.</p>':''}${s.fields.map(field).join('')}</section>`).join('');
- return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${name} — Write to Freedom</title><link rel="icon" href="/crest.svg"><link rel="stylesheet" href="/characters/profile.css"><link rel="stylesheet" href="/characters/profile-editor.css"><link rel="stylesheet" href="/factions/profile.css"><script type="module" src="/factions/profile.js"></script></head><body><header class="site-header"><a class="brand" href="/"><img src="/crest.svg" width="35" height="40" alt=""><span>Write to Freedom<small>A Free Novelpedia</small></span></a><a href="/factions/">← All factions</a></header><div class="page-layout"><aside class="desktop-contents"><nav aria-label="Faction contents"><h2>Contents</h2><ol>${contents}</ol></nav></aside><main id="profile"><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/factions/">Factions</a> / <span aria-current="page" data-display-name>${name}</span></nav><div class="title-row"><h1><button type="button" id="edit-name" title="Edit faction name" data-display-name>${name}</button></h1></div><form id="profile-form" data-id="${escape(faction.id)}" data-version="${faction.version}"><div class="article-bar"><span class="current-view">Faction profile</span><div class="save-actions"><span id="save-status" role="status">Saved</span><button id="save-character" type="submit">Save changes</button></div></div><p class="byline">Click any field to edit your faction.</p><p id="editor-error" role="alert" hidden></p><noscript>Enable JavaScript to edit and save this profile.</noscript><details class="mobile-contents"><summary>Contents</summary><nav><ol>${contents}</ol></nav></details><fieldset id="editor-fields"><legend class="sr-only">Faction profile</legend><article><aside class="infobox" id="identity" aria-label="Faction information"><h2 data-display-name>${name}</h2><div class="epithet-field">${field(factionSections[0].fields[1])}</div><div class="identity-panel blue"><span id="monogram" class="monogram">${initials}</span></div><h3>Faction information</h3>${factionSections[0].fields.filter(f=>f[0]!=='motto').map(field).join('')}<a class="member-count" href="#members">${members.length} affiliated ${members.length===1?'character':'characters'}</a></aside>${body}</article></fieldset></form><footer class="profile-footer"><a href="/factions/">← Back to factions</a><a href="#profile">Back to top ↑</a></footer></main></div></body></html>`;
+ const body=factionSections.filter(s=>!['identity','symbols'].includes(s.id)).map(s=>renderSection(s,
+ (s.id==='members'?roster+'<p class="section-note">Choose this faction on a character’s profile to add them here.</p>':'')+s.fields.map(field).join(''),faction,{fullWidth:s.id==='ideology'})).join('');
+ const fields=(keys)=>keys.map(key=>field(factionSections[0].fields.find(f=>f[0]===key))).join('');
+ const infobox=renderProfileName(faction,'faction')+`<div class="epithet-field">${fields(['motto'])}</div><div class="identity-panel blue"><span id="monogram" class="monogram">${initials}</span></div>`+
+  renderInfoGroup('Faction information','identity-information',fields(['name','type','status','founded']))+
+  renderInfoGroup('Leadership','identity-leadership',fields(['founderId','leaderId']))+
+  renderInfoGroup('Location & headquarters','identity-location',fields(['location','headquarters']))+
+  `<a class="member-count" href="#members">${members.length} affiliated ${members.length===1?'character':'characters'}</a>`;
+ return renderProfilePage({record:faction,type:'faction',collection:'Factions',collectionUrl:'/factions/',infobox,content:body,script:'/factions/profile.js',styles:['/factions/profile.css']});
 }

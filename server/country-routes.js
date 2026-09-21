@@ -1,6 +1,7 @@
+import {readHiddenFields} from '../public/profiles/schema.js';
 import {repository} from './db.js';
 import {locationCatalog,defaultCountry} from './countries.js';
-import {countryFields,countryImageFields,validImageUrl} from '../public/locations/countries/template.js';
+import {countryHideableFields,countryFields,countryImageFields,validImageUrl} from '../public/locations/countries/template.js';
 import {characterCast} from './sample-characters.js';
 import {renderCountry} from './render-country.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
@@ -19,6 +20,7 @@ export async function countryRoute(request,env){
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid country data.'},400);}
   if(!input||!Number.isInteger(input.version))return json({error:'Reload this country before saving.'},400);
   const document={};for(const key of countryFields){const value=Object.hasOwn(input,key)?input[key]:current[key]||'';if(typeof value!=='string'||value.length>(key==='name'?160:countryImageFields.includes(key)?2048:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
+  document.hiddenFields=readHiddenFields(input,current,countryHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
   document.name=document.name.trim().replace(/\s+/g,' ');if(!document.name)return json({error:'Enter a country name.'},400);
   for(const key of countryImageFields)if(!validImageUrl(document[key]))return json({error:'Use an HTTPS image URL for the flag, coat of arms, or map.'},400);
   for(const key of ['capitalId','largestCityId'])if(document[key]&&!locations.some(l=>l.id===document[key]&&l.type==='city'&&l.parentId===id))return json({error:'Choose a city that belongs to this country.'},400);

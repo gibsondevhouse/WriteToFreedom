@@ -1,5 +1,6 @@
+import {hiddenFieldNames} from '../../profiles/schema.js';
 export const countrySections=[
- {id:'identity',title:'Country information',fields:[['name','Name','input'],['officialName','Official name','input'],['motto','Motto','input'],['anthem','Anthem','input'],['capitalId','Capital','city'],['largestCityId','Largest city','city'],['officialLanguages','Official languages','input'],['demonym','Demonym','input'],['governmentType','Government','input'],['leaderId','Head of state','character'],['legislature','Legislature','input'],['founded','Established','input'],['area','Area','input'],['population','Population','input'],['populationDate','Population as of','input'],['currency','Currency','input'],['timeZone','Time zone / calendar','input']]},
+ {id:'identity',title:'Country information',fields:[['name','Name','input'],['officialName','Official name','input'],['motto','Motto','input'],['anthem','Anthem','input'],['capitalId','Capital','city'],['largestCityId','Largest city','city'],['officialLanguages','Official languages','choice'],['demonym','Demonym','input'],['governmentType','Government','choice'],['leaderId','Head of state','character'],['legislature','Legislature','input'],['founded','Established','input'],['area','Area','input'],['population','Population','input'],['populationDate','Population as of','input'],['currency','Currency','input'],['timeZone','Time zone / calendar','input']]},
  {id:'symbols',title:'National symbols & map',fields:[['flagUrl','Flag image URL','url'],['coatOfArmsUrl','Coat of arms image URL','url'],['mapUrl','Map image URL','url']]},
  {id:'overview',title:'Overview',fields:[['introduction','Introduction','textarea'],['summary','Short description','textarea']]},
  {id:'etymology',title:'Etymology',fields:[['etymology','Names & their origins','textarea']]},
@@ -14,5 +15,6 @@ export const countrySections=[
 ];
 export const countryFields=countrySections.flatMap(s=>s.fields.map(f=>f[0]));
 export const countryImageFields=['flagUrl','coatOfArmsUrl','mapUrl'];
-export const blankCountry=()=>Object.fromEntries(countryFields.map(k=>[k,'']));
+export const blankCountry=()=>({...Object.fromEntries(countryFields.map(k=>[k,''])),hiddenFields:[]});
+export const countryHideableFields=hiddenFieldNames(countrySections);
 export function validImageUrl(value){if(!value)return true;try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}}

@@ -1,3 +1,4 @@
+import {hiddenFieldNames} from '../profiles/schema.js';
 export const factionTypes=['Family','House','Guild','Alliance','Order','Government','Military','Religion','Secret society','Organization','Other'];
 export const factionStatuses=['Active','Emerging','Disbanded','Destroyed','In hiding','Unknown'];
 export const factionSections=[
@@ -13,4 +14,5 @@ export const factionSections=[
  {id:'notes',title:'Open questions',fields:[['questions','Unresolved questions','textarea']]}
 ];
 export const factionFields=factionSections.flatMap(s=>s.fields.map(f=>f[0]));
-export const blankFaction=()=>Object.fromEntries(factionFields.map(k=>[k,'']));
+export const blankFaction=()=>({...Object.fromEntries(factionFields.map(k=>[k,''])),hiddenFields:[]});
+export const factionHideableFields=hiddenFieldNames(factionSections);

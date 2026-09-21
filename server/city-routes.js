@@ -1,7 +1,8 @@
+import {readHiddenFields} from '../public/profiles/schema.js';
 import {repository} from './db.js';
 import {locationCatalog,defaultCountry} from './countries.js';
 import {defaultCity} from './cities.js';
-import {cityFields,cityImageFields,validImageUrl} from '../public/locations/cities/template.js';
+import {cityHideableFields,cityFields,cityImageFields,validImageUrl} from '../public/locations/cities/template.js';
 import {characterCast} from './sample-characters.js';
 import {renderCity} from './render-city.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
@@ -21,6 +22,7 @@ export async function cityRoute(request,env){
   if(!input||!Number.isInteger(input.version)||input.version<0)return json({error:'Reload this city before saving.'},400);
   if(input.version!==current.version)return json({error:'This city changed in another tab. Copy your unsaved text, then reload before saving.'},409);
   const document={};for(const key of cityFields){const value=Object.hasOwn(input,key)?input[key]:current[key]||'';if(typeof value!=='string'||value.length>(key==='name'?160:cityImageFields.includes(key)?2048:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
+  document.hiddenFields=readHiddenFields(input,current,cityHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
   document.name=document.name.trim().replace(/\s+/g,' ');if(!document.name)return json({error:'Enter a city name.'},400);
   if(!locations.some(l=>l.id===document.parentId&&l.type==='country'))return json({error:'Every city must belong to a country. Choose an existing country.'},400);
   for(const key of cityImageFields)if(!validImageUrl(document[key]))return json({error:'Use an HTTPS image URL for city images and maps.'},400);

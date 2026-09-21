@@ -1,6 +1,7 @@
+import {hiddenFieldNames} from '../../profiles/schema.js';
 export {validImageUrl} from '../countries/template.js';
 export const citySections=[
- {id:'identity',title:'City information',fields:[['name','Name','input'],['officialName','Official name','input'],['parentId','Country','country'],['region','State / province / region','input'],['nickname','Nicknames','input'],['motto','Motto','input'],['settled','Settled','input'],['incorporated','Incorporated / chartered','input'],['founder','Founder','input'],['governmentType','Government','input'],['governingBody','Governing body','input'],['leaderId','Mayor / city leader','character'],['area','Area','input'],['elevation','Elevation','input'],['population','Population','input'],['populationDate','Population as of','input'],['demonym','Demonym','input'],['officialLanguages','Languages','input'],['timeZone','Time zone / calendar','input']]},
+ {id:'identity',title:'City information',fields:[['name','Name','input'],['officialName','Official name','input'],['parentId','Country','country'],['region','State / province / region','input'],['nickname','Nicknames','input'],['motto','Motto','input'],['settled','Settled','input'],['incorporated','Incorporated / chartered','input'],['founder','Founder','input'],['governmentType','Government','choice'],['governingBody','Governing body','input'],['leaderId','Mayor / city leader','character'],['area','Area','input'],['elevation','Elevation','input'],['population','Population','input'],['populationDate','Population as of','input'],['demonym','Demonym','input'],['officialLanguages','Languages','choice'],['timeZone','Time zone / calendar','input']]},
  {id:'symbols',title:'City images & map',fields:[['skylineUrl','City view image URL','url'],['flagUrl','Flag image URL','url'],['sealUrl','Seal image URL','url'],['mapUrl','Map image URL','url']]},
  {id:'overview',title:'Overview',fields:[['introduction','Introduction','textarea'],['summary','Short description','textarea']]},
  {id:'etymology',title:'Etymology',fields:[['etymology','Names & their origins','textarea']]},
@@ -17,4 +18,5 @@ export const citySections=[
 ];
 export const cityFields=citySections.flatMap(s=>s.fields.map(f=>f[0]));
 export const cityImageFields=['skylineUrl','flagUrl','sealUrl','mapUrl'];
-export const blankCity=()=>Object.fromEntries(cityFields.map(k=>[k,'']));
+export const blankCity=()=>({...Object.fromEntries(cityFields.map(k=>[k,''])),hiddenFields:[]});
+export const cityHideableFields=hiddenFieldNames(citySections);
