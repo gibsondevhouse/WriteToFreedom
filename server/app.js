@@ -1,3 +1,4 @@
+import { countryRoute } from './country-routes.js';
 import { locationRoute } from './location-routes.js';
 import { factionRoute } from './faction-routes.js';
 import { factionCatalog, attachFactionNames } from './factions.js';
@@ -32,6 +33,8 @@ function validate(input,current) {
 }
 export function createWorker(assets) { return {async fetch(request,env) {
  const url=new URL(request.url);const path=url.pathname;
+ if(/^\/locations\/countries\/(?:sample-kingdom|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
+ if(/^\/locations\/countries\/[^/]+\/$/.test(path)||path.startsWith('/api/countries/'))return countryRoute(request,env);
  if(path==='/api/locations')return locationRoute(request,env);
  if(path==='/characters/edit/'||path==='/characters/edit/index.html') {
   const legacyId=url.searchParams.get('id');

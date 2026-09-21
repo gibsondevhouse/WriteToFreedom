@@ -1,11 +1,12 @@
+import { locationCatalog } from './countries.js';
 import { repository } from './db.js';
-import { seedLocations, locationTypes } from '../public/locations/data.js';
+import { locationTypes } from '../public/locations/data.js';
 import { idPattern } from '../public/characters/template.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 export async function locationRoute(request,env){
  const owner=request.headers.get('oai-authenticated-user-id');if(!owner)return json({error:'Sign in to access your locations.'},401);
  try{
-  const db=repository(env.DB),records=[...seedLocations,...await db.listLocations(owner)];
+  const db=repository(env.DB),records=await locationCatalog(db,owner);
   if(request.method==='GET')return json({locations:records});
   if(request.method!=='POST')return json({error:'Method not allowed.'},405);
   const url=new URL(request.url);if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);

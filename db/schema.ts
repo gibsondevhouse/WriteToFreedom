@@ -33,3 +33,11 @@ export const locations = sqliteTable('locations', {
  parentId: text('parent_id'),
  createdAt: text('created_at').notNull(),
 }, table => [index('idx_locations_owner_created').on(table.ownerId,table.createdAt)]);
+
+export const countryProfiles = sqliteTable('country_profiles', {
+ ownerId: text('owner_id').notNull(),
+ locationId: text('location_id').notNull(),
+ document: text('document').notNull(),
+ version: integer('version').notNull().default(1),
+ updatedAt: text('updated_at').notNull(),
+}, table => [uniqueIndex('idx_country_profiles_owner_location').on(table.ownerId,table.locationId)]);
