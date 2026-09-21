@@ -18,11 +18,11 @@ async function api(url,options={}) {
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to load your characters.');return data;
 }
-function normalize(character) { return {...character,name:character.name.trim()||'Untitled character',initials:character.name.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'?',roles:character.roles.trim()?[character.roles]:['Draft character'],provider:'',color:'blue',title:character.title||'Character in development',summary:character.summary||'A blank character, ready for you to bring to life.'}; }
-async function loadSavedCharacters() {try{const data=await api('/api/characters');records=[...characters,...data.characters.map(normalize)];render();}catch(e){showStorageError(e.message+' Your sample cast is still available.');}}
+function normalize(character) { const seed=characters.find(c=>c.id===character.id);return {...character,name:character.name.trim()||'Untitled character',initials:character.name.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'?',roles:character.roles.trim()?[character.roles]:['Draft character'],provider:seed?.provider||'',color:seed?.color||'blue',title:character.title||'Character in development',summary:character.summary||'A blank character, ready for you to bring to life.'}; }
+async function loadSavedCharacters() {try{const data=await api('/api/characters');records=data.characters.map(normalize);render();}catch(e){showStorageError(e.message+' Your sample cast is still available.');}}
 newButton.addEventListener('click',async()=>{
  newButton.disabled=true;newButton.textContent='Creating…';storageError.hidden=true;pendingId??=crypto.randomUUID();
- try{const character=await api('/api/characters',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});location.assign('/characters/edit/?id='+encodeURIComponent(character.id));}
+ try{const character=await api('/api/characters',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});location.assign('/characters/'+encodeURIComponent(character.id)+'/');}
  catch(e){showStorageError(e.message);newButton.disabled=false;newButton.textContent='+ New character';}
 });
 

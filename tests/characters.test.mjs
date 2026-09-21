@@ -11,12 +11,12 @@ test('blank creation is idempotent, saves complete template, and reopens by stab
  const request=setup(),id=crypto.randomUUID();
  let response=await request('/api/characters','POST',{id});assert.equal(response.status,201);const blank=await response.json();
  for(const field of fieldNames)assert.equal(blank[field],'');assert.deepEqual(blank.relationships,[]);
- await request('/api/characters','POST',{id});assert.equal((await (await request('/api/characters')).json()).characters.length,1);
+ await request('/api/characters','POST',{id});assert.equal((await (await request('/api/characters')).json()).characters.length,5);
  const record={...blank,firstName:'Nia',title:'The mapmaker',biography:'First line\nSecond line',roles:'Cartographer',tendencies:'Notices details\nKeeps promises',relationships:[{targetId:'claude',type:'Mentor',description:'Learned the old maps.'}]};
  response=await request('/api/characters/'+id,'PUT',record);assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.version,2);
  const reopened=await (await request('/api/characters/'+id)).json();assert.equal(reopened.biography,record.biography);assert.deepEqual(reopened.relationships,record.relationships);
- const html=await (await request('/characters/'+id+'/')).text();assert.ok(html.includes('Nia'));assert.ok(html.includes('/characters/claude/'));assert.ok(html.includes('Edit character'));
- const list=await (await request('/api/characters')).json();assert.equal(list.characters[0].name,'Nia');
+ const html=await (await request('/characters/'+id+'/')).text();assert.ok(html.includes('Nia'));assert.ok(html.includes('claude'));assert.ok(html.includes('Save changes'));assert.ok(!html.includes('/characters/edit/'));
+ const list=await (await request('/api/characters')).json();assert.equal(list.characters.find(c=>c.id===id).name,'Nia');
  response=await request('/api/characters/'+id,'PUT',{...record,firstName:'Stale overwrite'});assert.equal(response.status,409);assert.equal((await (await request('/api/characters/'+id)).json()).name,'Nia');
 });
 test('private ownership, cross-origin requests, and invalid relationship targets are enforced',async()=>{
@@ -24,7 +24,7 @@ test('private ownership, cross-origin requests, and invalid relationship targets
  assert.equal((await request('/api/characters','GET',undefined,null)).status,401);
  assert.equal((await request('/api/characters','POST',{id},'author-a','https://other.example')).status,403);
  await request('/api/characters','POST',{id});
- assert.deepEqual((await (await request('/api/characters','GET',undefined,'author-b')).json()).characters,[]);
+ assert.equal((await (await request('/api/characters','GET',undefined,'author-b')).json()).characters.length,4);
  assert.equal((await request('/api/characters/'+id,'GET',undefined,'author-b')).status,404);
  assert.equal((await request('/characters/'+id+'/','GET',undefined,'author-b')).status,404);
  assert.equal((await request('/api/characters/'+id,'PUT',{...blankCharacter(),version:1},'author-b')).status,404);
@@ -45,7 +45,7 @@ test('two owned custom characters can be linked and appear on the rendered profi
  const request=setup(),first=crypto.randomUUID(),second=crypto.randomUUID();await request('/api/characters','POST',{id:first});await request('/api/characters','POST',{id:second});
  await request('/api/characters/'+second,'PUT',{...blankCharacter(),firstName:'Ayo',version:1});
  const response=await request('/api/characters/'+first,'PUT',{...blankCharacter(),firstName:'Nia',version:1,relationships:[{targetId:second,type:'Sibling',description:'Raised together.'}]});assert.equal(response.status,200);
- const html=await (await request('/characters/'+first+'/')).text();assert.ok(html.includes('Ayo'));assert.ok(html.includes('/characters/'+second+'/'));
+ const html=await (await request('/characters/'+first+'/')).text();assert.ok(html.includes('Ayo'));assert.ok(html.includes(second));
 });
 
 test('hyphenated name components, story roles, alignment, and factions survive save and reopen',async()=>{
@@ -83,4 +83,33 @@ test('legacy names and free-text values are retained without guessing how names 
  const again=await request('/api/characters/'+id,'PUT',{...doc,version:2});assert.equal(again.status,200);assert.equal((await again.json()).name,oldClient.name);
  assert.equal((await request('/api/characters/'+id,'PUT',{...doc,storyRole:'Invalid role',version:3})).status,400);
  assert.equal((await request('/api/characters/'+id,'PUT',{...doc,alignment:'Invalid alignment',version:3})).status,400);
+});
+
+
+test('sample profiles save private overrides without duplicating the cast or losing template fields',async()=>{
+ const request=setup();
+ const sample=await (await request('/api/characters/claude')).json();assert.equal(sample.version,0);
+ for(const key of fieldNames)assert.equal(typeof sample[key],'string',key);
+ const changed={...sample,firstName:'Claude-Marie',middleName:'Ayo-Jane',lastName:'Ember-West',biography:'A new beginning.',alignment:'Good'};
+ const result=await request('/api/characters/claude','PUT',changed);assert.equal(result.status,200);const saved=await result.json();assert.equal(saved.version,1);assert.equal(saved.id,'claude');
+ const list=(await (await request('/api/characters')).json()).characters;assert.equal(list.length,4);assert.equal(list.find(c=>c.id==='claude').name,'Claude-Marie Ayo-Jane Ember-West');
+ const other=await (await request('/api/characters/claude','GET',undefined,'author-b')).json();assert.equal(other.name,'Claude');assert.equal(other.version,0);
+ assert.equal((await request('/api/characters/claude','PUT',changed)).status,409);
+ const updated=await request('/api/characters/claude','PUT',{...saved,flaw:'Impatient'});assert.equal(updated.status,200);assert.equal((await updated.json()).version,2);
+ const otherSaved=await request('/api/characters/claude','PUT',{...other,firstName:'Another Claude'},'author-b');assert.equal(otherSaved.status,200);
+ assert.equal((await (await request('/api/characters/claude')).json()).firstName,'Claude-Marie');
+});
+
+test('blank and sample profiles expose the full editable template and redirect old editor URLs',async()=>{
+ const request=setup(),id=crypto.randomUUID();await request('/api/characters','POST',{id});
+ for(const target of [id,'claude','gpt','deepseek','gemini']){
+  const page=await request('/characters/'+target+'/');assert.equal(page.status,200);const html=await page.text();
+  for(const key of fieldNames)assert.equal(html.split('name="'+key+'"').length-1,1,'editable '+key);
+  assert.ok(html.includes('id="profile-form"'));assert.ok(html.includes('id="add-relationship"'));assert.ok(!html.includes('/characters/edit/'));
+  const data=JSON.parse(html.match(/<script id="profile-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);assert.equal(data.character.id,target);
+  assert.equal(data.cast.length,5);assert.ok(Array.isArray(data.character.relationships));
+  const old=await request('/characters/edit/?id='+target);assert.equal(old.status,302);assert.equal(old.headers.get('location'),origin+'/characters/'+target+'/');
+ }
+ const unauth=await request('/characters/claude/','GET',undefined,null);assert.equal(unauth.status,401);
+ assert.equal((await request('/characters/claude/index.html')).headers.get('location'),origin+'/characters/claude/');
 });

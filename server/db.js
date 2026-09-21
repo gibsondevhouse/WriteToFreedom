@@ -1,12 +1,24 @@
 import { normalizeCharacter } from '../public/characters/template.js';
+import { characters as seeds } from '../public/characters/data.js';
+async function storageId(owner,id) {
+ if(!seeds.some(seed=>seed.id===id))return id;
+ const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['sample-character',owner,id]))))).slice(0,16);
+ hash[6]=(hash[6]&15)|64;hash[8]=(hash[8]&63)|128;
+ const hex=hash.map(b=>b.toString(16).padStart(2,'0')).join('');
+ return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 export function repository(binding) {
  if (!binding) throw new Error('Character storage is unavailable.');
- const decode = row => row ? {...normalizeCharacter(JSON.parse(row.document)), id:row.id, version:row.version, createdAt:row.created_at, updatedAt:row.updated_at} : null;
+ const decode = row => {if(!row)return null;const doc=normalizeCharacter(JSON.parse(row.document));return {...doc,id:doc.sampleId||row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at};};
  return {
   async list(owner) { const data = await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? ORDER BY created_at ASC, id ASC').bind(owner).all(); return data.results.map(decode); },
-  async get(owner,id) { return decode(await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? AND id = ?').bind(owner,id).first()); },
+  async get(owner,id) { return decode(await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? AND id = ?').bind(owner,await storageId(owner,id)).first()); },
   async create(owner,id,document) { const now=new Date().toISOString();await binding.prepare('INSERT INTO character_drafts (id, owner_id, document, version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?) ON CONFLICT(id) DO NOTHING').bind(id,owner,JSON.stringify(document),now,now).run(); return this.get(owner,id); },
-  async save(owner,id,version,document) { const result=await binding.prepare('UPDATE character_drafts SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND id = ? AND version = ?').bind(JSON.stringify(document),new Date().toISOString(),owner,id,version).run(); return result.meta.changes ? this.get(owner,id) : null; },
+  async save(owner,id,version,document) {
+   const storedId=await storageId(owner,id),sample=seeds.some(seed=>seed.id===id),doc=sample?{...document,sampleId:id}:document,now=new Date().toISOString();
+   if(sample&&version===0){const result=await binding.prepare('INSERT INTO character_drafts (id, owner_id, document, version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?) ON CONFLICT(id) DO NOTHING').bind(storedId,owner,JSON.stringify(doc),now,now).run();return result.meta.changes?this.get(owner,id):null;}
+   const result=await binding.prepare('UPDATE character_drafts SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND id = ? AND version = ?').bind(JSON.stringify(doc),now,owner,storedId,version).run();return result.meta.changes?this.get(owner,id):null;
+  },
   async listFactions(owner) { return (await binding.prepare('SELECT id, name FROM factions WHERE owner_id = ? ORDER BY name COLLATE NOCASE').bind(owner).all()).results; },
   async createFaction(owner,id,name) {
    const nameKey=name.normalize('NFKC').toLocaleLowerCase();

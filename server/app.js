@@ -3,6 +3,7 @@ import { blankCharacter, fieldNames, idPattern, nameFields, fullName, storyRoles
 import { seedFactions } from '../public/characters/factions.js';
 import { characters as seeds } from '../public/characters/data.js';
 import { renderProfile } from './render-profile.js';
+import { sampleCharacter, characterCast } from './sample-characters.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 function validate(input,current) {
  const output=blankCharacter();
@@ -29,9 +30,14 @@ function validate(input,current) {
 }
 export function createWorker(assets) { return {async fetch(request,env) {
  const url=new URL(request.url);const path=url.pathname;
+ if(path==='/characters/edit/'||path==='/characters/edit/index.html') {
+  const legacyId=url.searchParams.get('id');
+  return Response.redirect(url.origin+(idPattern.test(legacyId)||sampleCharacter(legacyId)?'/characters/'+legacyId+'/':'/characters/'),302);
+ }
+ if(/^\/characters\/([0-9a-f-]{36}|claude|gpt|deepseek|gemini)(?:\/index.html)?$/i.test(path))return Response.redirect(url.origin+path.replace(/\/index.html$/,'')+'/',308);
  const factionsApi=path==='/api/factions';
  const api=path==='/api/characters'||path.startsWith('/api/characters/')||factionsApi;
- const profile=path.match(/^\/characters\/([0-9a-f-]{36})\/$/i);
+ const profile=path.match(/^\/characters\/([0-9a-f-]{36}|claude|gpt|deepseek|gemini)\/$/i);
  if(api||profile) {
   const owner=request.headers.get('oai-authenticated-user-id');
   if(!owner) return json({error:'Sign in to access your characters.'},401);
@@ -50,15 +56,15 @@ export function createWorker(assets) { return {async fetch(request,env) {
     return faction?json(faction,201):json({error:'Could not create this faction. Try again.'},409);
    }
    if(profile) {
-    const character=await db.get(owner,profile[1]);
+    const character=await db.get(owner,profile[1])||sampleCharacter(profile[1]);
     if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
-    return new Response(renderProfile(character,[...seeds,...await db.list(owner)]),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    return new Response(renderProfile(character,characterCast(await db.list(owner)),[...seedFactions,...await db.listFactions(owner)]),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];
-   if(id&&!idPattern.test(id)) return json({error:'Character not found.'},404);
+   if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
    if(request.method==='GET') {
-    if(!id) return json({characters:await db.list(owner)});
-    const character=await db.get(owner,id);return character?json(character):json({error:'Character not found.'},404);
+    if(!id) return json({characters:characterCast(await db.list(owner))});
+    const character=await db.get(owner,id)||sampleCharacter(id);return character?json(character):json({error:'Character not found.'},404);
    }
    if(!['POST','PUT'].includes(request.method)) return json({error:'Method not allowed.'},405);
    if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')) return json({error:'This request could not be verified. Reload and try again.'},403);
@@ -70,7 +76,7 @@ export function createWorker(assets) { return {async fetch(request,env) {
     const character=await db.create(owner,input.id,blankCharacter());return character?json(character,201):json({error:'Could not create this character. Try again.'},409);
    }
    if(request.method==='PUT'&&id) {
-    const current=await db.get(owner,id);
+    const current=await db.get(owner,id)||sampleCharacter(id);
     if(!current)return json({error:'Character not found.'},404);
     let document;try{document=validate(input,current);}catch(error){return json({error:error.message},400);}
     if(document.factionId){

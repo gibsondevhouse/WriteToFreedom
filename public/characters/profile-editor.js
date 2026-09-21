@@ -1,36 +1,14 @@
-import { templateSections, fieldNames, idPattern, nameFields, fullName, storyRoles, alignments } from '../template.js';
-import { characters as seeds } from '../data.js';
-const id=new URLSearchParams(location.search).get('id');
-const form=document.querySelector('#character-form'),fields=document.querySelector('#editor-fields'),host=document.querySelector('#template-fields'),contents=document.querySelector('#editor-contents');
-const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error'),retry=document.querySelector('#retry-load'),view=document.querySelector('#view-profile');
-let documentVersion,cast=[],factions=[],dirty=false,saving=false,relationshipHost;
-let factionSelect,factionPanel,factionName,factionFeedback,createFactionButton,cancelFactionButton,previousFaction='',legacyAffiliation='',creatingFaction=false,factionRequestId;
+import { fieldNames, nameFields, fullName } from './template.js';
+const initial=JSON.parse(document.querySelector('#profile-data').textContent);
+const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
+const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');
+let documentVersion=initial.character.version,cast=initial.cast,factions=initial.factions,dirty=false,saving=false;
+const relationshipHost=document.querySelector('#relationship-fields');
+let factionSelect,factionPanel,factionName,factionFeedback,createFactionButton,cancelFactionButton,previousFaction='',legacyAffiliation=initial.character.affiliation||'',creatingFaction=false,factionRequestId;
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 function showError(message){error.textContent=message;error.hidden=false;}
-async function request(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload this page to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save your character. Please try again.');return data;}
-for(const section of templateSections){
- const wrap=node('section',undefined,'template-section');wrap.id=section.id;wrap.append(node('h2',section.title));
- const li=node('li'),link=node('a',section.title);link.href='#'+section.id;li.append(link);contents.append(li);
- const grid=node('div',undefined,'field-grid');
- for(const [key,label,type] of section.fields){
-  const field=node('div',undefined,'editor-field'+(nameFields.includes(key)?' name-part':''));
-  const caption=node('label',label);caption.htmlFor='field-'+key;field.append(caption);
-  const input=node(type==='textarea'?'textarea':['select','faction'].includes(type)?'select':'input');input.name=key;input.id='field-'+key;
-  if(type==='input'||type==='textarea'){input.maxLength=nameFields.includes(key)?160:10000;if(type==='input'){input.type='text';input.autocomplete='off';}}
-  if(type==='select'){const placeholder=node('option',key==='alignment'?'Select alignment':'Select story role');placeholder.value='';input.append(placeholder);(key==='alignment'?alignments:storyRoles).forEach(value=>{const option=node('option',value);option.value=value;input.append(option);});}
-  field.append(input);
-  if(nameFields.includes(key))field.append(node('small','Hyphens and spaces are welcome.','field-hint'));
-  if(['tendencies','questions'].includes(key))field.append(node('small','Write one item per line.','field-hint'));
-  if(type==='faction')buildFactionControl(field,input);
-  grid.append(field);
- }
- wrap.append(grid);
- if(section.id==='relationships'){
-  wrap.append(node('p','Connect this character to someone in your cast.','relationship-help'));relationshipHost=node('div');wrap.append(relationshipHost);const add=node('button','+ Add relationship');add.type='button';add.addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});wrap.append(add);
- }
- host.append(wrap);
-}
-
+async function request(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Keep a copy of your changes before reloading to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save your character. Please try again.');return data;}
+function resize(input){if(input.tagName==='TEXTAREA'){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function populateFactions(selected=''){
  factionSelect.replaceChildren();const empty=node('option','No faction selected');empty.value='';factionSelect.append(empty);
  [...factions].sort((a,b)=>a.name.localeCompare(b.name)).forEach(faction=>{const option=node('option',faction.name);option.value=faction.id;factionSelect.append(option);});
@@ -65,21 +43,19 @@ function addRelationship(value={targetId:'',type:'',description:''}){
  const type=node('input');type.type='text';type.dataset.key='type';type.maxLength=160;type.value=value.type;
  const description=node('textarea');description.dataset.key='description';description.maxLength=10000;description.value=value.description;
  for(const [label,input] of [['Character',target],['Connection',type],['Relationship dynamic',description]]){const field=node('label',undefined,'editor-field');field.append(node('span',label),input);row.append(field);}
- const remove=node('button','Remove relationship','remove-relationship');remove.type='button';remove.addEventListener('click',()=>{row.remove();markDirty();document.querySelector('#relationships>button').focus();});row.append(remove);relationshipHost.append(row);
+ const remove=node('button','Remove relationship','remove-relationship');remove.type='button';remove.addEventListener('click',()=>{row.remove();markDirty();document.querySelector('#add-relationship').focus();});const link=node('a','Open profile →','relationship-profile-link');function updateLink(){link.hidden=!target.value;link.href='/characters/'+target.value+'/';}target.addEventListener('change',updateLink);updateLink();row.append(link,remove);relationshipHost.append(row);resize(description);
 }
-function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelector('#editor-title').textContent=name||'New character';document.title=(name||'New character')+' — Write to Freedom';}
+function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
-form.addEventListener('input',markDirty);form.addEventListener('change',markDirty);
-async function load(){
- retry.hidden=true;error.hidden=true;status.textContent='Loading character…';fields.disabled=true;save.disabled=true;
- if(!id||!idPattern.test(id)){showError('Choose New character from the character list to start a blank profile.');status.textContent='No character selected';return;}
- try{
-  const [character,list,factionList]=await Promise.all([request('/api/characters/'+id),request('/api/characters'),request('/api/factions')]);cast=[...seeds,...list.characters];factions=factionList.factions;documentVersion=character.version;legacyAffiliation=character.affiliation||'';populateFactions(character.factionId||'');
-  fieldNames.filter(key=>key!=='factionId').forEach(key=>{const control=form.elements.namedItem(key);const value=character[key]||'';if(control.tagName==='SELECT'&&value&&![...control.options].some(o=>o.value===value)){const option=node('option',value+' (existing)');option.value=value;control.append(option);}control.value=value;});relationshipHost.replaceChildren();character.relationships.forEach(addRelationship);
-  fields.disabled=false;save.disabled=false;dirty=false;view.href='/characters/'+id+'/';view.hidden=false;status.textContent='Saved';updateTitle();if(!character.name)form.elements.namedItem('firstName').focus();
- }catch(e){showError(e.message);status.textContent='Unable to load character';retry.hidden=false;}
-}
-retry.addEventListener('click',load);
+form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});
+form.addEventListener('change',event=>{if(event.target===factionName)return;markDirty();});
+buildFactionControl(document.querySelector('#field-factionId').parentElement,document.querySelector('#field-factionId'));
+populateFactions(initial.character.factionId||'');
+initial.character.relationships.forEach(addRelationship);
+document.querySelector('#add-relationship').addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});
+document.querySelector('#edit-name').addEventListener('click',()=>{document.querySelector('#field-firstName').focus();});
+document.querySelectorAll('textarea').forEach(resize);
+window.addEventListener('resize',()=>document.querySelectorAll('textarea').forEach(resize));
 form.addEventListener('submit',async event=>{
  event.preventDefault();if(saving||creatingFaction||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
  const payload=Object.fromEntries(fieldNames.map(key=>[key,form.elements.namedItem(key).value]));payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
@@ -91,4 +67,3 @@ form.addEventListener('submit',async event=>{
 });
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(!save.disabled)form.requestSubmit();}});
-load();
