@@ -24,3 +24,12 @@ export const factionProfiles = sqliteTable('faction_profiles', {
  version: integer('version').notNull().default(1),
  updatedAt: text('updated_at').notNull(),
 }, table => [uniqueIndex('idx_faction_profiles_owner_faction').on(table.ownerId,table.factionId)]);
+
+export const locations = sqliteTable('locations', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ name: text('name').notNull(),
+ type: text('type').notNull(),
+ parentId: text('parent_id'),
+ createdAt: text('created_at').notNull(),
+}, table => [index('idx_locations_owner_created').on(table.ownerId,table.createdAt)]);

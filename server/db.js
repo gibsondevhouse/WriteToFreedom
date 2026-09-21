@@ -11,6 +11,11 @@ export function repository(binding) {
  if (!binding) throw new Error('Character storage is unavailable.');
  const decode = row => {if(!row)return null;const doc=normalizeCharacter(JSON.parse(row.document));return {...doc,id:doc.sampleId||row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at};};
  return {
+  async listLocations(owner) {return (await binding.prepare('SELECT id, name, type, parent_id AS parentId FROM locations WHERE owner_id = ? ORDER BY created_at, rowid').bind(owner).all()).results;},
+  async createLocation(owner,location) {
+   await binding.prepare('INSERT INTO locations (id, owner_id, name, type, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(location.id,owner,location.name,location.type,location.parentId,new Date().toISOString()).run();
+   return await binding.prepare('SELECT id, name, type, parent_id AS parentId FROM locations WHERE owner_id = ? AND id = ?').bind(owner,location.id).first();
+  },
   async list(owner) { const data = await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? ORDER BY created_at ASC, id ASC').bind(owner).all(); return data.results.map(decode); },
   async get(owner,id) { return decode(await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? AND id = ?').bind(owner,await storageId(owner,id)).first()); },
   async create(owner,id,document) { const now=new Date().toISOString();await binding.prepare('INSERT INTO character_drafts (id, owner_id, document, version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?) ON CONFLICT(id) DO NOTHING').bind(id,owner,JSON.stringify(document),now,now).run(); return this.get(owner,id); },

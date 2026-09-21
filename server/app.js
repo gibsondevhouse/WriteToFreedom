@@ -1,3 +1,4 @@
+import { locationRoute } from './location-routes.js';
 import { factionRoute } from './faction-routes.js';
 import { factionCatalog, attachFactionNames } from './factions.js';
 import { repository } from './db.js';
@@ -31,6 +32,7 @@ function validate(input,current) {
 }
 export function createWorker(assets) { return {async fetch(request,env) {
  const url=new URL(request.url);const path=url.pathname;
+ if(path==='/api/locations')return locationRoute(request,env);
  if(path==='/characters/edit/'||path==='/characters/edit/index.html') {
   const legacyId=url.searchParams.get('id');
   return Response.redirect(url.origin+(idPattern.test(legacyId)||sampleCharacter(legacyId)?'/characters/'+legacyId+'/':'/characters/'),302);
