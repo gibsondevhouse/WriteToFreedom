@@ -1,4 +1,5 @@
-import {initDatePicker} from './date-picker.js?v=date-picker-1';
+import {initProfileViewport} from './viewport.js?v=profile-reading-1';
+import {initDatePicker} from './date-picker.js?v=profile-reading-1';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
@@ -64,6 +65,11 @@ function revealHash(){
  const target=document.getElementById(anchor);
  if(!target)return;
  const button=target.querySelector('[data-collapse-target]');if(button)setExpanded(button,true);revealAncestors(target);
+ requestAnimationFrame(()=>{
+  const identity=target.closest('.infobox'),heading=target.matches('.profile-section')?target.querySelector('.section-header h2'):null;
+  if(identity&&matchMedia('(min-width:651px)').matches)identity.scrollIntoView({block:'start',behavior:'instant'});
+  (heading||target).scrollIntoView({block:identity?'nearest':'start',behavior:'instant'});
+ });
 }
 window.addEventListener('hashchange',revealHash);revealHash();
 function applyVisibility(){
@@ -78,5 +84,6 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')document.que
  document.querySelector('#edit-name').addEventListener('click',()=>{const input=form.elements.namedItem(nameField);revealAncestors(input);input.focus();});
  form.querySelectorAll('textarea').forEach(resize);
  window.addEventListener('resize',()=>form.querySelectorAll('textarea').forEach(resize));
+ initProfileViewport(form);
  return {choiceValues,commitChoices:()=>pendingChoiceEditors.every(commit=>commit()),hiddenFields:()=>[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility),revealAncestors};
 }

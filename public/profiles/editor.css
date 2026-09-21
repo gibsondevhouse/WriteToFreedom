@@ -66,3 +66,17 @@
 
 .entity-profile .infobox .profile-name{font:700 21px/1.35 Arial,Helvetica,sans-serif;text-align:center;background:#303640;border:0;margin:0;padding:5px 8px;letter-spacing:normal}
 .entity-profile .profile-name #edit-name{display:block;width:100%;text-align:center}
+
+/* Keep the article and its attributes in separate columns for continuous reading. */
+.entity-profile #profile-form{--profile-header-height:54px}
+.entity-profile #editor-fields>article{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:30px;align-items:start}
+.entity-profile .profile-content{grid-column:1;grid-row:1;min-width:0}
+.entity-profile #identity{grid-column:2;grid-row:1;float:none;width:100%;margin:0;align-self:start;position:relative;max-height:calc(100dvh - var(--profile-header-height) - 12px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#536479 transparent;scroll-padding:8px;scroll-margin-top:var(--profile-header-height)}
+.entity-profile .profile-reading #identity{position:sticky;top:var(--profile-header-height)}
+.entity-profile .profile-content .profile-section,.entity-profile .profile-content .section-header,.entity-profile .profile-content .section-header h2{scroll-margin-top:var(--profile-header-height)}
+.entity-profile #identity [data-profile-field]{scroll-margin:8px}
+.entity-profile .current-view{position:relative;overflow:hidden;white-space:nowrap;min-width:0;max-width:60%;flex-shrink:1}
+.current-view-label{display:block;overflow:hidden;text-overflow:ellipsis;line-height:21px}
+.current-view-previous{position:absolute;top:9px;left:0;width:100%;overflow:hidden;text-overflow:ellipsis;line-height:21px;pointer-events:none}
+@media(max-width:900px) and (min-width:651px){.entity-profile #editor-fields>article{grid-template-columns:minmax(0,1fr) 270px;gap:23px}}
+@media(max-width:650px){.entity-profile #editor-fields>article{display:block}.entity-profile #identity,.entity-profile .profile-reading #identity{position:static;max-height:none;overflow:visible;width:100%;max-width:380px;margin:0 auto 28px}.entity-profile .current-view{max-width:50%}}

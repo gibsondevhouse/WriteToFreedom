@@ -2,6 +2,14 @@ import {months,precisionNames,parseStoryDate,formatStoryDate,calendarCells,shift
 const modes=Object.keys(precisionNames),minYear=-999999,maxYear=999999;
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
 function button(text,label,action,cls){const b=node('button',text,cls);b.type='button';if(label)b.setAttribute('aria-label',label);b.addEventListener('click',action);return b;}
+// Keep the picker beside its source card when there is room, inside the viewport otherwise.
+export function datePickerPlacement(field,card,viewport,width,height){
+ const leftEdge=viewport.left+12,topEdge=viewport.top+12,rightEdge=viewport.left+viewport.width-12,bottomEdge=viewport.top+viewport.height-12;
+ const beside=card&&card.left-12-width>=leftEdge&&card.left-12<=rightEdge;
+ const left=beside?card.left-12-width:Math.max(leftEdge,Math.min(field.right-width,rightEdge-width));
+ const desiredTop=beside?field.top-16:field.bottom+9+height<=bottomEdge?field.bottom+9:field.top-height-9;
+ return {left,top:Math.max(topEdge,Math.min(desiredTop,bottomEdge-height))};
+}
 export function initDatePicker(form){
  const fields=[...form.querySelectorAll('[data-date-input]')];if(!fields.length)return;
  const today=new Date(),now={year:today.getFullYear(),month:today.getMonth()+1,day:today.getDate()};
@@ -34,8 +42,9 @@ export function initDatePicker(form){
   else note.textContent='Choose a date or enter your own. Save changes on the profile to keep it.';
  }
  function position(){if(!dialog.open||!active)return;const box=active.getBoundingClientRect(),viewport=window.visualViewport,w=viewport?.width||innerWidth,h=viewport?.height||innerHeight,ox=viewport?.offsetLeft||0,oy=viewport?.offsetTop||0;
-  dialog.style.maxHeight=Math.max(120,h-24)+'px';dialog.style.width=Math.min(354,w-24)+'px';const height=dialog.offsetHeight,left=Math.max(ox+12,Math.min(box.right-dialog.offsetWidth,ox+w-dialog.offsetWidth-12));
-  const below=box.bottom+9,top=below+height<=oy+h-12?below:Math.max(oy+12,Math.min(box.top-height-9,oy+h-height-12));dialog.style.left=left+'px';dialog.style.top=top+'px';
+  dialog.style.maxHeight=Math.max(120,h-24)+'px';dialog.style.width=Math.min(354,w-24)+'px';
+  const point=datePickerPlacement(box,active.closest('.infobox')?.getBoundingClientRect(),{left:ox,top:oy,width:w,height:h},dialog.offsetWidth,dialog.offsetHeight);
+  dialog.style.left=point.left+'px';dialog.style.top=point.top+'px';
  }
  function selected(date){return parsed&&parsed.year===date.year&&parsed.month===date.month&&parsed.day===date.day&&parsed.precision==='day';}
  function choose(parts){if(!readYear())return;try{commit(formatStoryDate({...parts,approximate,precision:mode}));}catch(error){navigationError.textContent=error.message;navigationError.hidden=false;}}
@@ -80,7 +89,7 @@ export function initDatePicker(form){
  function applyDraft(){if(needsSelection||!draft.reportValidity())return false;return commit(draft.value.trim());}
  function open(input){if(input.disabled||input.closest('fieldset:disabled'))return;active=input;restoreFocus=true;parsed=parseStoryDate(input.value);draft.value=input.value;mode=parsed?.precision||'day';approximate=parsed?.approximate||false;needsSelection=false;navigationError.hidden=true;
   view={year:parsed?.year??now.year,month:parsed?.month||(parsed?.quarter?(parsed.quarter-1)*3+1:parsed?.half?(parsed.half-1)*6+1:parsed?1:now.month),day:parsed?.day||1};focused={...view,day:parsed?.day||(!parsed?now.day:1)};
-  title.textContent=input.getAttribute('aria-label')||'Choose date';document.querySelectorAll('.field-menu[open]').forEach(menu=>menu.open=false);render();dialog.showModal();position();draft.focus();draft.select();
+  title.textContent=input.getAttribute('aria-label')||'Choose date';document.querySelectorAll('.field-menu[open]').forEach(menu=>menu.open=false);render();dialog.showModal();document.body.classList.add('date-picker-open');position();draft.focus();draft.select();
  }
  for(const input of fields){input.addEventListener('click',()=>open(input));input.addEventListener('keydown',event=>{if(['Enter',' ','ArrowDown'].includes(event.key)){event.preventDefault();open(input);}});}
  draft.addEventListener('input',()=>{parsed=parseStoryDate(draft.value);needsSelection=false;approximate=parsed?.approximate||false;if(parsed){mode=parsed.precision;view={year:parsed.year,month:parsed.month||(parsed.quarter?(parsed.quarter-1)*3+1:parsed.half?(parsed.half-1)*6+1:1),day:parsed.day||1};focused={...view};}render();});
@@ -92,7 +101,7 @@ export function initDatePicker(form){
  approx.addEventListener('change',()=>{approximate=approx.checked;if(parsed){draft.value=formatStoryDate({...parsed,approximate});parsed=parseStoryDate(draft.value);}describe();});
  tabs.addEventListener('keydown',event=>{const current=modes.indexOf(mode);let index;if(event.key==='ArrowRight')index=(current+1)%modes.length;else if(event.key==='ArrowLeft')index=(current+modes.length-1)%modes.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=modes.length-1;else return;event.preventDefault();setMode(modes[index]);tabs.children[index].focus();});
  dialog.addEventListener('click',event=>{const rect=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom))dialog.close();});
- dialog.addEventListener('close',()=>{if(restoreFocus)active?.focus({preventScroll:true});});
+ dialog.addEventListener('close',()=>{document.body.classList.remove('date-picker-open');if(restoreFocus)active?.focus({preventScroll:true});});
  document.addEventListener('keydown',event=>{if(dialog.open&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='s'){event.preventDefault();event.stopImmediatePropagation();restoreFocus=false;if(applyDraft())form.requestSubmit();else restoreFocus=true;}},true);
- window.addEventListener('resize',position);window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);
+ window.addEventListener('scroll',position,{passive:true,capture:true});window.addEventListener('resize',position);window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);
 }
