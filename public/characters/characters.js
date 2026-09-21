@@ -8,6 +8,23 @@ const clear = document.querySelector('#clear-search');
 const count = document.querySelector('#result-count');
 const empty = document.querySelector('#empty-state');
 let reversed = false;
+let records = [...characters];
+const newButton = document.querySelector('#new-character');
+const storageError = document.querySelector('#storage-error');
+let pendingId;
+function showStorageError(message) { storageError.textContent=message;storageError.hidden=false; }
+async function api(url,options={}) {
+ const response=await fetch(url,{credentials:'same-origin',...options});
+ if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
+ const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to load your characters.');return data;
+}
+function normalize(character) { return {...character,name:character.name.trim()||'Untitled character',initials:character.name.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'?',roles:character.roles.trim()?[character.roles]:['Draft character'],provider:'',color:'blue',title:character.title||'Character in development',summary:character.summary||'A blank character, ready for you to bring to life.'}; }
+async function loadSavedCharacters() {try{const data=await api('/api/characters');records=[...characters,...data.characters.map(normalize)];render();}catch(e){showStorageError(e.message+' Your sample cast is still available.');}}
+newButton.addEventListener('click',async()=>{
+ newButton.disabled=true;newButton.textContent='Creating…';storageError.hidden=true;pendingId??=crypto.randomUUID();
+ try{const character=await api('/api/characters',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});location.assign('/characters/edit/?id='+encodeURIComponent(character.id));}
+ catch(e){showStorageError(e.message);newButton.disabled=false;newButton.textContent='+ New character';}
+});
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -26,7 +43,7 @@ function createCharacter(character, index) {
   const avatar = element('span', `avatar ${character.color}`, character.initials);
   avatar.setAttribute('aria-hidden', 'true');
   const info = element('div', 'character-info');
-  info.append(element('h2', '', `${index + 1}. ${character.name}`), element('p', 'roles', `${character.roles.join(' · ')} · ${character.provider}`), element('p', 'character-title', character.title));
+  info.append(element('h2', '', `${index + 1}. ${character.name}`), element('p', 'roles', [...character.roles,character.provider].filter(Boolean).join(' · ')), element('p', 'character-title', character.title));
   const icon = element('span', 'profile-arrow', '›');
   icon.setAttribute('aria-hidden', 'true');
   heading.append(avatar, info, icon);
@@ -36,9 +53,9 @@ function createCharacter(character, index) {
 }
 
 function render() {
-  const matches = selectCharacters(search.value, sort.value, reversed);
+  const matches = selectCharacters(search.value, sort.value, reversed, records);
   list.replaceChildren(...matches.map(createCharacter));
-  count.textContent = search.value.trim() ? `${matches.length} of ${characters.length} characters` : `1–${characters.length} of ${characters.length} characters`;
+  count.textContent = search.value.trim() ? `${matches.length} of ${records.length} characters` : `1–${records.length} of ${records.length} characters`;
   clear.hidden = !search.value;
   empty.hidden = matches.length > 0;
   list.hidden = matches.length === 0;
@@ -65,3 +82,5 @@ document.querySelector('#reset-search').addEventListener('click', resetSearch);
 window.addEventListener('hashchange', showLinkedCharacter);
 render();
 showLinkedCharacter();
+loadSavedCharacters();
+window.addEventListener('pageshow',event=>{if(event.persisted){newButton.disabled=false;newButton.textContent='+ New character';pendingId=undefined;loadSavedCharacters();}});

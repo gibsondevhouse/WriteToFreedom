@@ -38,9 +38,9 @@ export const characters = [
   }
 ];
 
-export function selectCharacters(query = '', sort = 'order', reversed = false) {
+export function selectCharacters(query = '', sort = 'order', reversed = false, records = characters) {
   const needle = query.trim().toLocaleLowerCase();
-  const result = characters.filter(character => JSON.stringify(character).toLocaleLowerCase().includes(needle));
+  const result = records.filter(character => JSON.stringify(character).toLocaleLowerCase().includes(needle));
   if (sort === 'name') result.sort((a, b) => a.name.localeCompare(b.name));
   if (sort === 'provider') result.sort((a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name));
   return reversed ? result.reverse() : result;

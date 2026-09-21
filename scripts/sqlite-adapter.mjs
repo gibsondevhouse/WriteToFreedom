@@ -1,0 +1,1 @@
+export function d1Adapter(sqlite) {return {prepare(sql){return {bind(...args){const query=sqlite.prepare(sql);return {async first(){return query.get(...args)||null;},async all(){return {results:query.all(...args)};},async run(){const result=query.run(...args);return {meta:{changes:Number(result.changes)}};}};}};}};}

@@ -3,3 +3,5 @@
 .profile-link{display:block;color:inherit}.profile-link:hover{text-decoration:none}.profile-arrow{color:#8da9ef;font-size:30px;font-weight:400;padding:0 8px}.profile-link:focus-visible{outline-offset:-3px}
 
 @media(max-width:600px){.seed-note{flex-wrap:wrap;align-items:center;gap:12px}.seed-note>span{flex-basis:100%}}
+
+.new-character-button:not(:disabled):hover{background:#447ff5}#storage-error{color:#ffced0;background:#3c252c;border:1px solid #8b4d5b;border-radius:4px;padding:12px 16px;font-size:14px;line-height:1.6}

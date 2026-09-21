@@ -1,2 +1,5 @@
 .sites-runtime/
 .DS_Store
+node_modules/
+dist/
+.env

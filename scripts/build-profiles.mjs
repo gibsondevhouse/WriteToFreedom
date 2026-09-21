@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { characters } from '../dist/characters/data.js';
-import { profiles } from '../dist/characters/profile-data.js';
+import { characters } from '../public/characters/data.js';
+import { profiles } from '../public/characters/profile-data.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const sections = [['overview','Overview'],['biography','Biography'],['personality','Personality & attributes'],['tendencies','Tendencies & voice'],['motivations','Motivations & conflicts'],['relationships','Relationships'],['story-arc','Story arc'],['open-questions','Open questions']];
@@ -51,7 +51,7 @@ for (const character of characters) {
 </main>
 </div>
 </body></html>`;
- const directory = new URL(`../dist/characters/${character.id}/`, import.meta.url);
+ const directory = new URL(`../public/characters/${character.id}/`, import.meta.url);
  await mkdir(directory, {recursive:true});
  await writeFile(new URL('index.html',directory), html);
 }
