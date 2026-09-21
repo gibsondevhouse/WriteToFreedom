@@ -11,6 +11,13 @@ export function repository(binding) {
  if (!binding) throw new Error('Character storage is unavailable.');
  const decode = row => {if(!row)return null;const doc=normalizeCharacter(JSON.parse(row.document));return {...doc,id:doc.sampleId||row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at};};
  return {
+  async listCityProfiles(owner) {return (await binding.prepare('SELECT * FROM city_profiles WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.location_id,version:row.version}));},
+  async saveCity(owner,id,version,document) {
+   const encoded=JSON.stringify(document),now=new Date().toISOString();
+   const write=version===0?binding.prepare('INSERT INTO city_profiles (owner_id, location_id, document, version, updated_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(owner_id, location_id) DO NOTHING').bind(owner,id,encoded,now):binding.prepare('UPDATE city_profiles SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND location_id = ? AND version = ?').bind(encoded,now,owner,id,version);
+   const rename=binding.prepare('UPDATE locations SET name = ?, parent_id = ? WHERE owner_id = ? AND id = ? AND type = ? AND EXISTS (SELECT 1 FROM city_profiles WHERE owner_id = ? AND location_id = ? AND version = ? AND document = ?)').bind(document.name,document.parentId,owner,id,'city',owner,id,version+1,encoded);
+   const [result]=await binding.batch([write,rename]);return result.meta.changes?{...document,id,version:version+1}:null;
+  },
   async listCountryProfiles(owner) {return (await binding.prepare('SELECT * FROM country_profiles WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.location_id,version:row.version}));},
   async saveCountry(owner,id,version,document) {
    const encoded=JSON.stringify(document),now=new Date().toISOString();

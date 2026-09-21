@@ -11,10 +11,10 @@ function render(){
  list.replaceChildren(...matches.map((location,index)=>{
   const row=node('li','location-row');row.id='location-'+location.id;
   const avatar=node('span','avatar '+location.type,location.name.replace(/^The /,'').split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase());avatar.setAttribute('aria-hidden','true');
-  const info=node('div','location-info'),heading=node('h2','',`${index+1}. ${location.name}`);heading.tabIndex=-1;if(location.type==='country'){heading.textContent='';const link=node('a','',`${index+1}. ${location.name}`);link.href='/locations/countries/'+location.id+'/';heading.append(link);}
+  const info=node('div','location-info'),heading=node('h2','',`${index+1}. ${location.name}`);heading.tabIndex=-1;if(['country','city'].includes(location.type)){heading.textContent='';const link=node('a','',`${index+1}. ${location.name}`);link.href='/locations/'+(location.type==='country'?'countries':'cities')+'/'+location.id+'/';heading.append(link);}
   info.append(node('span','location-type',typeLabels[location.type]),heading);
   const path=node('p','location-path'),parents=ancestors(location,records);
-  parents.forEach((p,i)=>{if(i)path.append(node('span','','›'));if(p.type==='country'){const link=node('a','',p.name);link.href='/locations/countries/'+p.id+'/';path.append(link);}else path.append(document.createTextNode(p.name));});if(parents.length)info.append(path);
+  parents.forEach((p,i)=>{if(i)path.append(node('span','','›'));if(['country','city'].includes(p.type)){const link=node('a','',p.name);link.href='/locations/'+(p.type==='country'?'countries':'cities')+'/'+p.id+'/';path.append(link);}else path.append(document.createTextNode(p.name));});if(parents.length)info.append(path);
   if(location.type!=='landmark'){
    const descendants=records.filter(r=>ancestors(r,records).some(a=>a.id===location.id)),cities=descendants.filter(r=>r.type==='city').length,landmarks=descendants.filter(r=>r.type==='landmark').length;
    info.append(node('p','location-children',location.type==='country'?plural(cities,'city','cities')+' · '+plural(landmarks,'landmark','landmarks'):plural(landmarks,'landmark','landmarks')));
@@ -37,7 +37,7 @@ type.addEventListener('change',populateParent);form.addEventListener('input',()=
 cancel.addEventListener('click',()=>dialog.close());dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
 form.addEventListener('submit',async event=>{event.preventDefault();if(saving)return;if(!name.value.trim()){name.setCustomValidity('Enter a location name.');name.reportValidity();return;}if(!form.reportValidity())return;
  pendingId??=crypto.randomUUID();const payload={id:pendingId,name:name.value,type:type.value,parentId:type.value==='country'?null:parent.value};saving=true;fields.disabled=true;save.disabled=true;cancel.disabled=true;save.textContent='Adding…';createError.hidden=true;
- try{const created=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(created.type==='country'){location.assign('/locations/countries/'+created.id+'/');return;}if(!records.some(r=>r.id===created.id))records.push(created);filter='';search.value='';render();dialog.close();count.textContent=created.name+' added. '+records.length+' locations.';document.getElementById('location-'+created.id)?.querySelector('h2').focus();}
+ try{const created=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(['country','city'].includes(created.type)){location.assign('/locations/'+(created.type==='country'?'countries':'cities')+'/'+created.id+'/');return;}if(!records.some(r=>r.id===created.id))records.push(created);filter='';search.value='';render();dialog.close();count.textContent=created.name+' added. '+records.length+' locations.';document.getElementById('location-'+created.id)?.querySelector('h2').focus();}
  catch(e){createError.textContent=e.message;createError.hidden=false;}
  finally{saving=false;fields.disabled=false;parent.disabled=type.value==='country';save.disabled=false;cancel.disabled=false;save.textContent='Add location';}
 });

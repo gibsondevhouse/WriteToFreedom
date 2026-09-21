@@ -11,7 +11,7 @@ test('country pages expose the editable template and derived city/landmark hiera
  const req=setup(),page=await req('/locations/countries/sample-kingdom/');assert.equal(page.status,200);assert.equal(page.headers.get('cache-control'),'no-store');const html=await page.text();
  for(const key of countryFields)assert.equal(html.split('name="'+key+'"').length-1,1,key);
  for(const value of ['The Capital','Royal Archive','Geography','Government &amp; politics','Economy','Culture'])assert.ok(html.includes(value),value);
- assert.ok(html.includes('/locations/#location-sample-capital'));assert.ok(html.includes('value="sample-capital" selected'));
+ assert.ok(html.includes('/locations/cities/sample-capital/'));assert.ok(html.includes('value="sample-capital" selected'));
  assert.equal((await req('/locations/countries/sample-capital/')).status,404);
  assert.equal((await req('/locations/countries/profile.js')).status,200);
  assert.equal((await req('/locations/countries/sample-kingdom')).status,308);

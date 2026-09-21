@@ -1,3 +1,4 @@
+import { cityRoute } from './city-routes.js';
 import { countryRoute } from './country-routes.js';
 import { locationRoute } from './location-routes.js';
 import { factionRoute } from './faction-routes.js';
@@ -35,6 +36,8 @@ export function createWorker(assets) { return {async fetch(request,env) {
  const url=new URL(request.url);const path=url.pathname;
  if(/^\/locations\/countries\/(?:sample-kingdom|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
  if(/^\/locations\/countries\/[^/]+\/$/.test(path)||path.startsWith('/api/countries/'))return countryRoute(request,env);
+ if(/^\/locations\/cities\/(?:sample-capital|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
+ if(/^\/locations\/cities\/[^/]+\/$/.test(path)||path.startsWith('/api/cities/'))return cityRoute(request,env);
  if(path==='/api/locations')return locationRoute(request,env);
  if(path==='/characters/edit/'||path==='/characters/edit/index.html') {
   const legacyId=url.searchParams.get('id');
