@@ -10,7 +10,7 @@ export function renderProfile(character, cast, factions=[]) {
   const val=character[key]||'',attrs=`id="field-${key}" name="${key}" aria-label="${escape(label)}"`;
   let control;
   if(type==='select'||type==='faction'){
-   let choices=type==='faction'?factions.map(f=>[f.id,f.name]):(key==='alignment'?alignments:storyRoles).map(v=>[v,v]);
+   let choices=type==='faction'?factions.map(f=>[f.id,f.name||'Untitled faction']):(key==='alignment'?alignments:storyRoles).map(v=>[v,v]);
    let selected=val;
    if(type==='faction'&&!selected&&character.affiliation){choices.push(['__legacy__',character.affiliation]);selected='__legacy__';}
    if(type==='select'&&val&&!choices.some(c=>c[0]===val))choices.push([val,val]);

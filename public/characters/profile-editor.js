@@ -11,7 +11,7 @@ async function request(url,options={}){const response=await fetch(url,{credentia
 function resize(input){if(input.tagName==='TEXTAREA'){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function populateFactions(selected=''){
  factionSelect.replaceChildren();const empty=node('option','No faction selected');empty.value='';factionSelect.append(empty);
- [...factions].sort((a,b)=>a.name.localeCompare(b.name)).forEach(faction=>{const option=node('option',faction.name);option.value=faction.id;factionSelect.append(option);});
+ [...factions].sort((a,b)=>a.name.localeCompare(b.name)).forEach(faction=>{const option=node('option',faction.name||'Untitled faction');option.value=faction.id;factionSelect.append(option);});
  if(!selected&&legacyAffiliation){const match=factions.find(f=>f.name===legacyAffiliation);if(match)selected=match.id;else{const legacy=node('option',legacyAffiliation+' (existing affiliation)');legacy.value='__legacy__';factionSelect.append(legacy);selected='__legacy__';}}
  const create=node('option','+ Create a faction…');create.value='__create__';factionSelect.append(create);
  factionSelect.value=selected;previousFaction=selected;
@@ -23,14 +23,15 @@ function buildFactionControl(field,input){
  const actions=node('div',undefined,'faction-actions');actions.append(createFactionButton,cancelFactionButton);
  factionFeedback=node('p',undefined,'field-hint');factionFeedback.setAttribute('role','status');
  factionPanel.append(label,factionName,actions);field.append(factionPanel,factionFeedback);
- input.addEventListener('change',()=>{if(input.value==='__create__'){input.value=previousFaction;factionPanel.hidden=false;factionFeedback.textContent='';factionName.focus();}else{previousFaction=input.value;factionPanel.hidden=true;}});
+ const profileLink=node('a','Open faction →','faction-profile-link');field.append(profileLink);function updateFactionLink(){profileLink.hidden=!input.value||input.value.startsWith('__');profileLink.href='/factions/'+input.value+'/';}input.addEventListener('change',updateFactionLink);queueMicrotask(updateFactionLink);
+ input.addEventListener('change',()=>{if(input.value==='__create__'){input.value=previousFaction;factionPanel.hidden=false;factionFeedback.textContent='';factionName.focus();}else{previousFaction=input.value;factionPanel.hidden=true;}updateFactionLink();});
  factionName.addEventListener('input',()=>{factionName.setCustomValidity('');factionRequestId=undefined;});
  factionName.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();createFactionButton.click();}});
  cancelFactionButton.addEventListener('click',()=>{factionPanel.hidden=true;factionName.value='';factionName.setCustomValidity('');factionSelect.focus();});
  createFactionButton.addEventListener('click',async()=>{
   if(creatingFaction)return;const name=factionName.value.trim();if(!name){factionName.setCustomValidity('Enter a faction name.');factionName.reportValidity();return;}
   factionName.setCustomValidity('');creatingFaction=true;createFactionButton.disabled=true;cancelFactionButton.disabled=true;save.disabled=true;factionName.disabled=true;factionSelect.disabled=true;factionFeedback.textContent='Creating faction…';factionRequestId??=crypto.randomUUID();
-  try{const created=await request('/api/factions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:factionRequestId,name})});if(!factions.some(f=>f.id===created.id))factions.push(created);populateFactions(created.id);factionPanel.hidden=true;factionName.value='';factionRequestId=undefined;markDirty();factionFeedback.textContent='Faction ready. Save character to keep this affiliation.';factionSelect.focus();}
+  try{const created=await request('/api/factions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:factionRequestId,name})});if(!factions.some(f=>f.id===created.id))factions.push(created);populateFactions(created.id);updateFactionLink();factionPanel.hidden=true;factionName.value='';factionRequestId=undefined;markDirty();factionFeedback.textContent='Faction ready. Save character to keep this affiliation.';factionSelect.focus();}
   catch(e){factionFeedback.textContent=e.message;}
   finally{creatingFaction=false;createFactionButton.disabled=false;cancelFactionButton.disabled=false;save.disabled=false;factionName.disabled=false;factionSelect.disabled=false;if(factionPanel.hidden)factionSelect.focus();else factionName.focus();}
  });

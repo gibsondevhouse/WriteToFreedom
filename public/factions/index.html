@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Explore the factions, histories, beliefs, members, and alliances in your novel.">
+  <title>Factions — Write to Freedom</title>
+  <link rel="icon" href="../crest.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/characters/characters.css">
+  <script src="factions.js" type="module"></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="../"><img src="../crest.svg" width="32" height="36" alt=""><span>Write to Freedom</span></a><a class="home-link" href="../">← Home</a></header>
+  <main>
+    <section class="page-heading" aria-labelledby="page-title">
+      <p class="eyebrow">FAMILIES &amp; ALLIANCES</p>
+      <h1 id="page-title">Factions</h1>
+      <p class="intro">The groups that shape your world.</p>
+      <p class="seed-note"><button id="new-faction" class="new-character-button" type="button"><span aria-hidden="true">+</span> New faction</button></p>
+      <p id="storage-error" role="alert" hidden></p>
+    </section>
+    <section class="cast" aria-label="Faction directory">
+      <div class="search-row"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><span class="sr-only">Search factions</span><input id="faction-search" type="search" placeholder="Search names, purpose, beliefs…" autocomplete="off"></label><button id="clear-search" type="button" hidden>Clear search</button></div>
+      <div class="list-toolbar"><p id="result-count" role="status" aria-live="polite">4 factions</p><div class="sort-controls"><label class="sr-only" for="sort-order">Sort factions</label><select id="sort-order"><option value="order">List order</option><option value="name">Alphabetical</option><option value="type">Type</option></select><button id="sort-direction" type="button" aria-label="Reverse list order" aria-pressed="false" title="Reverse list order"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16m-4-4 4 4 4-4M17 20V4m-4 4 4-4 4 4"/></svg></button></div></div>
+      <ol id="faction-list" class="character-list"></ol>
+      <div id="empty-state" class="empty-state" hidden><h2>No factions found</h2><p>Try a name, a purpose, or a belief.</p><button id="reset-search" type="button">Show all factions</button></div>
+      <noscript><p>This faction list needs JavaScript enabled. <a href="../">Return home</a>.</p></noscript>
+      <p class="list-footnote">Select a faction to read its full profile, history, and members.</p>
+    </section>
+  </main>
+</body>
+</html>

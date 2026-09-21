@@ -1,6 +1,7 @@
+import { factionRoute } from './faction-routes.js';
+import { factionCatalog, attachFactionNames } from './factions.js';
 import { repository } from './db.js';
 import { blankCharacter, fieldNames, idPattern, nameFields, fullName, storyRoles, alignments } from '../public/characters/template.js';
-import { seedFactions } from '../public/characters/factions.js';
 import { characters as seeds } from '../public/characters/data.js';
 import { renderProfile } from './render-profile.js';
 import { sampleCharacter, characterCast } from './sample-characters.js';
@@ -35,36 +36,27 @@ export function createWorker(assets) { return {async fetch(request,env) {
   return Response.redirect(url.origin+(idPattern.test(legacyId)||sampleCharacter(legacyId)?'/characters/'+legacyId+'/':'/characters/'),302);
  }
  if(/^\/characters\/([0-9a-f-]{36}|claude|gpt|deepseek|gemini)(?:\/index.html)?$/i.test(path))return Response.redirect(url.origin+path.replace(/\/index.html$/,'')+'/',308);
- const factionsApi=path==='/api/factions';
- const api=path==='/api/characters'||path.startsWith('/api/characters/')||factionsApi;
+ if(/^\/factions\/(?:sample-(?:ember|lantern|archive|horizon)|[0-9a-f-]{36})(?:\/index.html)?$/i.test(path))return Response.redirect(url.origin+path.replace(/\/index.html$/,'')+'/',308);
+ if(path==='/api/factions'||path.startsWith('/api/factions/')||/^\/factions\/[^/]+\/$/.test(path))return factionRoute(request,env);
+ const api=path==='/api/characters'||path.startsWith('/api/characters/');
  const profile=path.match(/^\/characters\/([0-9a-f-]{36}|claude|gpt|deepseek|gemini)\/$/i);
  if(api||profile) {
   const owner=request.headers.get('oai-authenticated-user-id');
   if(!owner) return json({error:'Sign in to access your characters.'},401);
   try {
    const db=repository(env.DB);
-   if(factionsApi){
-    if(request.method==='GET')return json({factions:[...seedFactions,...await db.listFactions(owner)]});
-    if(request.method!=='POST')return json({error:'Method not allowed.'},405);
-    if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
-    const raw=await request.text();if(raw.length>2048)return json({error:'Faction name is too long.'},413);
-    let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid faction data.'},400);}
-    if(!input||!idPattern.test(input.id)||typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>160)return json({error:'Enter a faction name of 1–160 characters.'},400);
-    const name=input.name.trim().replace(/\s+/g,' ');
-    const existing=seedFactions.find(f=>f.name.toLocaleLowerCase()===name.toLocaleLowerCase());
-    const faction=existing||await db.createFaction(owner,input.id,name);
-    return faction?json(faction,201):json({error:'Could not create this faction. Try again.'},409);
-   }
    if(profile) {
-    const character=await db.get(owner,profile[1])||sampleCharacter(profile[1]);
+    const factions=await factionCatalog(db,owner);
+    const character=attachFactionNames([await db.get(owner,profile[1])||sampleCharacter(profile[1])].filter(Boolean),factions)[0];
     if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
-    return new Response(renderProfile(character,characterCast(await db.list(owner)),[...seedFactions,...await db.listFactions(owner)]),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    return new Response(renderProfile(character,attachFactionNames(characterCast(await db.list(owner)),factions),factions),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
    if(request.method==='GET') {
-    if(!id) return json({characters:characterCast(await db.list(owner))});
-    const character=await db.get(owner,id)||sampleCharacter(id);return character?json(character):json({error:'Character not found.'},404);
+    const factions=await factionCatalog(db,owner);
+    if(!id) return json({characters:attachFactionNames(characterCast(await db.list(owner)),factions)});
+    const character=await db.get(owner,id)||sampleCharacter(id);return character?json(attachFactionNames([character],factions)[0]):json({error:'Character not found.'},404);
    }
    if(!['POST','PUT'].includes(request.method)) return json({error:'Method not allowed.'},405);
    if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')) return json({error:'This request could not be verified. Reload and try again.'},403);
@@ -80,7 +72,7 @@ export function createWorker(assets) { return {async fetch(request,env) {
     if(!current)return json({error:'Character not found.'},404);
     let document;try{document=validate(input,current);}catch(error){return json({error:error.message},400);}
     if(document.factionId){
-     const faction=[...seedFactions,...await db.listFactions(owner)].find(f=>f.id===document.factionId);
+     const faction=(await factionCatalog(db,owner)).find(f=>f.id===document.factionId);
      if(!faction)return json({error:'Choose an existing faction or create one.'},400);
      document.affiliation=faction.name;
     }

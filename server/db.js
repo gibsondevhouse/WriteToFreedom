@@ -19,6 +19,17 @@ export function repository(binding) {
    if(sample&&version===0){const result=await binding.prepare('INSERT INTO character_drafts (id, owner_id, document, version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?) ON CONFLICT(id) DO NOTHING').bind(storedId,owner,JSON.stringify(doc),now,now).run();return result.meta.changes?this.get(owner,id):null;}
    const result=await binding.prepare('UPDATE character_drafts SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND id = ? AND version = ?').bind(JSON.stringify(doc),now,owner,storedId,version).run();return result.meta.changes?this.get(owner,id):null;
   },
+  async listFactionProfiles(owner) {return (await binding.prepare('SELECT * FROM faction_profiles WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.faction_id,version:row.version}));},
+  async saveFaction(owner,id,version,document) {
+   const statement=version===0?binding.prepare('INSERT INTO faction_profiles (owner_id, faction_id, document, version, updated_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(owner_id, faction_id) DO NOTHING').bind(owner,id,JSON.stringify(document),new Date().toISOString()):binding.prepare('UPDATE faction_profiles SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND faction_id = ? AND version = ?').bind(JSON.stringify(document),new Date().toISOString(),owner,id,version);
+   const encoded=JSON.stringify(document),nameKey=document.name?document.name.normalize('NFKC').toLocaleLowerCase():'draft:'+id;
+   const rename=binding.prepare('UPDATE factions SET name = ?, name_key = ? WHERE owner_id = ? AND id = ? AND EXISTS (SELECT 1 FROM faction_profiles WHERE owner_id = ? AND faction_id = ? AND version = ? AND document = ?)').bind(document.name,nameKey,owner,id,owner,id,version+1,encoded);
+   const [result]=await binding.batch([statement,rename]);return result.meta.changes?{...document,id,version:version+1}:null;
+  },
+  async createBlankFaction(owner,id) {
+   await binding.prepare('INSERT INTO factions (id, owner_id, name, name_key, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(id,owner,'','draft:'+id,new Date().toISOString()).run();
+   return (await this.listFactions(owner)).find(f=>f.id===id)||null;
+  },
   async listFactions(owner) { return (await binding.prepare('SELECT id, name FROM factions WHERE owner_id = ? ORDER BY name COLLATE NOCASE').bind(owner).all()).results; },
   async createFaction(owner,id,name) {
    const nameKey=name.normalize('NFKC').toLocaleLowerCase();
