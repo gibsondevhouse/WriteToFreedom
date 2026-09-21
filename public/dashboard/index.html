@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
+ <title>Dashboard — Write to Freedom</title><meta name="description" content="Your novel at a glance: characters, factions, places, open questions, and events through time.">
+ <link rel="icon" href="/crest.svg" type="image/svg+xml"><link rel="stylesheet" href="dashboard.css"><script src="dashboard.js" type="module"></script>
+</head>
+<body>
+ <a class="skip-link" href="#dashboard">Skip to dashboard</a>
+ <header class="dashboard-header">
+  <nav class="breadcrumb" aria-label="Breadcrumb"><a class="brand" href="/"><img src="/crest.svg" width="30" height="34" alt=""><span>Write to Freedom</span></a><span class="divider" aria-hidden="true">/</span><h1 aria-current="page">Dashboard</h1></nav>
+  <nav class="section-nav" aria-label="Novel sections"><a href="/characters/">Characters</a><a href="/factions/">Factions</a><a href="/locations/">Locations</a><a href="/timeline/">Timeline</a></nav>
+ </header>
+ <main id="dashboard" tabindex="-1">
+  <p id="load-status" class="load-status" role="status">Loading your novel…</p>
+  <div id="load-error" class="load-error" role="alert" hidden><p></p><button type="button" id="retry">Try again</button></div>
+  <div id="dashboard-rows" aria-busy="true"></div>
+  <noscript><p>Enable JavaScript to load your dashboard, or <a href="/characters/">open your characters</a>.</p></noscript>
+ </main>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import {timelineRoute} from './timeline-routes.js';
+import {dashboardRoute} from './dashboard-routes.js';
 import {locationCatalog} from './countries.js';
 import { cityRoute } from './city-routes.js';
 import { countryRoute } from './country-routes.js';
@@ -46,6 +47,7 @@ export function createWorker(assets) { return {async fetch(request,env) {
  if(/^\/locations\/cities\/(?:sample-capital|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
  if(/^\/locations\/cities\/[^/]+\/$/.test(path)||path.startsWith('/api/cities/'))return cityRoute(request,env);
  if(path==='/api/timeline')return timelineRoute(request,env);
+ if(path==='/api/dashboard')return dashboardRoute(request,env);
  if(path==='/api/locations')return locationRoute(request,env);
  if(path==='/characters/edit/'||path==='/characters/edit/index.html') {
   const legacyId=url.searchParams.get('id');
