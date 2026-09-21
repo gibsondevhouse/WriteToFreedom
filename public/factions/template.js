@@ -2,7 +2,7 @@ import {hiddenFieldNames} from '../profiles/schema.js';
 export const factionTypes=['Family','House','Guild','Alliance','Order','Government','Military','Religion','Secret society','Organization','Other'];
 export const factionStatuses=['Active','Emerging','Disbanded','Destroyed','In hiding','Unknown'];
 export const factionSections=[
- {id:'identity',title:'Faction information',fields:[['name','Name','input'],['motto','Motto / epithet','input'],['type','Type','select'],['status','Status','select'],['founded','Founded','input'],['founderId','Founder','character'],['leaderId','Leader','character'],['location','Location','input'],['headquarters','Headquarters','input']]},
+ {id:'identity',title:'Faction information',fields:[['name','Name','input'],['motto','Motto / epithet','input'],['type','Type','select'],['status','Status','select'],['founded','Founded','date'],['founderId','Founder','character'],['leaderId','Leader','character'],['location','Location','input'],['headquarters','Headquarters','input']]},
  {id:'overview',title:'Overview',fields:[['introduction','Introduction','textarea'],['summary','Short description','textarea']]},
  {id:'history',title:'History',fields:[['origins','Origins','textarea'],['history','Major events','textarea'],['presentDay','Present circumstances','textarea']]},
  {id:'ideology',title:'Ideology & purpose',fields:[['purpose','Purpose & goals','textarea'],['ideology','Beliefs & values','textarea']]},

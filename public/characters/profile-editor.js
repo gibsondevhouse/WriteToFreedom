@@ -1,5 +1,5 @@
-import {initProfileControls,resize} from '../profiles/controls.js?v=profile-standard-1';
-import { fieldNames, nameFields, fullName } from './template.js?v=profile-standard-1';
+import {initProfileControls,resize} from '../profiles/controls.js?v=profile-dates-1';
+import { fieldNames, nameFields, fullName } from './template.js?v=profile-dates-1';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
 const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');

@@ -1,7 +1,9 @@
+import {initDatePicker} from './date-picker.js?v=date-picker-1';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
 export function initProfileControls(form,markDirty,{nameField="name"}={}){
+initDatePicker(form);
 const pendingChoiceEditors=[],choiceValues=new Map();
 function buildChoiceControl(control){
  const value=control.querySelector('input[type="hidden"]'),select=control.querySelector('[data-choice-select]'),list=control.querySelector('.choice-values');

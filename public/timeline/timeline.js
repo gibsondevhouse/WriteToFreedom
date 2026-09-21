@@ -1,4 +1,5 @@
-import {types,kinds,filterEvents,timelineRows,zoomAt,fitView,rulerTicks,parseStoryDate,minScale,maxScale} from './model.js?v=timeline-1';
+import {precisionNames} from '../profiles/dates.js?v=date-picker-1';
+import {types,kinds,filterEvents,timelineRows,zoomAt,fitView,rulerTicks,parseStoryDate,minScale,maxScale} from './model.js?v=timeline-dates-1';
 const $=selector=>document.querySelector(selector),stage=$('#timeline'),ruler=$('#ruler'),grid=$('#grid'),lanes=$('#lanes'),message=$('#timeline-message'),filters=$('#filters'),orb=$('#filter-toggle'),eventDialog=$('#event-dialog');
 const ROW=104,RULER=57;
 let data={events:[],unplaced:[],undated:0,counts:{}},visible=[],rows=[],view={start:1,scale:120,y:0},size={width:stage.clientWidth,height:stage.clientHeight},loaded=false,loading=false,frame=0,filterDirty=false,lastFocus=null,suppressClick=false;
@@ -54,7 +55,7 @@ for(const dialog of [filters,eventDialog]){
  dialog.addEventListener('click',event=>{const box=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))dialog.close();});
  dialog.addEventListener('close',()=>{if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});else stage.focus({preventScroll:true});});
 }
-function openEvents(row,events){$('#event-title').textContent=row.name;const list=$('#event-list');list.replaceChildren();for(const event of events){const li=node('li');li.append(node('strong',event.label),node('span',event.rawDate+(event.date.precision==='year'?' · Year only':event.date.precision==='month'?' · Month only':'')));const link=node('a','Open '+row.type+' profile →');link.href=event.href;li.append(link);list.append(li);}openDialog(eventDialog);}
+function openEvents(row,events){$('#event-title').textContent=row.name;const list=$('#event-list');list.replaceChildren();for(const event of events){const li=node('li');li.append(node('strong',event.label),node('span',event.rawDate+(event.date.precision==='day'?'':' · '+precisionNames[event.date.precision]+' precision')));const link=node('a','Open '+row.type+' profile →');link.href=event.href;li.append(link);list.append(li);}openDialog(eventDialog);}
 function populateMetadata(){
  for(const count of $('#type-filters').querySelectorAll('[data-count]'))count.textContent=data.events.filter(e=>e.type===count.dataset.count).length;
  for(const count of $('#kind-filters').querySelectorAll('[data-count]'))count.textContent=data.events.filter(e=>e.kind===count.dataset.count).length;

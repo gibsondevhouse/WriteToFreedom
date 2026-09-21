@@ -1,7 +1,7 @@
 import {ancestors} from '../public/locations/data.js';
 import { characters as seeds } from '../public/characters/data.js';
 import { templateSections, nameFields, storyRoles, alignments, humanFieldGroups, humanFields, humanChoices } from '../public/characters/template.js';
-import {escape,renderChoice,renderFieldWrapper,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
+import {escape,renderChoice,renderDateControl,renderFieldWrapper,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 export {escape} from './profile-components.js';
 export function renderProfile(character, cast, factions=[],locations=[]) {
  const color=seeds.find(c=>c.id===character.id)?.color||'blue';
@@ -20,6 +20,7 @@ export function renderProfile(character, cast, factions=[],locations=[]) {
    control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(l=>`<option value="${escape(l.id)}"${val===l.id?' selected':''}>${escape(l.name)}${type==='location'?' — '+escape(ancestors(l,locations).map(p=>p.name).join(' › ')||'Country'):''}</option>`).join('')}</select>`;
   }else if(type==='number')control=`<input ${attrs} type="number" min="0" step="${key==='age'?'1':'any'}" value="${escape(val)}" placeholder="Not set">`;
   else if(type==='choice')control=renderChoice(key,label,val,attrs);
+  else if(type==='date')control=renderDateControl(key,label,val,attrs);
   else if(type==='input')control=`<input ${attrs} type="text" autocomplete="off" maxlength="${nameFields.includes(key)?160:10000}" value="${escape(val)}" placeholder="Add ${escape(label.toLowerCase())}…">`;
   else control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="Add ${escape(label.toLowerCase())}…">${escape(val)}</textarea>`;
   return renderFieldWrapper(character,key,label,type,control);

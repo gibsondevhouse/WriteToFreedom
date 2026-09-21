@@ -1,4 +1,4 @@
-import {initProfileControls,resize} from './controls.js?v=profile-standard-1';
+import {initProfileControls,resize} from './controls.js?v=profile-dates-1';
 
 // Entity adapters supply only their field names, endpoint, and image constraints.
 export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],validImageUrl=()=>false}){

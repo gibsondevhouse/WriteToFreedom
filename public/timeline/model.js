@@ -2,27 +2,8 @@
 // always retained; coarse dates are positioned at their midpoint, never invented days.
 export const types={character:'Characters',faction:'Factions',country:'Countries',city:'Cities'};
 export const kinds={birth:'Births',death:'Deaths',founded:'Foundings',settled:'Settlements',incorporated:'Charters',population:'Population records'};
-const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-export const leapYear=year=>year%4===0&&(year%100!==0||year%400===0);
-export const daysInMonth=(year,month)=>[31,leapYear(year)?29:28,31,30,31,30,31,31,30,31,30,31][month-1];
-export function datePosition(year,month,day){if(!month)return year+.5;let days=0;for(let m=1;m<month;m++)days+=daysInMonth(year,m);return year+(days+(day?day-1:daysInMonth(year,month)/2))/(leapYear(year)?366:365);}
-export function yearLabel(year){return year<=0?`${1-year} BCE`:String(year);}
-export function parseStoryDate(raw){
- if(typeof raw!=='string'||!raw.trim()||raw.length>160)return null;
- let text=raw.trim().replace(/\s+/g,' '),approximate=false;
- if(/^(?:c\.?|ca\.?|circa|about|approx\.?)\s+/i.test(text)){approximate=true;text=text.replace(/^(?:c\.?|ca\.?|circa|about|approx\.?)\s+/i,'');}
- let era='';const eraMatch=text.match(/\s+(BCE|BC|CE|AD)$/i);if(eraMatch){era=eraMatch[1].toUpperCase();text=text.slice(0,-eraMatch[0].length);}
- let year,month,day,match;
- if((match=text.match(/^(?:year\s+)?([+-]?\d{1,6})$/i)))year=Number(match[1]);
- else if((match=text.match(/^([+-]?\d{1,6})-(\d{2})(?:-(\d{2}))?$/))){year=Number(match[1]);month=Number(match[2]);day=match[3]===undefined?undefined:Number(match[3]);}
- else if((match=text.match(/^([a-z]+)\s+(?:(\d{1,2})(?:st|nd|rd|th)?,?\s+)?([+-]?\d{1,6})$/i))){if(!match[2]&&!era&&match[3].replace(/^[+-]/,'').length<3)return null;month=months.findIndex(m=>m.toLowerCase()===match[1].toLowerCase()||m.slice(0,3).toLowerCase()===match[1].toLowerCase())+1;day=match[2]===undefined?undefined:Number(match[2]);year=Number(match[3]);}
- else if((match=text.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+),?\s+([+-]?\d{1,6})$/i))){month=months.findIndex(m=>m.toLowerCase()===match[2].toLowerCase()||m.slice(0,3).toLowerCase()===match[2].toLowerCase())+1;day=Number(match[1]);year=Number(match[3]);}
- else return null;
- if(era&&year<=0)return null;
- if(era==='BC'||era==='BCE')year=1-year;
- if(!Number.isInteger(year)||Math.abs(year)>999999||month!==undefined&&(!month||month>12)||day!==undefined&&(!day||day>daysInMonth(year,month)))return null;
- return {year,month:month??null,day:day??null,precision:day?'day':month?'month':'year',approximate,position:datePosition(year,month,day),text:raw.trim()};
-}
+import {months,leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
+export {leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
 const fields={
  character:[['birthDate','birth','Born'],['deathDate','death','Died']],
  faction:[['founded','founded','Founded']],country:[['founded','founded','Established'],['populationDate','population','Population recorded']],
