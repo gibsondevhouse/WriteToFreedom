@@ -3,6 +3,6 @@
 /* Keep the source attributes readable while the modal picker has focus. */
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.date-dialog{background:rgba(31,43,57,.66);backdrop-filter:blur(22px) saturate(135%);-webkit-backdrop-filter:blur(22px) saturate(135%)}}
 .entity-profile .profile-content,.entity-profile .breadcrumb,.entity-profile .article-bar,.entity-profile .byline,.entity-profile #editor-error,.entity-profile .profile-footer{transition:opacity .18s ease}
-.date-picker-open .profile-content,.date-picker-open .breadcrumb,.date-picker-open .article-bar,.date-picker-open .byline,.date-picker-open #editor-error,.date-picker-open .profile-footer{opacity:.24}
+.date-picker-open .profile-content,.date-picker-open .breadcrumb,.date-picker-open .article-bar,.date-picker-open .byline,.date-picker-open #editor-error{opacity:.24}
 .date-picker-open .infobox{border-color:#97b3d2}
 @media(prefers-reduced-motion:reduce){.entity-profile .profile-content,.entity-profile .breadcrumb,.entity-profile .article-bar,.entity-profile .byline,.entity-profile #editor-error,.entity-profile .profile-footer{transition:none}}

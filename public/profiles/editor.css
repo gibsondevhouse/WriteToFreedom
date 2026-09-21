@@ -80,3 +80,7 @@
 .current-view-previous{position:absolute;top:9px;left:0;width:100%;overflow:hidden;text-overflow:ellipsis;line-height:21px;pointer-events:none}
 @media(max-width:900px) and (min-width:651px){.entity-profile #editor-fields>article{grid-template-columns:minmax(0,1fr) 270px;gap:23px}}
 @media(max-width:650px){.entity-profile #editor-fields>article{display:block}.entity-profile #identity,.entity-profile .profile-reading #identity{position:static;max-height:none;overflow:visible;width:100%;max-width:380px;margin:0 auto 28px}.entity-profile .current-view{max-width:50%}}
+
+/* The article footer shares the left column. Match the page end to the card's
+   12px viewport clearance so its sticky boundary cannot push it upward. */
+@media(min-width:651px){.entity-profile .page-layout{padding-bottom:12px}}

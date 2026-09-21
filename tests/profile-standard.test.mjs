@@ -40,7 +40,7 @@ for(const {type,id,api,page,field,names} of profiles){
   const req=setup(),html=await (await req(page+id+'/')).text();
   for(const name of names)assert.equal(html.split(`name="${name}"`).length-1,1,name);
   assert.equal(html.split('<h1 ').length-1,1);assert.equal(html.split('id="edit-name"').length-1,1);
-  assert.ok(html.includes('class="entity-profile '+type+'-profile"'));assert.ok(html.includes('/profiles/editor.css?v=profile-reading-1'));
+  assert.ok(html.includes('class="entity-profile '+type+'-profile"'));assert.ok(html.includes('/profiles/editor.css?v=profile-footer-1'));
   assert.ok(!html.includes('class="title-row"'));assert.ok(!html.includes('class="site-header"'));assert.ok(!html.includes('class="mobile-contents"'));assert.ok(!html.includes('class="desktop-contents"'));
   assert.match(html,/aria-controls="overview-body" data-collapse-target="overview-body"/);
   assert.match(html,/summary aria-label="Choose visible fields for Overview"/);
