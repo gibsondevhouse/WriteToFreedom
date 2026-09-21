@@ -1,5 +1,5 @@
-# Crest Portal
+# Write to Freedom
 
-A responsive recreation of the selected Wikipedia portal section. The globe is replaced with an original African-inspired white SVG crest. Search and language navigation link to Wikipedia. Article counts reflect the supplied reference snapshot.
+A responsive novel-planning home page with an original African-inspired white SVG crest. It presents Characters, Factions, Locations, Dashboard, Story Arcs, Chapters, Scenes, Story Beats, Lore, and Timeline. Navigation, browsing, and search are disabled placeholders; section pages and novel data are not implemented yet.
 
-Serve `dist` with any static HTTP server. No dependencies or build step are required. The editable vector is `dist/crest.svg`; styles and behavior are in `dist/styles.css` and `dist/app.js`.
+Serve `dist` with any static HTTP server. No dependencies or build step are required. The editable vector is `dist/crest.svg`; homepage markup and styling are in `dist/index.html` and `dist/styles.css`.
