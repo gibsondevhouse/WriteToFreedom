@@ -10,23 +10,24 @@
   <link rel="stylesheet" href="character-cards.css">
   <script src="characters.js" type="module"></script>
 </head>
-<body>
-  <header class="site-header"><a class="brand" href="../"><img src="../crest.svg" width="32" height="36" alt=""><span>Write to Freedom</span></a><a class="home-link" href="../">← Home</a></header>
+<body class="character-directory">
+  <header class="site-header"><nav class="directory-breadcrumb" aria-label="Breadcrumb"><a class="brand" href="../"><img src="../crest.svg" width="32" height="36" alt=""><span>Write to Freedom</span></a><span class="breadcrumb-divider" aria-hidden="true">/</span><h1 id="page-title" aria-current="page">Characters</h1></nav></header>
   <main>
     <section class="page-heading" aria-labelledby="page-title">
       <p class="eyebrow">PEOPLE &amp; RELATIONSHIPS</p>
-      <h1 id="page-title">Characters</h1>
       <p class="intro">Every story begins with someone.</p>
-      <p class="seed-note"><button id="new-character" class="new-character-button" type="button"><span aria-hidden="true">+</span> New character</button></p>
       <p id="storage-error" role="alert" hidden></p>
     </section>
     <section class="cast" aria-label="Character directory">
-      <div class="search-row"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><span class="sr-only">Search characters</span><input id="character-search" type="search" placeholder="Search names, traits, relationships…" autocomplete="off"></label><button id="clear-search" type="button" hidden>Clear search</button></div>
+      <div class="directory-controls">
+        <button id="character-archive" class="archive-button" type="button" disabled title="Character archive is coming soon" aria-describedby="archive-status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v12H4zM3 4h18v4H3zM9 12h6"/></svg>Archive</button><span id="archive-status" class="sr-only">Character archive is not available yet.</span>
+        <div class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><label class="sr-only" for="character-search">Search characters</label><input id="character-search" type="search" placeholder="Search names, traits, relationships…" autocomplete="off"><button id="clear-search" type="button" aria-label="Clear search" title="Clear search" hidden>×</button></div>
+        <button id="new-character" class="new-character-button" type="button"><span aria-hidden="true">+</span> New character</button>
+      </div>
       <div class="list-toolbar"><p id="result-count" role="status" aria-live="polite">4 characters</p><div class="sort-controls"><label class="sr-only" for="sort-order">Sort characters</label><select id="sort-order"><option value="order">List order</option><option value="name">Alphabetical</option><option value="provider">Provider</option></select><button id="sort-direction" type="button" aria-label="Reverse list order" aria-pressed="false" title="Reverse list order"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16m-4-4 4 4 4-4M17 20V4m-4 4 4-4 4 4"/></svg></button></div></div>
       <ol id="character-list" class="character-list character-card-grid"></ol>
       <div id="empty-state" class="empty-state" hidden><h2>No characters found</h2><p>Try a name, a trait, or a relationship.</p><button id="reset-search" type="button">Show all characters</button></div>
       <noscript><p>This character list needs JavaScript enabled. <a href="../">Return home</a>.</p></noscript>
-      <p class="list-footnote">Select a character to read their full profile, biography, and relationships.</p>
     </section>
   </main>
 </body>

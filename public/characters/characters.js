@@ -46,7 +46,12 @@ function createCharacter(character, index) {
   const labels = element('div', 'character-labels');
   [...character.roles,character.provider].filter(Boolean).forEach(label => labels.append(element('span', 'character-label', label)));
   info.append(element('h2', '', `${index + 1}. ${character.name}`), labels);
-  heading.append(avatar, info);
+  const affiliationImage = element('span', 'affiliation-placeholder');
+  affiliationImage.setAttribute('role', 'img');
+  affiliationImage.setAttribute('aria-label', (character.affiliation || 'House, alliance, or family') + ' image placeholder');
+  affiliationImage.title = (character.affiliation || 'House / alliance / family') + ' — image placeholder';
+  affiliationImage.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 5-5 3 3 4-6 5 8"/></svg>';
+  heading.append(avatar, info, affiliationImage);
   summary.append(heading);
   article.append(summary); row.append(article);
   return row;
