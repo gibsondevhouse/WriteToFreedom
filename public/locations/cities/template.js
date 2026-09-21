@@ -12,7 +12,7 @@ export const citySections=[
  {id:'demographics',title:'Demographics',fields:[['demographics','Peoples & communities','textarea'],['languages','Languages & dialects','textarea'],['religion','Religion & beliefs','textarea']]},
  {id:'culture',title:'Culture & daily life',fields:[['culture','Customs & city identity','textarea'],['arts','Arts, literature & entertainment','textarea'],['food','Food & daily life','textarea'],['festivals','Festivals, sports & recreation','textarea']]},
  {id:'infrastructure',title:'Infrastructure',fields:[['transport','Streets, transit & connections','textarea'],['utilities','Water, energy & communications','textarea'],['education','Education & libraries','textarea'],['health','Health & living conditions','textarea'],['technology','Science, technology & magic','textarea']]},
- {id:'places',title:'Landmarks',fields:[]},
+ {id:'places',title:'Areas & landmarks',fields:[]},
  {id:'notes',title:'Open questions',fields:[['questions','Unresolved questions','textarea']]}
 ];
 export const cityFields=citySections.flatMap(s=>s.fields.map(f=>f[0]));

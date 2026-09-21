@@ -25,9 +25,20 @@ export function repository(binding) {
    const rename=binding.prepare('UPDATE locations SET name = ? WHERE owner_id = ? AND id = ? AND type = ? AND EXISTS (SELECT 1 FROM country_profiles WHERE owner_id = ? AND location_id = ? AND version = ? AND document = ?)').bind(document.name,owner,id,'country',owner,id,version+1,encoded);
    const [result]=await binding.batch([write,rename]);return result.meta.changes?{...document,id,version:version+1}:null;
   },
+  async listLocationDetails(owner) {return (await binding.prepare('SELECT * FROM location_details WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.location_id,version:row.version}));},
+  async saveLocationDetails(owner,id,version,document) {
+   const encoded=JSON.stringify(document);
+   const write=version===0?binding.prepare('INSERT INTO location_details (owner_id, location_id, document, version) VALUES (?, ?, ?, 1) ON CONFLICT(owner_id, location_id) DO NOTHING').bind(owner,id,encoded):binding.prepare('UPDATE location_details SET document = ?, version = version + 1 WHERE owner_id = ? AND location_id = ? AND version = ?').bind(encoded,owner,id,version);
+   const rename=binding.prepare('UPDATE locations SET name = ?, parent_id = ? WHERE owner_id = ? AND id = ? AND EXISTS (SELECT 1 FROM location_details WHERE owner_id = ? AND location_id = ? AND version = ? AND document = ?)').bind(document.name,document.parentId,owner,id,owner,id,version+1,encoded);
+   const [result]=await binding.batch([write,rename]);return result.meta.changes?{...document,id,version:version+1}:null;
+  },
   async listLocations(owner) {return (await binding.prepare('SELECT id, name, type, parent_id AS parentId FROM locations WHERE owner_id = ? ORDER BY created_at, rowid').bind(owner).all()).results;},
   async createLocation(owner,location) {
-   await binding.prepare('INSERT INTO locations (id, owner_id, name, type, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(location.id,owner,location.name,location.type,location.parentId,new Date().toISOString()).run();
+   const insert=binding.prepare('INSERT INTO locations (id, owner_id, name, type, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(location.id,owner,location.name,location.type,location.parentId,new Date().toISOString());
+   if(location.type==='area'){
+    const details=binding.prepare('INSERT INTO location_details (owner_id, location_id, document, version) SELECT ?, ?, ?, 1 WHERE EXISTS (SELECT 1 FROM locations WHERE id = ? AND owner_id = ? AND type = ?) ON CONFLICT(owner_id, location_id) DO NOTHING').bind(owner,location.id,JSON.stringify({name:location.name,parentId:location.parentId,areaType:location.areaType}),location.id,owner,'area');
+    await binding.batch([insert,details]);
+   }else await insert.run();
    return await binding.prepare('SELECT id, name, type, parent_id AS parentId FROM locations WHERE owner_id = ? AND id = ?').bind(owner,location.id).first();
   },
   async list(owner) { const data = await binding.prepare('SELECT * FROM character_drafts WHERE owner_id = ? ORDER BY created_at ASC, id ASC').bind(owner).all(); return data.results.map(decode); },

@@ -1,9 +1,10 @@
 import {seedLocations} from '../public/locations/data.js';
 import {blankCountry} from '../public/locations/countries/template.js';
 export async function locationCatalog(db,owner){
- const [locations,countries,cities]=await Promise.all([db.listLocations(owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+ const [locations,countries,cities,details]=await Promise.all([db.listLocations(owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLocationDetails(owner)]);
  const countryNames=new Map(countries.map(p=>[p.id,p.name])),cityProfiles=new Map(cities.map(p=>[p.id,p]));
- return [...seedLocations,...locations].map(r=>{const profile=cityProfiles.get(r.id);return r.type==='city'&&profile?{...r,name:profile.name,parentId:profile.parentId}:{...r,name:countryNames.get(r.id)??r.name};});
+ const locationDetails=new Map(details.map(p=>[p.id,p]));
+ return [...seedLocations,...locations].map(r=>{if(['area','landmark'].includes(r.type)){const detail=locationDetails.get(r.id);return {...r,version:0,...detail};}const profile=cityProfiles.get(r.id);return r.type==='city'&&profile?{...r,name:profile.name,parentId:profile.parentId}:{...r,name:countryNames.get(r.id)??r.name};});
 }
 export function defaultCountry(location){return {...blankCountry(),...(location.id==='sample-kingdom'?{
  capitalId:'sample-capital',governmentType:'Kingdom',

@@ -49,3 +49,10 @@ export const cityProfiles = sqliteTable('city_profiles', {
  version: integer('version').notNull().default(1),
  updatedAt: text('updated_at').notNull(),
 }, table => [uniqueIndex('idx_city_profiles_owner_location').on(table.ownerId,table.locationId)]);
+
+export const locationDetails = sqliteTable('location_details', {
+ ownerId: text('owner_id').notNull(),
+ locationId: text('location_id').notNull(),
+ document: text('document').notNull(),
+ version: integer('version').notNull().default(1),
+}, table => [uniqueIndex('idx_location_details_owner_location').on(table.ownerId,table.locationId)]);
