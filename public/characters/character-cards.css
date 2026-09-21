@@ -1,0 +1,16 @@
+/* Directory cards are scoped here so other location and faction lists keep their layout. */
+.character-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:0;border:0;border-radius:0;background:transparent}
+.character-card-grid .character-card{min-width:0;border:1px solid #35414c;border-radius:5px;background:#141e28;overflow:hidden}
+.character-card-grid .character-card+.character-card{border-top:1px solid #35414c}
+.character-card .character,.character-card .character-summary{height:100%}
+.character-card .character-summary{display:flex;align-items:center;min-height:144px;padding:22px}
+.character-card .character-heading{width:100%;gap:18px}
+.character-card .avatar{flex:0 0 66px;height:66px;font-size:25px}
+.character-card .character-info h2{font-size:19px;line-height:1.35;margin:0 0 10px;overflow-wrap:anywhere}
+.character-labels{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.character-label{font-size:12px;line-height:1.35;font-weight:500;color:#c9d4e3;background:#283644;border:1px solid #3b4b5d;border-radius:20px;padding:4px 9px;max-width:100%;overflow-wrap:anywhere}
+.character-card:hover{border-color:#657e9e;background:#182632}
+.character-card .profile-link:focus-visible{outline:2px solid #9ab7ff;outline-offset:-3px;border-radius:4px}
+@media(max-width:1000px){.character-card .character-summary{padding:20px 17px;min-height:140px}.character-card .character-heading{gap:14px}.character-card .avatar{flex-basis:58px;height:58px;font-size:22px}.character-card .character-info h2{font-size:18px}}
+@media(max-width:640px){.character-card-grid{grid-template-columns:1fr;gap:12px}.character-card .character-summary{min-height:114px;padding:19px}.character-card .character-info h2{margin-bottom:8px}}
+@media(prefers-reduced-motion:no-preference){.character-card{transition:background .15s,border-color .15s}}

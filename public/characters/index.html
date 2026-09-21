@@ -7,6 +7,7 @@
   <title>Characters — Write to Freedom</title>
   <link rel="icon" href="../crest.svg" type="image/svg+xml">
   <link rel="stylesheet" href="characters.css">
+  <link rel="stylesheet" href="character-cards.css">
   <script src="characters.js" type="module"></script>
 </head>
 <body>
@@ -22,7 +23,7 @@
     <section class="cast" aria-label="Character directory">
       <div class="search-row"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><span class="sr-only">Search characters</span><input id="character-search" type="search" placeholder="Search names, traits, relationships…" autocomplete="off"></label><button id="clear-search" type="button" hidden>Clear search</button></div>
       <div class="list-toolbar"><p id="result-count" role="status" aria-live="polite">4 characters</p><div class="sort-controls"><label class="sr-only" for="sort-order">Sort characters</label><select id="sort-order"><option value="order">List order</option><option value="name">Alphabetical</option><option value="provider">Provider</option></select><button id="sort-direction" type="button" aria-label="Reverse list order" aria-pressed="false" title="Reverse list order"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16m-4-4 4 4 4-4M17 20V4m-4 4 4-4 4 4"/></svg></button></div></div>
-      <ol id="character-list" class="character-list"></ol>
+      <ol id="character-list" class="character-list character-card-grid"></ol>
       <div id="empty-state" class="empty-state" hidden><h2>No characters found</h2><p>Try a name, a trait, or a relationship.</p><button id="reset-search" type="button">Show all characters</button></div>
       <noscript><p>This character list needs JavaScript enabled. <a href="../">Return home</a>.</p></noscript>
       <p class="list-footnote">Select a character to read their full profile, biography, and relationships.</p>
