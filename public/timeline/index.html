@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="color-scheme" content="dark"><title>Timeline — Write to Freedom</title>
+ <link rel="icon" href="/crest.svg"><link rel="stylesheet" href="/timeline/timeline.css?v=timeline-1">
+ <script type="module" src="/timeline/timeline.js?v=timeline-1"></script>
+</head>
+<body>
+ <header class="timeline-header"><nav aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><h1>Timeline</h1></nav><span id="timeline-count" role="status">Loading dates…</span></header>
+ <main id="timeline" tabindex="0" aria-label="Story timeline" aria-describedby="timeline-help">
+  <div id="ruler" aria-hidden="true"></div><div id="grid" aria-hidden="true"></div><div id="lanes" aria-label="Dated events"></div>
+  <div id="timeline-message" class="timeline-message" role="status"><span class="empty-mark" aria-hidden="true">◇</span><h2>Gathering your story’s dates</h2><p>Loading saved profiles…</p></div>
+  <p id="timeline-help">Drag to pan <span>·</span> Pinch or Ctrl + scroll to zoom</p>
+ </main>
+ <button id="filter-toggle" class="filter-orb" type="button" aria-label="Open timeline filters" aria-haspopup="dialog" title="Timeline filters & zoom">
+  <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="8" cy="6" r="2"/><circle cx="15" cy="12" r="2"/></svg><span id="filter-active" hidden></span>
+ </button>
+ <dialog id="filters" class="floating-dialog" aria-labelledby="filter-title">
+  <div class="dialog-heading"><h2 id="filter-title">Timeline filters</h2><button type="button" class="close-dialog" aria-label="Close filters">×</button></div>
+  <label class="search-label"><span class="sr-only">Find an event or profile</span><input type="search" id="timeline-search" placeholder="Find an event or profile…" autocomplete="off"></label>
+  <fieldset><legend>Show on timeline</legend><div id="type-filters" class="filter-grid"></div></fieldset>
+  <details class="event-filter"><summary>Event types</summary><div id="kind-filters" class="filter-grid"></div></details>
+  <div class="view-controls"><span id="scale-label">Year view</span><div class="zoom-controls"><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit-view">Fit events</button><button type="button" id="zoom-in" aria-label="Zoom in">+</button></div></div>
+  <label class="zoom-slider"><span class="sr-only">Timeline zoom</span><input id="zoom-level" type="range" min="0" max="100" step="0.1" aria-label="Timeline zoom"></label>
+  <form id="go-to-year"><label for="jump-year">Go to year</label><div><input id="jump-year" type="text" inputmode="text" placeholder="e.g. 1984 or 44 BCE" maxlength="160"><button type="submit">Go</button></div><p id="jump-error" role="alert" hidden>Enter a year, such as 1984 or 44 BCE.</p></form>
+  <details id="unplaced-dates"><summary id="unplaced-label">Unplaced dates</summary><p>These dates need a year or a supported date format to appear on the timeline.</p><ul id="unplaced-list"></ul></details>
+  <div class="filter-footer"><span id="filter-summary"></span><button type="button" id="reset-filters">Reset filters</button></div>
+  <p class="filter-help">Dates update from saved profiles. Use a year, YYYY-MM-DD, or a date such as 12 May 1984. BCE and circa dates work too. Arrow keys pan; + / − zoom; Home fits events.</p>
+ </dialog>
+ <dialog id="event-dialog" class="floating-dialog event-dialog" aria-labelledby="event-title"><div class="dialog-heading"><h2 id="event-title">Events</h2><button type="button" class="close-dialog" aria-label="Close events">×</button></div><ul id="event-list"></ul></dialog>
+ <noscript><p class="no-script">Enable JavaScript to explore your timeline. <a href="/">Return home</a>.</p></noscript>
+</body>
+</html>
