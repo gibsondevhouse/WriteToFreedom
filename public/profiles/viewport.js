@@ -20,9 +20,9 @@ export function initProfileViewport(form){
   animations=[leave,enter];leave.finished.then(()=>outgoing.remove(),()=>outgoing.remove());
  }
  function update(){
-  frame=0;const bounds=bar.getBoundingClientRect(),height=bounds.height;
+  frame=0;const bounds=bar.getBoundingClientRect(),offset=parseFloat(getComputedStyle(bar).top)||0,height=bounds.height+offset;
   if(height!==headerHeight){headerHeight=height;form.style.setProperty('--profile-header-height',height+'px');}
-  const index=bounds.top<=0?sectionAtHeader(headings.map(heading=>heading.getClientRects().length?heading.getBoundingClientRect().top:Infinity),bounds.bottom):-1;
+  const index=bounds.top<=offset?sectionAtHeader(headings.map(heading=>heading.getClientRects().length?heading.getBoundingClientRect().top:Infinity),bounds.bottom):-1;
   form.classList.toggle('profile-reading',index>=0);
   show(index<0?original:headings[index].textContent.trim());
  }

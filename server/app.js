@@ -1,3 +1,4 @@
+import {workspaceShell} from './workspace-shell.js';
 import {timelineRoute} from './timeline-routes.js';
 import {dashboardRoute} from './dashboard-routes.js';
 import {locationCatalog} from './countries.js';
@@ -40,7 +41,7 @@ function validate(input,current) {
  output.hiddenFields=[...new Set(hidden)];
  return output;
 }
-export function createWorker(assets) { return {async fetch(request,env) {
+function createAppWorker(assets) { return {async fetch(request,env) {
  const url=new URL(request.url);const path=url.pathname;
  if(/^\/locations\/countries\/(?:sample-kingdom|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
  if(/^\/locations\/countries\/[^/]+\/$/.test(path)||path.startsWith('/api/countries/'))return countryRoute(request,env);
@@ -112,3 +113,15 @@ export function createWorker(assets) { return {async fetch(request,env) {
  if(!asset)return new Response('Page not found',{status:404});
  return new Response(request.method==='HEAD'?null:asset.content,{headers:{'content-type':asset.type,'cache-control':'no-cache','x-content-type-options':'nosniff'}});
 }};}
+
+
+// Apply the same navigation shell to static directories and server-rendered profiles.
+export function createWorker(assets) {
+ const app=createAppWorker(assets);
+ return {async fetch(request,env,ctx) {
+  const response=await app.fetch(request,env,ctx);
+  if(request.method==='HEAD'||!response.headers.get('content-type')?.includes('text/html'))return response;
+  const headers=new Headers(response.headers);headers.delete('content-length');
+  return new Response(workspaceShell(await response.text(),new URL(request.url).pathname),{status:response.status,headers});
+ }};
+}

@@ -2,17 +2,21 @@ import {searchCatalog} from './search.js';
 
 const input = document.querySelector('#novel-search');
 const results = document.querySelector('#search-results');
-const content = document.querySelector('#dashboard-content');
 const list = document.querySelector('#search-list');
 const status = document.querySelector('#search-status');
 let catalog;
+let loadingCatalog;
+let searchError;
 
 function search() {
   const query = input.value.trim();
   results.hidden = !query;
-  content.hidden = Boolean(query);
   list.replaceChildren();
-  if (!query || !catalog) return;
+  if (!query) return;
+  if (!catalog) {
+    status.textContent = searchError || 'Searching your novel…';
+    return;
+  }
   const matches = searchCatalog(catalog, query);
   const shown = matches.slice(0, 50);
   status.textContent = matches.length
@@ -43,7 +47,26 @@ function search() {
   }
 }
 
-input.addEventListener('input', search);
+async function ensureCatalog() {
+  if (catalog || loadingCatalog) return loadingCatalog;
+  searchError = '';
+  loadingCatalog = (async () => {
+    try {
+      const response = await fetch('/api/dashboard', {credentials: 'same-origin', cache: 'no-store'});
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error();
+      updateWorkspace(await response.json());
+    } catch {
+      searchError = 'Search could not load. Type again to retry.';
+      search();
+    } finally { loadingCatalog = null; }
+  })();
+  return loadingCatalog;
+}
+input.addEventListener('focus', () => { ensureCatalog(); search(); });
+input.addEventListener('input', () => { ensureCatalog(); search(); });
+document.addEventListener('click', event => {
+  if (!results.contains(event.target) && !event.target.closest('.workspace-search')) results.hidden = true;
+});
 input.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     event.preventDefault();
@@ -69,42 +92,55 @@ document.addEventListener('keydown', event => {
 });
 document.querySelector('.workspace-search kbd').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
 
-const menu = document.querySelector('.menu-toggle');
-const navigation = document.querySelector('#workspace-navigation');
+const menu = document.querySelector('.sidebar-toggle');
+const sidebar = document.querySelector('#workspace-sidebar');
+const root = document.documentElement;
 const narrow = matchMedia('(max-width: 760px)');
 function adaptNavigation() {
-  // Move focus before hiding a focused navigation item during a resize.
-  if (narrow.matches) menu.hidden = false;
-  if (narrow.matches && navigation.contains(document.activeElement)) menu.focus();
-  if (!narrow.matches && document.activeElement === menu) document.querySelector('.workspace-brand').focus();
-  menu.hidden = !narrow.matches;
-  navigation.hidden = narrow.matches;
-  menu.setAttribute('aria-expanded', String(!navigation.hidden));
+  const expanded = narrow.matches ? root.dataset.mobileNav === 'open' : root.dataset.sidebar !== 'collapsed';
+  menu.setAttribute('aria-expanded', String(expanded));
+  const label = `${expanded ? 'Collapse' : 'Expand'} sidebar`;
+  menu.setAttribute('aria-label', label);
+  menu.title = label;
+  if (narrow.matches && !expanded && sidebar.contains(document.activeElement)) menu.focus();
 }
 menu.addEventListener('click', () => {
-  navigation.hidden = !navigation.hidden;
-  menu.setAttribute('aria-expanded', String(!navigation.hidden));
+  if (narrow.matches) {
+    root.dataset.mobileNav = root.dataset.mobileNav === 'open' ? 'closed' : 'open';
+  } else {
+    const collapsed = root.dataset.sidebar !== 'collapsed';
+    root.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
+    try { localStorage.setItem('wtf-sidebar-collapsed', String(collapsed)); } catch {}
+  }
+  adaptNavigation();
 });
-navigation.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && narrow.matches) {
-    navigation.hidden = true;
-    menu.setAttribute('aria-expanded', 'false');
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && narrow.matches && root.dataset.mobileNav === 'open') {
+    root.dataset.mobileNav = 'closed';
+    adaptNavigation();
     menu.focus();
   }
 });
-narrow.addEventListener('change', adaptNavigation);
+document.addEventListener('click', event => {
+  if (narrow.matches && root.dataset.mobileNav === 'open' && !sidebar.contains(event.target) && !menu.contains(event.target)) {
+    root.dataset.mobileNav = 'closed';
+    adaptNavigation();
+  }
+});
+narrow.addEventListener('change', () => {
+  root.dataset.mobileNav = 'closed';
+  adaptNavigation();
+});
+window.addEventListener('storage', event => {
+  if (event.key === 'wtf-sidebar-collapsed') {
+    root.dataset.sidebar = event.newValue === 'true' ? 'collapsed' : 'expanded';
+    adaptNavigation();
+  }
+});
 adaptNavigation();
 
 export function updateWorkspace(data) {
   catalog = data;
-  const counts = {
-    characters: data.characters.length,
-    factions: data.factions.length,
-    locations: data.locations.length,
-    dates: data.timeline.events.length + data.timeline.unplaced.length,
-  };
-  for (const node of document.querySelectorAll('[data-count]')) node.textContent = counts[node.dataset.count].toLocaleString();
-  document.querySelector('#workspace-stats').hidden = false;
-  input.disabled = false;
+  searchError = '';
   search();
 }
