@@ -1,4 +1,4 @@
-import {createCharacterCard} from './character-cards.js?v=1';
+import {createCharacterCard} from './character-cards.js?v=2';
 import {createQuestionBanner} from './question-banner.js';
 import {updateWorkspace} from './workspace.js?v=shared-1';
 const rows=document.querySelector('#dashboard-rows'),status=document.querySelector('#load-status'),errorBox=document.querySelector('#load-error');

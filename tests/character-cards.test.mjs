@@ -47,3 +47,13 @@ test('saved attributes and imagery survive regular profile edits, remain private
  const profile=await (await request('/characters/claude/')).text();assert.match(profile,/name="portraitUrl"/);
  db.close();
 });
+
+test('morality selector saves independently of attribute ratings, imagery, and relationships',async()=>{
+ const {db,request}=setup();const initial=await (await request('/api/characters/claude')).json();
+ const saved=await (await request('/api/characters/claude','PUT',{...initial,attributeRatings:{strength:81},portraitUrl:'https://example.org/portrait.jpg'})).json();
+ const response=await request('/api/characters/claude','PUT',{...saved,alignment:'Morally gray'});assert.equal(response.status,200);const updated=await response.json();
+ assert.equal(updated.alignment,'Morally gray');assert.deepEqual(updated.attributeRatings,{strength:81});assert.equal(updated.portraitUrl,saved.portraitUrl);assert.deepEqual(updated.relationships,saved.relationships);
+ const dashboard=await (await request('/api/dashboard')).json();assert.equal(dashboard.characters.find(c=>c.id==='claude').alignment,'Morally gray');
+ assert.equal((await request('/api/characters/claude','PUT',{...updated,alignment:'invented'})).status,400);
+ db.close();
+});
