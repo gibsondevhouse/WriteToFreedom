@@ -37,7 +37,7 @@ export function characterMentions(character,profiles,{includeOwn=true}={}){
       if(type!=='textarea'||!source[key]?.trim()||!mentionsName(source[key],character.name))continue;
       mentions.push({source:source.name||'Untitled '+kind,label,kind,text:source[key],href:href(kind,source.id)+(source.hiddenFields?.includes(key)?'':'#field-'+key)});
     }
-    if(kind==='character')for(const note of source.notes||[]){if(mentionsName(note.text,character.name))mentions.push({source:source.name||'Untitled character',label:'Note',kind,text:note.text,href:href(kind,source.id)+'#note-'+note.id});}
+    if(kind==='character')for(const note of source.notes||[]){if(mentionsName(note.text,character.name)||(note.links||[]).some(l=>l.kind==='character'&&l.id===character.id))mentions.push({source:source.name||'Untitled character',label:'Note',kind,text:note.text,href:href(kind,source.id)+'#note-'+note.id});}
     if(kind==='character')for(const relationship of source.relationships||[]){
       if(relationship.description?.trim()&&(relationship.targetId===character.id||mentionsName(relationship.description,character.name)))mentions.push({source:source.name||'Untitled character',label:'Relationship notes',kind,text:relationship.description,href:href(kind,source.id)+(source.hiddenFields?.includes('relationships')?'':'#relationships')});
     }

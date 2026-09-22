@@ -1,3 +1,4 @@
+import {renderConnectedNotes} from './note-connections.js';
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import { factionSections, factionTypes, factionStatuses } from '../public/factions/template.js';
 export function renderFaction(faction,cast){
@@ -13,5 +14,5 @@ export function renderFaction(faction,cast){
   renderInfoGroup('Leadership','identity-leadership',fields(['founderId','leaderId']))+
   renderInfoGroup('Location & headquarters','identity-location',fields(['location','headquarters']))+
   `<a class="member-count" href="#members">${members.length} affiliated ${members.length===1?'character':'characters'}</a>`;
- return renderProfilePage({record:faction,type:'faction',collection:'Factions',collectionUrl:'/factions/',infobox,content:body,script:'/factions/profile.js',styles:['/factions/profile.css']});
+ return renderProfilePage({record:faction,type:'faction',collection:'Factions',collectionUrl:'/factions/',infobox,content:body+renderConnectedNotes(cast,{kind:'faction',id:faction.id},faction),script:'/factions/profile.js',styles:['/characters/profile-notes.css','/factions/profile.css']});
 }

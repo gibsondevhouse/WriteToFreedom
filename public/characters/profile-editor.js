@@ -1,4 +1,4 @@
-import {initCharacterNotes} from './note-editor.js?v=1';
+import {initCharacterNotes} from './note-editor.js?v=2';
 import {attributeGroups} from './attributes.js?v=section-attributes-1';
 import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
 import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';
@@ -60,7 +60,7 @@ for(const sectionId of new Set(attributeGroups.map(group=>group.sectionId))){
  document.querySelector('#'+sectionId+'-body').append(createAttributeControls(attributeRatings,markDirty,groups));
 }
 const controls=initProfileControls(form,markDirty,{nameField:'firstName',nationalityContinents}),choiceValues=controls.choiceValues;
-const noteEditor=initCharacterNotes(form,initial.character.notes||[],markDirty,controls);
+const noteEditor=initCharacterNotes(form,initial.character.notes||[],markDirty,controls,initial);
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
 form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});

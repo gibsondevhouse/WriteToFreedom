@@ -1,3 +1,4 @@
+import {renderConnectedNotes} from './note-connections.js';
 import {ancestors} from '../public/locations/data.js';
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import {citySections,validImageUrl} from '../public/locations/cities/template.js';
@@ -17,5 +18,5 @@ export function renderCity(city,locations,cast){
   renderInfoGroup('Government','identity-government',fields(['governmentType','governingBody','leaderId']))+
   renderInfoGroup('Geography & population','identity-geography',fields(['area','elevation','population','populationDate','demonym','officialLanguages','timeZone']))+
   `<a class="places-count" href="#places">${landmarks.length} ${landmarks.length===1?'landmark':'landmarks'}</a>`;
- return renderProfilePage({record:city,type:'city',collection:'Locations',collectionUrl:'/locations/',infobox,content:body,script:'/locations/cities/profile.js',styles:['/locations/countries/profile.css','/locations/cities/profile.css'],boxClass:'country-infobox city-infobox'});
+ return renderProfilePage({record:city,type:'city',collection:'Locations',collectionUrl:'/locations/',infobox,content:body+renderConnectedNotes(cast,{kind:'location',id:city.id},city),script:'/locations/cities/profile.js',styles:['/characters/profile-notes.css','/locations/countries/profile.css','/locations/cities/profile.css'],boxClass:'country-infobox city-infobox'});
 }

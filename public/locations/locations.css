@@ -3,3 +3,5 @@
 .avatar.area{background:#4a365e;color:#e2c8f7}.location-info{flex:1}.edit-location{font-size:14px;flex-shrink:0;margin-left:auto}.location-row .location-path a{color:#a9c2f9}@media(max-width:480px){.location-row{flex-wrap:wrap}.edit-location{margin-left:54px}.location-info{flex-basis:calc(100% - 60px)}}
 
 .avatar.universe,.avatar.galaxy{background:#302d51;color:#d1c9f3}.avatar.solar-system{background:#443a2c;color:#e1c995}.avatar.planet,.avatar.moon{background:#293c55;color:#bbd2ef}.avatar.continent{background:#294943;color:#b4d6c9}
+
+.location-linked-notes{margin-top:10px;font-size:14px;color:#b7c8e1}.location-linked-notes summary{cursor:pointer}.location-linked-notes ul{padding-left:18px}.location-linked-notes li{margin:8px 0;min-width:0}.location-linked-notes a{display:block;max-width:60ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.location-linked-notes small{display:block;color:#8f9eb3}

@@ -25,6 +25,8 @@ function render(){
    info.append(node('p','location-children',summary||'No locations within it yet'));
 
   }
+  if(location.linkedNotes?.length){const details=node('details','location-linked-notes'),summary=node('summary','',location.linkedNotes.length+' linked '+(location.linkedNotes.length===1?'note':'notes')),notes=node('ul');
+   for(const note of location.linkedNotes){const li=node('li'),link=node('a','',note.title||note.text);link.href=note.href;link.title=note.text;li.append(link,node('small','',note.source));notes.append(li);}details.append(summary,notes);info.append(details);}
   row.append(avatar,info);
   if(!['country','city'].includes(location.type)){const edit=node('button','edit-location','Edit');edit.type='button';edit.setAttribute('aria-label','Edit '+location.name);edit.addEventListener('click',()=>openEditor(location));row.append(edit);}
   return row;
@@ -64,7 +66,7 @@ form.addEventListener('submit',async event=>{event.preventDefault();if(saving)re
  try{
   const saved=await api({method:editing?'PUT':'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
   if(['country','city'].includes(saved.type)){location.assign(href(saved));return;}
-  const index=records.findIndex(r=>r.id===saved.id);if(index<0)records.push(saved);else records[index]=saved;
+  const index=records.findIndex(r=>r.id===saved.id);if(index<0)records.push(saved);else records[index]={...saved,linkedNotes:records[index].linkedNotes};
   filter='';search.value='';render();dialog.close();count.textContent=saved.name+(editing?' updated. ':' added. ')+records.length+' locations.';document.getElementById('location-'+saved.id)?.querySelector('h2').focus();
  }catch(e){createError.textContent=e.message;createError.hidden=false;}
  finally{saving=false;fields.disabled=false;type.disabled=!!editing;parent.disabled=!(parentTypes[type.value]||[]).length;areaType.disabled=type.value!=='area';save.disabled=false;cancel.disabled=false;save.textContent=editing?'Save changes':'Add location';}

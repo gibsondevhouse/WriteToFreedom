@@ -1,5 +1,5 @@
 import {profileChoices,multiChoiceFields,nationalityGroups} from '../public/profiles/choices.js';
-export const profileRevision='cursor-notes-1';
+export const profileRevision='linked-notes-1';
 export const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const jsonData=value=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
 const chevron='<svg class="collapse-chevron" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';

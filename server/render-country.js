@@ -1,3 +1,4 @@
+import {renderConnectedNotes} from './note-connections.js';
 import {ancestors,parentChoices} from '../public/locations/data.js';
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import {countrySections,validImageUrl} from '../public/locations/countries/template.js';
@@ -16,5 +17,5 @@ export function renderCountry(country,locations,cast){
   renderInfoGroup('Geography & population','identity-geography',fields(['parentId','capitalId','largestCityId','area','population','populationDate']))+
   renderInfoGroup('Economy & time','identity-economy',fields(['currency','timeZone']))+
   `<a class="places-count" href="#places">${cities.length} ${cities.length===1?'city':'cities'} · ${landmarks.length} ${landmarks.length===1?'landmark':'landmarks'}</a>`;
- return renderProfilePage({record:country,type:'country',collection:'Locations',collectionUrl:'/locations/',infobox,content:body,script:'/locations/countries/profile.js',styles:['/locations/countries/profile.css'],boxClass:'country-infobox'});
+ return renderProfilePage({record:country,type:'country',collection:'Locations',collectionUrl:'/locations/',infobox,content:body+renderConnectedNotes(cast,{kind:'location',id:country.id},country),script:'/locations/countries/profile.js',styles:['/characters/profile-notes.css','/locations/countries/profile.css'],boxClass:'country-infobox'});
 }

@@ -1,3 +1,4 @@
+import {noteTargets,validateNoteConnections} from './note-connections.js';
 import {validateNotes} from '../public/characters/notes.js';
 import {validateRatings} from '../public/characters/attributes.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
@@ -115,7 +116,10 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const locations=await locationCatalog(db,owner);
     if(Object.values(document.nationalityContinents).some(id=>!locations.some(l=>l.id===id&&l.type==='continent')))return json({error:'Choose a continent from your locations for each custom nationality.'},400);
     for(const key of ['birthPlaceId','residenceId','citizenshipId'])if(document[key]&&!locations.some(l=>l.id===document[key]&&(key!=='citizenshipId'||l.type==='country')))return json({error:'Choose an existing location for birthplace or residence, and a country for citizenship.'},400);
-    const allowed=new Set([...seeds.map(c=>c.id),...(await db.list(owner)).map(c=>c.id)]);
+    const savedCast=await db.list(owner),cast=characterCast(savedCast);
+    const allowed=new Set(cast.map(c=>c.id));
+    const proposedCast=cast.map(c=>c.id===id?{...document,id}:c);
+    try{validateNoteConnections(document.notes,noteTargets(proposedCast,await factionCatalog(db,owner),locations),current.notes||[]);}catch(error){return json({error:error.message},400);}
     if(document.relationships.some(r=>r.targetId===id||!allowed.has(r.targetId)))return json({error:'Choose another existing character for each relationship.'},400);
     if(!Number.isInteger(input.version))return json({error:'Reload this character before saving.'},400);
     const updated=await db.save(owner,id,input.version,document);
