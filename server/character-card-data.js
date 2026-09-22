@@ -24,6 +24,11 @@ export function characterCardDetails(character,{cast,factions,countries,location
     if(!outgoing.length&&!incoming.length)return [];
     return [{id:other.id,name:other.name||'Untitled character',image:other.portraitUrl||'',href:href('character',other.id),connections:[...outgoing.map(r=>({type:r.type||'Connection',description:r.description,direction:'outgoing'})),...incoming.map(r=>({type:r.type||'Connection',description:r.description,direction:'incoming'}))]}];
   });
+  const mentions=characterMentions(character,profiles);
+  return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},affiliationCard:affiliation,relationships,mentions};
+}
+
+export function characterMentions(character,profiles){
   const mentions=[];
   for(const [kind,records] of Object.entries(profiles))for(const source of records){
     if(kind==='character'&&source.id===character.id)continue;
@@ -35,5 +40,5 @@ export function characterCardDetails(character,{cast,factions,countries,location
       if(relationship.description?.trim()&&(relationship.targetId===character.id||mentionsName(relationship.description,character.name)))mentions.push({source:source.name||'Untitled character',label:'Relationship notes',kind,text:relationship.description,href:href(kind,source.id)+(source.hiddenFields?.includes('relationships')?'':'#relationships')});
     }
   }
-  return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},affiliationCard:affiliation,relationships,mentions};
+  return mentions;
 }

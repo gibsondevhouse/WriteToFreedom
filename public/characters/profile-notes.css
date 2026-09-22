@@ -1,0 +1,19 @@
+/* Numbered references follow the article's reading column. */
+.character-profile .profile-references {
+  margin:0;
+  padding:0 0 0 2.2em;
+  font:14px/1.65 Arial,Helvetica,sans-serif;
+  color:#dce3ec;
+}
+.character-profile .profile-references li {
+  margin:0 0 8px;
+  padding-left:3px;
+  overflow-wrap:anywhere;
+  scroll-margin-top:calc(var(--profile-header-height) + 16px);
+}
+.character-profile .profile-references li::marker { color:#c8d1de; font-variant-numeric:tabular-nums; }
+.character-profile .profile-references li:target { background:#a4bdff0b; border-radius:4px; }
+.character-profile .reference-backlink { display:inline-block; padding:0 3px; font-weight:600; text-decoration:none; }
+.character-profile .reference-source { color:#a4bdff; }
+.character-profile .reference-label { font-style:italic; color:#aab8ca; }
+.character-profile .reference-empty { margin:0; color:#9daec2; font-size:14px; }

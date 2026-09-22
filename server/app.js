@@ -3,7 +3,9 @@ import {validImageUrl} from '../public/locations/countries/template.js';
 import {workspaceShell} from './workspace-shell.js';
 import {timelineRoute} from './timeline-routes.js';
 import {dashboardRoute} from './dashboard-routes.js';
-import {locationCatalog} from './countries.js';
+import {locationCatalog,defaultCountry} from './countries.js';
+import {defaultCity} from './cities.js';
+import {characterMentions} from './character-card-data.js';
 import { cityRoute } from './city-routes.js';
 import { countryRoute } from './country-routes.js';
 import { locationRoute } from './location-routes.js';
@@ -77,7 +79,11 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const factions=await factionCatalog(db,owner);
     const character=attachFactionNames([await db.get(owner,profile[1])||sampleCharacter(profile[1])].filter(Boolean),factions)[0];
     if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
-    return new Response(renderProfile(character,attachFactionNames(characterCast(await db.list(owner)),factions),factions,await locationCatalog(db,owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    const [savedCast,locations,countries,cities]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+    const cast=attachFactionNames(characterCast(savedCast),factions);
+    const countryMap=new Map(countries.map(p=>[p.id,p])),cityMap=new Map(cities.map(p=>[p.id,p]));
+    const notes=characterMentions(character,{character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))});
+    return new Response(renderProfile(character,cast,factions,locations,notes),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);

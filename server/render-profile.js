@@ -3,7 +3,7 @@ import { characters as seeds } from '../public/characters/data.js';
 import { templateSections, nameFields, storyRoles, alignments, humanFieldGroups, humanFields, humanChoices } from '../public/characters/template.js';
 import {escape,renderChoice,renderDateControl,renderFieldWrapper,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 export {escape} from './profile-components.js';
-export function renderProfile(character, cast, factions=[],locations=[]) {
+export function renderProfile(character, cast, factions=[],locations=[],notes=[]) {
  const color=seeds.find(c=>c.id===character.id)?.color||'blue';
  const initials=escape(character.name.trim().split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?');
  const field=([key,label,type])=>{
@@ -30,9 +30,14 @@ export function renderProfile(character, cast, factions=[],locations=[]) {
   const fields=section.id==='overview'?[section.fields[1],section.fields[0]]:section.fields;
   const content=section.id==='relationships'?`<div data-profile-field="relationships"${character.hiddenFields?.includes('relationships')?' hidden':''}><div id="relationship-fields"></div><button type="button" id="add-relationship" class="quiet-button">+ Add relationship</button></div>`:fields.map(field).join('');
   return renderSection(section,content,character,{fullWidth:section.id==='relationships',menuFields:section.id==='relationships'?[['relationships','Relationship entries']]:section.fields});
- }).join('');
+ }).join('')+renderSection({id:'notes',title:'Notes',fields:[]},renderNotes(notes),character);
  const identityFields=templateSections[0].fields.filter(f=>f[0]!=='title'&&!humanFields.some(h=>h[0]===f[0]));
  const cardGroups=[{title:'Character information',fields:identityFields},...humanFieldGroups].map((group,index)=>renderInfoGroup(group.title,'identity-group-'+index,group.fields.map(field).join(''))).join('');
  const infobox=renderProfileName(character,'character')+`<div class="epithet-field">${field(templateSections[0].fields.find(f=>f[0]==='title'))}</div><div class="identity-panel ${color}"><span class="monogram" id="monogram">${initials}</span></div>${cardGroups}<small class="name-hint">Dates can use your story’s calendar. Height and weight use the selected units.</small><small class="name-hint">Names can include hyphens and spaces.</small>`;
- return renderProfilePage({record:character,type:'character',collection:'Characters',collectionUrl:'/characters/',infobox,content:body,script:'/characters/profile-editor.js',styles:['/characters/attribute-controls.css','/characters/profile-card.css'],initial:{character,cast:cast.map(c=>({id:c.id,name:c.name})),factions}});
+ return renderProfilePage({record:character,type:'character',collection:'Characters',collectionUrl:'/characters/',infobox,content:body,script:'/characters/profile-editor.js',styles:['/characters/attribute-controls.css','/characters/profile-card.css','/characters/profile-notes.css'],initial:{character,cast:cast.map(c=>({id:c.id,name:c.name})),factions}});
+}
+
+function renderNotes(notes){
+ if(!notes.length)return '<p class="reference-empty">No notes mention this character yet.</p>';
+ return `<ol class="profile-references">${notes.map((note,index)=>`<li id="character-note-${index+1}"><a class="reference-backlink" href="${escape(note.href)}" aria-label="Open source for note ${index+1}: ${escape(note.source)}" title="Open source">↑</a> <a class="reference-source" href="${escape(note.href)}">${escape(note.source)}</a>. <span class="reference-label">${escape(note.label)}</span>. <span class="reference-text">${escape(note.text.replace(/\s+/g,' ').trim())}</span></li>`).join('')}</ol>`;
 }

@@ -71,3 +71,20 @@ test('section ratings save together without losing existing ratings or prose, an
   const update=await request('/api/characters/claude','PUT',{...saved,attributeRatings:revised});assert.equal(update.status,200);assert.deepEqual((await update.json()).attributeRatings,revised);
  }finally{db.close();}
 });
+
+test('profile notes render numbered references to saved sources and escape their text',async()=>{
+ const {db,request}=setup();try{
+  const hero=await (await request('/api/characters/claude')).json();
+  const source=await (await request('/api/characters/gpt')).json();
+  const text=hero.name+' found the <sealed> ledger & kept it safe.';
+  const saved=await request('/api/characters/gpt','PUT',{...source,biography:text});assert.equal(saved.status,200);
+  const html=await (await request('/characters/claude/')).text();
+  assert.match(html,/id="notes" class="profile-section"/);
+  assert.match(html,/aria-controls="notes-body" data-collapse-target="notes-body"/);
+  assert.match(html,/<ol class="profile-references"><li id="character-note-1">/);
+  assert.ok(html.includes('href="/characters/gpt/#field-biography"'));
+  assert.ok(html.includes('&lt;sealed&gt; ledger &amp; kept it safe.'));
+  assert.ok(!html.includes('<sealed>'));
+  const other=await (await request('/characters/claude/','GET',undefined,'other-author')).text();assert.ok(!other.includes('&lt;sealed&gt; ledger'));
+ }finally{db.close();}
+});
