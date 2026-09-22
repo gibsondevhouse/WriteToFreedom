@@ -1,3 +1,4 @@
+import {validateNotes} from '../public/characters/notes.js';
 import {validateRatings} from '../public/characters/attributes.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
 import {workspaceShell} from './workspace-shell.js';
@@ -46,6 +47,7 @@ function validate(input,current) {
  const nationalities=output.nationality.split(/\s*·\s*/).filter(Boolean);
  output.nationalityContinents=Object.fromEntries(Object.entries(assignments).filter(([name])=>nationalities.includes(name)));
  if(Object.values(output.nationalityContinents).some(id=>typeof id!=='string'))throw new Error('Choose an existing continent.');
+ output.notes=validateNotes(Object.hasOwn(input,'notes')?input.notes:(current.notes||[]),output);
  output.attributeRatings=validateRatings(Object.hasOwn(input,'attributeRatings')?input.attributeRatings:(current.attributeRatings||{}));
  const hidden=Object.hasOwn(input,'hiddenFields')?input.hiddenFields:current.hiddenFields||[];
  if(!Array.isArray(hidden)||hidden.length>hideableFields.length||hidden.some(key=>!hideableFields.includes(key)))throw new Error('Invalid field visibility settings.');
@@ -82,7 +84,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const [savedCast,locations,countries,cities]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
     const cast=attachFactionNames(characterCast(savedCast),factions);
     const countryMap=new Map(countries.map(p=>[p.id,p])),cityMap=new Map(cities.map(p=>[p.id,p]));
-    const notes=characterMentions(character,{character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))});
+    const notes=characterMentions(character,{character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))},{includeOwn:false});
     return new Response(renderProfile(character,cast,factions,locations,notes),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];

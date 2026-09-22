@@ -81,7 +81,7 @@ test('profile notes render numbered references to saved sources and escape their
   const html=await (await request('/characters/claude/')).text();
   assert.match(html,/id="notes" class="profile-section"/);
   assert.match(html,/aria-controls="notes-body" data-collapse-target="notes-body"/);
-  assert.match(html,/<ol class="profile-references"><li id="character-note-1">/);
+  assert.match(html,/<ol id="mentioned-notes" class="profile-references" start="1"><li id="character-note-1">/);
   assert.ok(html.includes('href="/characters/gpt/#field-biography"'));
   assert.ok(html.includes('&lt;sealed&gt; ledger &amp; kept it safe.'));
   assert.ok(!html.includes('<sealed>'));

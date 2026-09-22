@@ -1,5 +1,5 @@
 import {profileChoices,multiChoiceFields,nationalityGroups} from '../public/profiles/choices.js';
-export const profileRevision='reference-notes-1';
+export const profileRevision='cursor-notes-1';
 export const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const jsonData=value=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
 const chevron='<svg class="collapse-chevron" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';
@@ -36,8 +36,8 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
   return renderFieldWrapper(record,key,label,type,control);
  };
 }
-export function renderSection(section,content,record,{fullWidth=false,menuFields=section.fields}={}){
- const menu=menuFields.length?`<details class="field-menu"><summary aria-label="Choose visible fields for ${escape(section.title)}" title="Choose visible fields"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg></summary><div class="field-menu-panel">${menuFields.map(([key,label])=>`<label><input type="checkbox" data-visibility="${key}"${record.hiddenFields?.includes(key)?'':' checked'}> ${escape(label)}</label>`).join('')}<div class="visibility-actions"><button type="button" data-visibility-all="show">Show all</button><button type="button" data-visibility-all="hide">Hide all</button></div></div></details>`:'';
+export function renderSection(section,content,record,{fullWidth=false,menuFields=section.fields,allowNotes=false}={}){
+ const menu=menuFields.length?`<details class="field-menu"><summary aria-label="Choose visible fields for ${escape(section.title)}" title="Choose visible fields"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg></summary><div class="field-menu-panel">${menuFields.map(([key,label])=>`<label><input type="checkbox" data-visibility="${key}"${record.hiddenFields?.includes(key)?'':' checked'}> ${escape(label)}</label>`).join('')}<div class="visibility-actions"><button type="button" data-visibility-all="show">Show all</button><button type="button" data-visibility-all="hide">Hide all</button></div>${allowNotes?'<button type="button" class="create-profile-note" data-create-note>Create a note</button>':''}</div></details>`:'';
  return `<section id="${section.id}" class="profile-section${fullWidth?' full-width':''}"><div class="section-header"><h2>${headingButton(section.title,section.id+'-body')}</h2>${menu}</div><div id="${section.id}-body" class="collapsible-region">${content}</div></section>`;
 }
 export function renderInfoGroup(title,id,content){return `<div class="card-group"><h3>${headingButton(title,id)}</h3><div id="${id}" class="collapsible-region">${content}</div></div>`;}

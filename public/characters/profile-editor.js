@@ -1,3 +1,4 @@
+import {initCharacterNotes} from './note-editor.js?v=1';
 import {attributeGroups} from './attributes.js?v=section-attributes-1';
 import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
 import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';
@@ -59,6 +60,7 @@ for(const sectionId of new Set(attributeGroups.map(group=>group.sectionId))){
  document.querySelector('#'+sectionId+'-body').append(createAttributeControls(attributeRatings,markDirty,groups));
 }
 const controls=initProfileControls(form,markDirty,{nameField:'firstName',nationalityContinents}),choiceValues=controls.choiceValues;
+const noteEditor=initCharacterNotes(form,initial.character.notes||[],markDirty,controls);
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
 form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});
@@ -68,8 +70,8 @@ populateFactions(initial.character.factionId||'');
 initial.character.relationships.forEach(addRelationship);
 document.querySelector('#add-relationship').addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});
 form.addEventListener('submit',async event=>{
- event.preventDefault();if(saving||creatingFaction)return;if(!controls.commitChoices()||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
- const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.nationalityContinents={...nationalityContinents};payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
+ event.preventDefault();if(saving||creatingFaction||!noteEditor.readyToSave())return;if(!controls.commitChoices()||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
+ const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.notes=noteEditor.notes;payload.nationalityContinents={...nationalityContinents};payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
  try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();}

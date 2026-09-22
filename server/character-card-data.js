@@ -28,14 +28,16 @@ export function characterCardDetails(character,{cast,factions,countries,location
   return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},affiliationCard:affiliation,relationships,mentions};
 }
 
-export function characterMentions(character,profiles){
+export function characterMentions(character,profiles,{includeOwn=true}={}){
   const mentions=[];
+  if(includeOwn)for(const note of character.notes||[])mentions.push({source:character.name||'Untitled character',label:'Note',kind:'character',text:note.text,href:href('character',character.id)+'#note-'+note.id});
   for(const [kind,records] of Object.entries(profiles))for(const source of records){
     if(kind==='character'&&source.id===character.id)continue;
     for(const section of schemas[kind])for(const [key,label,type] of section.fields){
       if(type!=='textarea'||!source[key]?.trim()||!mentionsName(source[key],character.name))continue;
       mentions.push({source:source.name||'Untitled '+kind,label,kind,text:source[key],href:href(kind,source.id)+(source.hiddenFields?.includes(key)?'':'#field-'+key)});
     }
+    if(kind==='character')for(const note of source.notes||[]){if(mentionsName(note.text,character.name))mentions.push({source:source.name||'Untitled character',label:'Note',kind,text:note.text,href:href(kind,source.id)+'#note-'+note.id});}
     if(kind==='character')for(const relationship of source.relationships||[]){
       if(relationship.description?.trim()&&(relationship.targetId===character.id||mentionsName(relationship.description,character.name)))mentions.push({source:source.name||'Untitled character',label:'Relationship notes',kind,text:relationship.description,href:href(kind,source.id)+(source.hiddenFields?.includes('relationships')?'':'#relationships')});
     }
