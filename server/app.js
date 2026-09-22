@@ -39,6 +39,11 @@ function validate(input,current) {
  for(const [key,options] of Object.entries(humanChoices))if(output[key]&&!options.includes(output[key]))throw new Error('Choose a valid '+key+' option.');
  for(const key of ['height','weight','age'])if(output[key]&&(!Number.isFinite(Number(output[key]))||Number(output[key])<0||(key==='age'&&!Number.isInteger(Number(output[key])))))throw new Error('Use a nonnegative number for age, height, and weight.');
  if(!validImageUrl(output.portraitUrl)||output.portraitUrl.length>2048)throw new Error('Use an HTTPS portrait image URL of at most 2048 characters.');
+ const assignments=Object.hasOwn(input,'nationalityContinents')?input.nationalityContinents:(current.nationalityContinents||{});
+ if(!assignments||typeof assignments!=='object'||Array.isArray(assignments)||Object.keys(assignments).length>100)throw new Error('Choose a continent for each custom nationality.');
+ const nationalities=output.nationality.split(/\s*·\s*/).filter(Boolean);
+ output.nationalityContinents=Object.fromEntries(Object.entries(assignments).filter(([name])=>nationalities.includes(name)));
+ if(Object.values(output.nationalityContinents).some(id=>typeof id!=='string'))throw new Error('Choose an existing continent.');
  output.attributeRatings=validateRatings(Object.hasOwn(input,'attributeRatings')?input.attributeRatings:(current.attributeRatings||{}));
  const hidden=Object.hasOwn(input,'hiddenFields')?input.hiddenFields:current.hiddenFields||[];
  if(!Array.isArray(hidden)||hidden.length>hideableFields.length||hidden.some(key=>!hideableFields.includes(key)))throw new Error('Invalid field visibility settings.');
@@ -100,6 +105,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
      document.affiliation=faction.name;
     }
     const locations=await locationCatalog(db,owner);
+    if(Object.values(document.nationalityContinents).some(id=>!locations.some(l=>l.id===id&&l.type==='continent')))return json({error:'Choose a continent from your locations for each custom nationality.'},400);
     for(const key of ['birthPlaceId','residenceId','citizenshipId'])if(document[key]&&!locations.some(l=>l.id===document[key]&&(key!=='citizenshipId'||l.type==='country')))return json({error:'Choose an existing location for birthplace or residence, and a country for citizenship.'},400);
     const allowed=new Set([...seeds.map(c=>c.id),...(await db.list(owner)).map(c=>c.id)]);
     if(document.relationships.some(r=>r.targetId===id||!allowed.has(r.targetId)))return json({error:'Choose another existing character for each relationship.'},400);

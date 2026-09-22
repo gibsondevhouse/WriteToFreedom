@@ -22,7 +22,7 @@ export function repository(binding) {
   async saveCountry(owner,id,version,document) {
    const encoded=JSON.stringify(document),now=new Date().toISOString();
    const write=version===0?binding.prepare('INSERT INTO country_profiles (owner_id, location_id, document, version, updated_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(owner_id, location_id) DO NOTHING').bind(owner,id,encoded,now):binding.prepare('UPDATE country_profiles SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND location_id = ? AND version = ?').bind(encoded,now,owner,id,version);
-   const rename=binding.prepare('UPDATE locations SET name = ? WHERE owner_id = ? AND id = ? AND type = ? AND EXISTS (SELECT 1 FROM country_profiles WHERE owner_id = ? AND location_id = ? AND version = ? AND document = ?)').bind(document.name,owner,id,'country',owner,id,version+1,encoded);
+   const rename=binding.prepare('UPDATE locations SET name = ?, parent_id = ? WHERE owner_id = ? AND id = ? AND type = ? AND EXISTS (SELECT 1 FROM country_profiles WHERE owner_id = ? AND location_id = ? AND version = ? AND document = ?)').bind(document.name,document.parentId||null,owner,id,'country',owner,id,version+1,encoded);
    const [result]=await binding.batch([write,rename]);return result.meta.changes?{...document,id,version:version+1}:null;
   },
   async listLocationDetails(owner) {return (await binding.prepare('SELECT * FROM location_details WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.location_id,version:row.version}));},

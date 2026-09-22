@@ -3,12 +3,13 @@ import {initDatePicker} from './date-picker.js?v=profile-reading-1';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
-export function initProfileControls(form,markDirty,{nameField="name"}={}){
+export function initProfileControls(form,markDirty,{nameField="name",nationalityContinents={}}={}){
 initDatePicker(form);
 const pendingChoiceEditors=[],choiceValues=new Map();
 function buildChoiceControl(control){
  const value=control.querySelector('input[type="hidden"]'),select=control.querySelector('[data-choice-select]'),list=control.querySelector('.choice-values');
  const custom=control.querySelector('.choice-custom'),input=control.querySelector('[data-choice-custom-input]'),multiple=control.dataset.multiple==='true';
+ const continent=control.querySelector('[data-nationality-continent]');
  const key=control.dataset.choiceField;let current=value.value||'';choiceValues.set(key,current);
  let chosen=multiple?current.split(/\s*·\s*/).filter(Boolean):[];
  function storeChoice(text){current=text;choiceValues.set(key,text);value.value=text;}
@@ -18,7 +19,7 @@ function buildChoiceControl(control){
    select.value=current;return;
   }
   list.replaceChildren();
-  chosen.forEach((item,index)=>{const chip=node('span',undefined,'choice-chip'),label=node('span',item),remove=node('button','×');remove.type='button';remove.setAttribute('aria-label','Remove '+item);remove.addEventListener('click',()=>{chosen.splice(index,1);storeChoice(chosen.join(' · '));paint();markDirty();select.focus();});chip.append(label,remove);list.append(chip);});
+  chosen.forEach((item,index)=>{const chip=node('span',undefined,'choice-chip'),label=node('span',item),remove=node('button','×');remove.type='button';remove.setAttribute('aria-label','Remove '+item);remove.addEventListener('click',()=>{chosen.splice(index,1);if(key==='nationality')delete nationalityContinents[item];storeChoice(chosen.join(' · '));paint();markDirty();select.focus();});chip.append(label,remove);list.append(chip);});
   for(const option of select.options)option.disabled=chosen.includes(option.value);
   select.value='';
  }
@@ -28,13 +29,25 @@ function buildChoiceControl(control){
   if(multiple)chosen=chosen.includes(text)?chosen:[...chosen,text];
   storeChoice(multiple?chosen.join(' · '):text);paint();markDirty();return true;
  }
+ async function refreshContinents(){
+  try{const response=await fetch('/api/locations',{credentials:'same-origin',cache:'no-store'});if(!response.ok)return;const data=await response.json();const selected=continent.value;continent.replaceChildren(new Option('Custom continent',''),...data.locations.filter(l=>l.type==='continent').map(l=>new Option(l.name,l.id)));if([...continent.options].some(o=>o.value===selected))continent.value=selected;}catch{}
+ }
+ if(continent){continent.addEventListener('focus',refreshContinents);window.addEventListener('focus',()=>{if(!custom.hidden)refreshContinents();});}
  function closeCustom(){custom.hidden=true;input.value='';input.setCustomValidity('');}
- function commitCustom(){const text=input.value.trim();if(!text)return true;if(!choose(text))return false;closeCustom();return true;}
+ function commitCustom(){const text=input.value.trim();if(!text)return true;if(continent){if(continent.value)nationalityContinents[text]=continent.value;else delete nationalityContinents[text];}
+ if(!choose(text))return false;
+ if(continent&&!([...select.options].some(option=>option.value===text))){
+  let group=[...select.querySelectorAll('optgroup[data-continent]')].find(group=>group.dataset.continent===continent.value);
+  if(!group){group=node('optgroup');group.dataset.continent=continent.value;group.label=continent.selectedOptions[0].textContent;select.insertBefore(group,select.lastElementChild);}
+  const option=new Option(text,text);option.disabled=true;group.insertBefore(option,group.firstChild);
+ }
+ closeCustom();return true;}
  pendingChoiceEditors.push(commitCustom);
  select.addEventListener('change',()=>{
-  if(select.value==='__custom__'){paint();custom.hidden=false;input.focus();return;}
+  if(select.value==='__custom__'){paint();custom.hidden=false;input.focus();if(continent)refreshContinents();return;}
   const selection=select.value;
   if(multiple&&!selection)return;
+  if(continent){const continentId=select.selectedOptions[0]?.parentElement?.dataset.continent;if(continentId)nationalityContinents[selection]=continentId;else delete nationalityContinents[selection];}
   choose(selection);closeCustom();
  });
  input.addEventListener('input',()=>input.setCustomValidity(''));

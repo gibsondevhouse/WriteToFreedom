@@ -1,4 +1,4 @@
-import {ancestors} from '../public/locations/data.js';
+import {ancestors,typeLabels} from '../public/locations/data.js';
 import { characters as seeds } from '../public/characters/data.js';
 import { templateSections, nameFields, storyRoles, alignments, humanFieldGroups, humanFields, humanChoices } from '../public/characters/template.js';
 import {escape,renderChoice,renderDateControl,renderFieldWrapper,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
@@ -17,9 +17,9 @@ export function renderProfile(character, cast, factions=[],locations=[]) {
    control=`<select ${attrs}><option value="">${type==='faction'?'No faction selected':'Not yet chosen'}</option>${choices.map(([v,l])=>`<option value="${escape(v)}"${v===selected?' selected':''}>${escape(l)}</option>`).join('')}${type==='faction'?'<option value="__create__">+ Create a faction…</option>':''}</select>`;
   }else if(type==='location'||type==='country'){
    const choices=locations.filter(l=>type==='location'||l.type==='country');
-   control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(l=>`<option value="${escape(l.id)}"${val===l.id?' selected':''}>${escape(l.name)}${type==='location'?' — '+escape(ancestors(l,locations).map(p=>p.name).join(' › ')||'Country'):''}</option>`).join('')}</select>`;
+   control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(l=>`<option value="${escape(l.id)}"${val===l.id?' selected':''}>${escape(l.name)}${type==='location'?' — '+escape(ancestors(l,locations).map(p=>p.name).join(' › ')||typeLabels[l.type]):''}</option>`).join('')}</select>`;
   }else if(type==='number')control=`<input ${attrs} type="number" min="0" step="${key==='age'?'1':'any'}" value="${escape(val)}" placeholder="Not set">`;
-  else if(type==='choice')control=renderChoice(key,label,val,attrs);
+  else if(type==='choice')control=renderChoice(key,label,val,attrs,{continents:locations.filter(l=>l.type==='continent'),nationalityContinents:character.nationalityContinents||{}});
   else if(type==='date')control=renderDateControl(key,label,val,attrs);
   else if(type==='url')control=`<input ${attrs} type="url" pattern="https://.*" maxlength="2048" value="${escape(val)}" placeholder="https://…">`;
   else if(type==='input')control=`<input ${attrs} type="text" autocomplete="off" maxlength="${nameFields.includes(key)?160:10000}" value="${escape(val)}" placeholder="Add ${escape(label.toLowerCase())}…">`;

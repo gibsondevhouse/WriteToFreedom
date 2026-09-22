@@ -1,5 +1,8 @@
-export const locationTypes=['country','city','area','landmark'];
-export const typeLabels={country:'Country',city:'City',area:'Area',landmark:'Landmark'};
+export const locationTypes=['universe','galaxy','solar-system','planet','moon','continent','country','city','area','landmark'];
+export const typeLabels={universe:'Universe',galaxy:'Galaxy','solar-system':'Solar system',planet:'Planet',moon:'Moon',continent:'Continent',country:'Country',city:'City',area:'Area',landmark:'Landmark'};
+export const typePlurals={universe:'Universes',galaxy:'Galaxies','solar-system':'Solar systems',planet:'Planets',moon:'Moons',continent:'Continents',country:'Countries',city:'Cities',area:'Areas',landmark:'Landmarks'};
+export const parentTypes={universe:[],galaxy:['universe'],'solar-system':['galaxy'],planet:['solar-system'],moon:['planet'],continent:['planet','moon'],country:['continent','planet','moon'],city:['country'],area:['city','area'],landmark:['city','area']};
+export const requiresParent=type=>['city','area','landmark'].includes(type);
 export const seedLocations=[
  {id:'sample-kingdom',name:'The Fractured Kingdom',type:'country',parentId:null},
  {id:'sample-capital',name:'The Capital',type:'city',parentId:'sample-kingdom'},
@@ -15,7 +18,7 @@ export function ancestors(location,records){
  return path;
 }
 export function parentChoices(type,records,id){
- return records.filter(r=>(type==='city'?r.type==='country':['city','area'].includes(r.type))&&r.id!==id&&!ancestors(r,records).some(a=>a.id===id));
+ return records.filter(r=>(parentTypes[type]||[]).includes(r.type)&&r.id!==id&&!ancestors(r,records).some(a=>a.id===id));
 }
 export function selectLocations(records,query='',type='',sort='order',reverse=false){
  const needle=query.trim().toLocaleLowerCase();

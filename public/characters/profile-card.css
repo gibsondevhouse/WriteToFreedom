@@ -48,3 +48,5 @@
 .character-profile .infobox .name-hint { color:#8390a2; line-height:1.6; }
 .character-profile .infobox .choice-custom,
 .character-profile .infobox .faction-create-panel { border-radius:8px; background:#1b2533; border-color:#ffffff14; }
+
+.nationality-continent-link{display:block;font-size:12px;margin:6px 0 10px;color:#97acd1}.choice-custom>label{display:block;font-size:12px;color:#98a5b7;margin-bottom:4px}

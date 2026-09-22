@@ -28,7 +28,7 @@ test('location mutations require identity, same origin, a valid type, and a nonb
  assert.equal((await request('GET',undefined,null)).status,401);
  assert.equal((await request('POST',record,'author-a','https://other.example')).status,403);
  assert.equal((await request('POST',{...record,name:' '})).status,400);
- assert.equal((await request('POST',{...record,type:'continent'})).status,400);
+ assert.equal((await request('POST',{...record,type:'invalid-type'})).status,400);
  assert.equal((await request('POST',{...record,name:'x'.repeat(161)})).status,400);
  assert.equal((await request('PUT',record)).status,404);
 });

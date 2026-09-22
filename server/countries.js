@@ -2,9 +2,9 @@ import {seedLocations} from '../public/locations/data.js';
 import {blankCountry} from '../public/locations/countries/template.js';
 export async function locationCatalog(db,owner){
  const [locations,countries,cities,details]=await Promise.all([db.listLocations(owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLocationDetails(owner)]);
- const countryNames=new Map(countries.map(p=>[p.id,p.name])),cityProfiles=new Map(cities.map(p=>[p.id,p]));
+ const countryProfiles=new Map(countries.map(p=>[p.id,p])),cityProfiles=new Map(cities.map(p=>[p.id,p]));
  const locationDetails=new Map(details.map(p=>[p.id,p]));
- return [...seedLocations,...locations].map(r=>{if(['area','landmark'].includes(r.type)){const detail=locationDetails.get(r.id);return {...r,version:0,...detail};}const profile=cityProfiles.get(r.id);return r.type==='city'&&profile?{...r,name:profile.name,parentId:profile.parentId}:{...r,name:countryNames.get(r.id)??r.name};});
+ return [...seedLocations,...locations].map(r=>{if(!['country','city'].includes(r.type)){const detail=locationDetails.get(r.id);return {...r,version:0,...detail};}const profile=cityProfiles.get(r.id);return r.type==='city'&&profile?{...r,name:profile.name,parentId:profile.parentId}:{...r,name:countryProfiles.get(r.id)?.name??r.name,parentId:countryProfiles.get(r.id)?.parentId??r.parentId};});
 }
 export function defaultCountry(location){return {...blankCountry(),...(location.id==='sample-kingdom'?{
  capitalId:'sample-capital',governmentType:'Kingdom',
@@ -15,4 +15,4 @@ export function defaultCountry(location){return {...blankCountry(),...(location.
  government:'The houses maintain their agreements through negotiation and the work of mediators. The House of Ember preserves the treaties that define their obligations.',
  infrastructure:'Travel between isolated cities remains difficult. The Lantern Guild is developing a transport network that could reconnect them.',
  questions:'What first united the houses?\nWhich parts of the founding history have been concealed?'
- }:{}),name:location.name,id:location.id,version:0};}
+ }:{}),name:location.name,parentId:location.parentId||'',id:location.id,version:0};}

@@ -1,12 +1,13 @@
 import {attributeGroups} from './attributes.js?v=section-attributes-1';
 import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
-import {initProfileControls,resize} from '../profiles/controls.js?v=profile-reading-1';
+import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';
 import { fieldNames, nameFields, fullName } from './template.js?v=character-cards-1';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
 const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');
 let documentVersion=initial.character.version,cast=initial.cast,factions=initial.factions,dirty=false,saving=false;
 const relationshipHost=document.querySelector('#relationship-fields');
+const nationalityContinents={...(initial.character.nationalityContinents||{})};
 const attributeRatings={...(initial.character.attributeRatings||{})};
 let factionSelect,factionPanel,factionName,factionFeedback,createFactionButton,cancelFactionButton,previousFaction='',legacyAffiliation=initial.character.affiliation||'',creatingFaction=false,factionRequestId;
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
@@ -57,7 +58,7 @@ for(const sectionId of new Set(attributeGroups.map(group=>group.sectionId))){
  const groups=attributeGroups.filter(group=>group.sectionId===sectionId);
  document.querySelector('#'+sectionId+'-body').append(createAttributeControls(attributeRatings,markDirty,groups));
 }
-const controls=initProfileControls(form,markDirty,{nameField:'firstName'}),choiceValues=controls.choiceValues;
+const controls=initProfileControls(form,markDirty,{nameField:'firstName',nationalityContinents}),choiceValues=controls.choiceValues;
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
 form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});
@@ -68,7 +69,7 @@ initial.character.relationships.forEach(addRelationship);
 document.querySelector('#add-relationship').addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});
 form.addEventListener('submit',async event=>{
  event.preventDefault();if(saving||creatingFaction)return;if(!controls.commitChoices()||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
- const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
+ const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.nationalityContinents={...nationalityContinents};payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
  try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();}
