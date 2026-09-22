@@ -91,3 +91,29 @@ test('legacy connections become inline references without duplicating names, and
  const n={id:crypto.randomUUID(),field:'arc',position:null,text:'<script>bad</script>',content:[{text:'<script>bad</script>',ref:{...ref,href:'javascript:bad()'}}]};
  assert.deepEqual(validateNotes([n],{})[0].content[0].ref,ref);
 });
+
+test('quick-created items of every linkable type can be inserted and saved without replacing the current profile',async()=>{
+ const db=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())db.exec(readFileSync('drizzle/'+file,'utf8'));
+ const worker=createWorker({}),env={DB:d1Adapter(db)};
+ const request=(path,method='GET',body,owner='author')=>worker.fetch(new Request('https://novel.example'+path,{method,headers:{origin:'https://novel.example','content-type':'application/json','oai-authenticated-user-id':owner},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
+ try{
+  const id=crypto.randomUUID();let response=await request('/api/characters','POST',{id,name:'New traveler'});assert.equal(response.status,201);const created=await response.json();assert.equal(created.name,'New traveler');assert.equal(created.firstName,'New traveler');
+  response=await request('/api/characters','POST',{id,name:'Changed retry'});assert.equal((await response.json()).name,'New traveler');assert.equal((await request('/api/characters/'+id,'GET',undefined,'other')).status,404);
+  assert.equal((await request('/api/characters','POST',{id:crypto.randomUUID(),name:' '})).status,400);
+  const faction=await (await request('/api/factions','POST',{id:crypto.randomUUID(),name:'The New Circle'})).json();
+  const locations=[],parents={};
+  for(const [type,parentType] of [['universe',null],['galaxy','universe'],['solar-system','galaxy'],['planet','solar-system'],['moon','planet'],['continent','planet'],['country','continent'],['city','country'],['area','city'],['landmark','area']]){
+   const location={id:crypto.randomUUID(),name:'New '+type,type,parentId:parents[parentType]||null,...(type==='area'?{areaType:'District'}:{})};
+   response=await request('/api/locations','POST',location);assert.equal(response.status,201);const saved=await response.json();parents[type]=saved.id;locations.push(saved);
+  }
+  const base=await (await request('/api/characters/gemini')).json();
+  const related={id:crypto.randomUUID(),title:'New lore',type:'lore',field:'arc',position:null,text:'A hidden custom.',content:[{text:'A hidden custom.'}],links:[]};
+  const detail={...related,id:crypto.randomUUID(),title:'New note',type:'detail'};
+  const refs=[{kind:'character',id:created.id},{kind:'faction',id:faction.id},...locations.map(l=>({kind:'location',id:l.id})),{kind:'note',id:related.id,characterId:'gemini'},{kind:'note',id:detail.id,characterId:'gemini'}];
+  const content=refs.flatMap((ref,i)=>[{text:i?' and ':'About '},{text:'Item '+i,ref}]);
+  const note={id:crypto.randomUUID(),field:'arc',position:0,text:content.map(p=>p.text).join(''),content};
+  // New unanchored note/lore entries precede the current draft's marker.
+  response=await request('/api/characters/gemini','PUT',{...base,arc:'[3]'+base.arc,notes:[related,detail,note]});assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.notes[2].links.length,14);assert.equal(saved.notes[2].position,0);assert.equal(saved.biography,base.biography);
+  const page=await (await request('/characters/gemini/')).text();assert.ok(page.includes('/characters/'+created.id+'/'));assert.ok(page.includes('#note-'+related.id));
+ }finally{db.close();}
+});

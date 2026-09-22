@@ -1,3 +1,4 @@
+import {createNoteItemButton} from './create-note-item.js';
 import {createInlineNoteEditor} from './inline-note-editor.js';
 import {createNoteConnections} from './note-connections.js';
 import {noteFields,noteMarker,moveNoteAnchors} from './notes.js';
@@ -17,6 +18,12 @@ export function initCharacterNotes(form,initial,markDirty,controls,profileData){
  const cancel=action('Cancel',()=>dialog.close()),submit=make('button','note-submit','Add note');submit.type='submit';
  buttons.append(cancel,submit);editor.append(heading,context,label,input,richBody.error,buttons);dialog.append(editor);document.body.append(dialog);
  const connections=createNoteConnections(editor,input,profileData,()=>notes,richBody);
+ buttons.prepend(createNoteItemButton(profileData,connections,value=>{
+  if(notes.length>=(editing?100:99))throw new Error('This profile has no room for another note. Remove one before creating another.');
+  const note={...value,field:editing?.field||pending.field,position:null,content:[{text:value.text}],links:[]};
+  notes.push(note);render();markDirty();
+  return {kind:'note',id:note.id,characterId:profileData.character.id,label:note.title,group:note.type==='lore'?'Lore':'Notes',href:'#note-'+note.id};
+ }));
  function fieldInput(field){return form.elements.namedItem(field);}
  function revealSource(source){controls.revealAncestors(source);const field=source.closest('[data-profile-field]');if(field?.hidden){const toggle=form.querySelector('[data-visibility="'+source.name+'"]');if(toggle){toggle.checked=true;toggle.dispatchEvent(new Event('change',{bubbles:true}));}}resize(source);}
  function jump(note){const source=fieldInput(note.field);revealSource(source);source.focus();const position=note.position??0;source.setSelectionRange(position,position+(note.position===null?0:noteMarker(notes.indexOf(note)).length));source.scrollIntoView({block:'center',behavior:'smooth'});}

@@ -102,7 +102,9 @@ function createAppWorker(assets) { return {async fetch(request,env) {
    if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid character data.'},400);
    if(request.method==='POST'&&!id) {
     if(!idPattern.test(input.id))return json({error:'Invalid character ID.'},400);
-    const character=await db.create(owner,input.id,blankCharacter());return character?json(character,201):json({error:'Could not create this character. Try again.'},409);
+    if(Object.hasOwn(input,'name')&&(typeof input.name!=='string'||!input.name.trim()||input.name.length>160))return json({error:'Enter a character name of 1–160 characters.'},400);
+    const document=blankCharacter();if(input.name){document.firstName=input.name.trim();document.name=document.firstName;}
+    const character=await db.create(owner,input.id,document);return character?json(character,201):json({error:'Could not create this character. Try again.'},409);
    }
    if(request.method==='PUT'&&id) {
     const current=await db.get(owner,id)||sampleCharacter(id);

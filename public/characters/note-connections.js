@@ -25,7 +25,10 @@ export function createNoteConnections(editor,body,initial,getNotes,richBody){
  }
  select.addEventListener('change',()=>add.disabled=!select.value);search.addEventListener('input',render);
  search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(select.options.length===2){select.selectedIndex=1;add.disabled=false;add.click();}else select.focus();}});
+ function checkInsert(label){if(contentReferences(richBody.read()).length>=30)throw new Error('Use up to 30 linked items. Remove a link before creating another.');if(body.value.length+label.length+1>2000)throw new Error('Shorten the note before inserting another item; the limit is 2,000 characters.');}
  return {
+  checkInsert,
+  insertCreated(target){initial.noteTargets||=[];if(!initial.noteTargets.some(t=>referenceKey(t)===referenceKey(target)))initial.noteTargets.push(target);richBody.insert(target);search.value='';feedback.textContent='';render();},
   load(note){currentId=note?.id||null;title.value=note?.title||'';type.value=note?.type||'detail';legacyTags=note?.tags||[];richBody.load(noteContent(note||{text:''},targets()));search.value='';feedback.textContent='';render();},
   read(){const content=richBody.read();if(content.length>200){body.setCustomValidity('This note has too many separate text pieces. Shorten it before saving.');body.reportValidity();return null;}return {title:title.value.trim(),type:type.value,content,links:contentReferences(content),...(legacyTags.length?{tags:legacyTags}:{})};},
   renderText(note){const text=node('span','reference-text'),all=targets();for(const part of noteContent(note,all)){const target=part.ref&&all.find(t=>referenceKey(t)===referenceKey(part.ref));const child=node(target?'a':'span',target?'note-inline-link':'',part.text);if(target)child.href=target.href;text.append(child);}return text;},
