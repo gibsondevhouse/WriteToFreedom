@@ -1,7 +1,9 @@
 export const attributeGroups = [
-  {id:'physical', title:'Physical', fields:[['strength','Strength'],['speed','Speed'],['agility','Agility'],['endurance','Endurance']]},
-  {id:'mind', title:'Mind', fields:[['intelligence','Intelligence'],['perception','Perception'],['willpower','Willpower'],['creativity','Creativity']]},
-  {id:'presence', title:'Presence', fields:[['charisma','Charisma'],['empathy','Empathy'],['leadership','Leadership'],['deception','Deception']]},
+  {id:'physical', sectionId:'personality', title:'Physical', fields:[['strength','Strength'],['speed','Speed'],['agility','Agility'],['endurance','Endurance']]},
+  {id:'mind', sectionId:'personality', title:'Mind', fields:[['intelligence','Intelligence'],['perception','Perception'],['creativity','Creativity'],['adaptability','Adaptability']]},
+  {id:'expression', sectionId:'tendencies', title:'Tendencies & voice', fields:[['leadership','Leadership'],['assertiveness','Assertiveness'],['composure','Composure'],['deception','Deception']]},
+  {id:'drive', sectionId:'motivations', title:'Motivations & conflicts', fields:[['willpower','Willpower'],['workEthic','Work ethic'],['planning','Planning'],['ambition','Ambition']]},
+  {id:'connection', sectionId:'relationships', title:'Relationships', fields:[['charisma','Charisma'],['empathy','Empathy'],['consistency','Consistency'],['loyalty','Loyalty']]},
 ];
 export const attributeKeys = attributeGroups.flatMap(group=>group.fields.map(([key])=>key));
 export function validateRatings(value) {

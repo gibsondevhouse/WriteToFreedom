@@ -57,3 +57,17 @@ test('morality selector saves independently of attribute ratings, imagery, and r
  assert.equal((await request('/api/characters/claude','PUT',{...updated,alignment:'invented'})).status,400);
  db.close();
 });
+
+test('section ratings save together without losing existing ratings or prose, and reach dashboard cards',async()=>{
+ const {db,request}=setup();
+ try{
+  const original=await (await request('/api/characters/claude')).json();
+  const attributeRatings={strength:72,intelligence:83,willpower:60,leadership:34,charisma:91,deception:18,adaptability:65,assertiveness:50,composure:77,workEthic:99,planning:0,ambition:42,consistency:80,loyalty:95};
+  const response=await request('/api/characters/claude','PUT',{...original,attributeRatings});assert.equal(response.status,200);
+  const saved=await (await request('/api/characters/claude')).json();
+  assert.deepEqual(saved.attributeRatings,attributeRatings);assert.equal(saved.strength,original.strength);assert.equal(saved.personality,original.personality);assert.deepEqual(saved.relationships,original.relationships);
+  const dashboard=await (await request('/api/dashboard')).json();assert.deepEqual(dashboard.characters.find(c=>c.id==='claude').attributeRatings,attributeRatings);
+  const revised={...attributeRatings,consistency:82};delete revised.planning;
+  const update=await request('/api/characters/claude','PUT',{...saved,attributeRatings:revised});assert.equal(update.status,200);assert.deepEqual((await update.json()).attributeRatings,revised);
+ }finally{db.close();}
+});

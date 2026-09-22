@@ -1,7 +1,7 @@
-import {createAttributeControls} from '../characters/attribute-controls.js';
+import {createAttributeControls} from '../characters/attribute-controls.js?v=section-attributes-1';
 import {alignments} from '../characters/template.js?v=character-cards-1';
 import {createConnectionsMap} from './connections-map.js';
-import {moralityIcons} from '../characters/attributes.js';
+import {moralityIcons} from '../characters/attributes.js?v=section-attributes-1';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function button(text,cls,action){const n=el('button',cls,text);n.type='button';n.addEventListener('click',action);return n;}

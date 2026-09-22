@@ -1,11 +1,11 @@
-import {attributeGroups} from './attributes.js';
+import {attributeGroups} from './attributes.js?v=section-attributes-1';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 
 // Mutates the supplied ratings draft; an empty numeric input leaves an attribute unrated.
-export function createAttributeControls(draft,markDirty){
+export function createAttributeControls(draft,markDirty,selectedGroups=attributeGroups){
   const groups=el('div','attribute-groups');
-  for(const group of attributeGroups){
+  for(const group of selectedGroups){
    const section=el('section','attribute-group '+group.id);section.append(el('h3','',group.title));const grid=el('div','attribute-ring-grid');
    for(const [key,name]of group.fields){
     const row=el('div','attribute-dial'),label=el('label','attribute-label',name),number=el('input','attribute-number'),ring=el('div','attribute-ring');

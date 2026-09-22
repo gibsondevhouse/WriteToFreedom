@@ -1,4 +1,4 @@
-@import url("/characters/attribute-controls.css?v=1");
+@import url("/characters/attribute-controls.css?v=2");
 /* Portrait-led story cards, with affiliation and character-specific actions. */
 .workspace .story-character-card { width:340px; max-width:calc(100vw - 40px); height:440px; padding:0; border:1px solid #ffffff18; border-radius:18px; background:linear-gradient(155deg,var(--tone),#152331 80%); text-align:left; box-shadow:0 10px 30px #0002; }
 .character-profile-link { position:relative; display:flex; flex:1; align-items:flex-end; min-height:0; isolation:isolate; color:#f2f5fb; text-decoration:none; }

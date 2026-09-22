@@ -1,4 +1,5 @@
-import {createAttributeControls} from './attribute-controls.js';
+import {attributeGroups} from './attributes.js?v=section-attributes-1';
+import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
 import {initProfileControls,resize} from '../profiles/controls.js?v=profile-reading-1';
 import { fieldNames, nameFields, fullName } from './template.js?v=character-cards-1';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
@@ -52,7 +53,10 @@ function addRelationship(value={targetId:'',type:'',description:''}){
  const description=node('textarea');description.dataset.key='description';description.rows=2;description.maxLength=10000;description.value=value.description;description.setAttribute('aria-label','Relationship dynamic');description.placeholder='Describe their relationship…';
  function preview(){caption.textContent=description.value.trim()||'Add relationship details';}preview();description.addEventListener('input',preview);notes.append(description);notes.addEventListener('toggle',()=>{if(notes.open)resize(description);});row.append(notes);relationshipHost.append(row);
 }
-document.querySelector('#personality-body').append(createAttributeControls(attributeRatings,markDirty));
+for(const sectionId of new Set(attributeGroups.map(group=>group.sectionId))){
+ const groups=attributeGroups.filter(group=>group.sectionId===sectionId);
+ document.querySelector('#'+sectionId+'-body').append(createAttributeControls(attributeRatings,markDirty,groups));
+}
 const controls=initProfileControls(form,markDirty,{nameField:'firstName'}),choiceValues=controls.choiceValues;
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
