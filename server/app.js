@@ -1,3 +1,5 @@
+import {validateRatings} from '../public/characters/attributes.js';
+import {validImageUrl} from '../public/locations/countries/template.js';
 import {workspaceShell} from './workspace-shell.js';
 import {timelineRoute} from './timeline-routes.js';
 import {dashboardRoute} from './dashboard-routes.js';
@@ -36,6 +38,8 @@ function validate(input,current) {
  });
  for(const [key,options] of Object.entries(humanChoices))if(output[key]&&!options.includes(output[key]))throw new Error('Choose a valid '+key+' option.');
  for(const key of ['height','weight','age'])if(output[key]&&(!Number.isFinite(Number(output[key]))||Number(output[key])<0||(key==='age'&&!Number.isInteger(Number(output[key])))))throw new Error('Use a nonnegative number for age, height, and weight.');
+ if(!validImageUrl(output.portraitUrl)||output.portraitUrl.length>2048)throw new Error('Use an HTTPS portrait image URL of at most 2048 characters.');
+ output.attributeRatings=validateRatings(Object.hasOwn(input,'attributeRatings')?input.attributeRatings:(current.attributeRatings||{}));
  const hidden=Object.hasOwn(input,'hiddenFields')?input.hiddenFields:current.hiddenFields||[];
  if(!Array.isArray(hidden)||hidden.length>hideableFields.length||hidden.some(key=>!hideableFields.includes(key)))throw new Error('Invalid field visibility settings.');
  output.hiddenFields=[...new Set(hidden)];

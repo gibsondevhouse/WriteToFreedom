@@ -9,7 +9,7 @@ export function renderFaction(faction,cast){
  (s.id==='members'?roster+'<p class="section-note">Choose this faction on a character’s profile to add them here.</p>':'')+s.fields.map(field).join(''),faction,{fullWidth:s.id==='ideology'})).join('');
  const fields=(keys)=>keys.map(key=>field(factionSections[0].fields.find(f=>f[0]===key))).join('');
  const infobox=renderProfileName(faction,'faction')+`<div class="epithet-field">${fields(['motto'])}</div><div class="identity-panel blue"><span id="monogram" class="monogram">${initials}</span></div>`+
-  renderInfoGroup('Faction information','identity-information',fields(['name','type','status','founded']))+
+  renderInfoGroup('Faction information','identity-information',fields(['name','type','status','founded','imageUrl']))+
   renderInfoGroup('Leadership','identity-leadership',fields(['founderId','leaderId']))+
   renderInfoGroup('Location & headquarters','identity-location',fields(['location','headquarters']))+
   `<a class="member-count" href="#members">${members.length} affiliated ${members.length===1?'character':'characters'}</a>`;

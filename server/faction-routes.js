@@ -1,3 +1,4 @@
+import {validImageUrl} from '../public/locations/countries/template.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
 import { repository } from './db.js';
 import { factionCatalog, attachFactionNames } from './factions.js';
@@ -36,6 +37,7 @@ export async function factionRoute(request,env){
    if(!Number.isInteger(input.version))return json({error:'Reload this faction before saving.'},400);
    const document=blankFaction();for(const key of factionFields){const value=Object.hasOwn(input,key)?input[key]:current[key];if(typeof value!=='string'||value.length>(key==='name'?160:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
   document.hiddenFields=readHiddenFields(input,current,factionHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
+   if(!validImageUrl(document.imageUrl)||document.imageUrl.length>2048)return json({error:'Use an HTTPS faction image URL of at most 2048 characters.'},400);
    document.name=document.name.trim().replace(/\s+/g,' ');
    for(const [key,choices] of [['type',factionTypes],['status',factionStatuses]])if(document[key]&&!choices.includes(document[key]))return json({error:'Choose a '+key+' from the list.'},400);
    const cast=characterCast(await db.list(owner));for(const key of ['founderId','leaderId'])if(document[key]&&!cast.some(c=>c.id===document[key]))return json({error:'Choose an existing character for the founder and leader.'},400);

@@ -1,3 +1,4 @@
+import {characterCardDetails} from './character-card-data.js';
 import {repository} from './db.js';
 import {characterCast} from './sample-characters.js';
 import {factionCatalog,attachFactionNames} from './factions.js';
@@ -22,7 +23,7 @@ export function dashboardData({characters,factions,locations,countries,cities}){
  const questions=Object.entries(profiles).flatMap(([kind,records])=>records.filter(r=>r.questions?.trim()).map(r=>{const prompts=r.questions.split(/\n+/).map(text=>text.trim()).filter(Boolean);return {...profileCard(r,kind),href:profileCard(r,kind).href+(r.hiddenFields?.includes('questions')?'':'#field-questions'),question:prompts[0],questionCount:prompts.length,prompts};}));
  return {
   questions,
-  characters:cast.map(r=>({...profileCard(r,'character'),roles:r.roles.split(/\s*[·,;]\s*/).filter(Boolean),storyRole:r.storyRole,affiliation:r.affiliation})),
+  characters:cast.map(r=>({...profileCard(r,'character'),roles:r.roles.split(/\s*[·,;]\s*/).filter(Boolean),storyRole:r.storyRole,affiliation:r.affiliation,...characterCardDetails(r,{cast,factions,countries:countryProfiles,locations,profiles})})),
   factions:factions.map(r=>({...profileCard(r,'faction'),type:r.type,members:cast.filter(c=>c.factionId===r.id).length})),
   locations:locations.map(r=>{const profile=(r.type==='country'?countryProfiles:cityProfiles).find(p=>p.id===r.id);return {...(profile?profileCard(profile,r.type):{id:r.id,name:r.name,kind:r.type,label:typeLabels[r.type],href:'/locations/#location-'+encodeURIComponent(r.id)}),parent:ancestors(r,locations).map(a=>a.name).join(' / '),image:profile?.skylineUrl||profile?.flagUrl||'',areaType:r.areaType||''};}),
   timeline:collectTimeline(profiles)

@@ -21,6 +21,7 @@ export function renderProfile(character, cast, factions=[],locations=[]) {
   }else if(type==='number')control=`<input ${attrs} type="number" min="0" step="${key==='age'?'1':'any'}" value="${escape(val)}" placeholder="Not set">`;
   else if(type==='choice')control=renderChoice(key,label,val,attrs);
   else if(type==='date')control=renderDateControl(key,label,val,attrs);
+  else if(type==='url')control=`<input ${attrs} type="url" pattern="https://.*" maxlength="2048" value="${escape(val)}" placeholder="https://…">`;
   else if(type==='input')control=`<input ${attrs} type="text" autocomplete="off" maxlength="${nameFields.includes(key)?160:10000}" value="${escape(val)}" placeholder="Add ${escape(label.toLowerCase())}…">`;
   else control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="Add ${escape(label.toLowerCase())}…">${escape(val)}</textarea>`;
   return renderFieldWrapper(character,key,label,type,control);
