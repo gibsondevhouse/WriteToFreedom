@@ -75,7 +75,7 @@ function openCharacter(record,view){
   return choices;
  }
  function buildAttributes(){
-  const layout=el('div','attribute-stack');layout.append(el('p','attribute-help','Ratings from 0–99. Leave unknown attributes blank.'));
+  const layout=el('div','attribute-stack');
   const groups=el('div','attribute-groups');
   for(const group of attributeGroups){
    const section=el('section','attribute-group '+group.id);section.append(el('h3','',group.title));const grid=el('div','attribute-ring-grid');
@@ -83,11 +83,10 @@ function openCharacter(record,view){
     const row=el('div','attribute-dial'),label=el('label','attribute-label',name),number=el('input','attribute-number'),ring=el('div','attribute-ring');
     number.id='rating-'+key;number.type='number';number.min='0';number.max='99';number.step='1';number.placeholder='—';number.value=draft[key]??'';number.setAttribute('aria-label',name+' rating');label.htmlFor=number.id;
     const slider=el('input','attribute-adjust');slider.type='range';slider.min='0';slider.max='99';slider.step='1';slider.value=draft[key]??0;slider.setAttribute('aria-label','Adjust '+name.toLowerCase());
-    const reset=button('Clear','attribute-reset',()=>{delete draft[key];number.value='';slider.value='0';paint();markDirty();});reset.setAttribute('aria-label','Clear '+name.toLowerCase());
     function paint(){const value=draft[key];ring.style.setProperty('--rating',(value??0)/99*100+'%');row.dataset.unset=String(value===undefined);slider.setAttribute('aria-valuetext',value===undefined?'Not rated':value+' out of 99');}
     slider.addEventListener('input',()=>{draft[key]=Number(slider.value);number.value=slider.value;paint();markDirty();});
     number.addEventListener('input',()=>{if(number.value===''){delete draft[key];slider.value='0';}else if(number.validity.valid){draft[key]=Number(number.value);slider.value=number.value;}paint();markDirty();});
-    ring.append(number);paint();row.append(ring,label,slider,reset);grid.append(row);
+    ring.append(number);paint();row.append(ring,label,slider);grid.append(row);
    }
    section.append(grid);groups.append(section);
   }
