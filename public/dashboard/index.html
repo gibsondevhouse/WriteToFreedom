@@ -1,21 +1,57 @@
 <!doctype html>
 <html lang="en">
 <head>
- <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
- <title>Dashboard — Write to Freedom</title><meta name="description" content="Your novel at a glance: characters, factions, places, open questions, and events through time.">
- <link rel="icon" href="/crest.svg" type="image/svg+xml"><link rel="stylesheet" href="dashboard.css"><script src="dashboard.js" type="module"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Dashboard — Write to Freedom</title>
+  <meta name="description" content="Your writing workspace: characters, factions, places, open questions, and story dates.">
+  <link rel="icon" href="/crest.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/dashboard/dashboard.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/dashboard/dashboard.js" type="module"></script>
 </head>
-<body>
- <a class="skip-link" href="#dashboard">Skip to dashboard</a>
- <header class="dashboard-header">
-  <nav class="breadcrumb" aria-label="Breadcrumb"><a class="brand" href="/"><img src="/crest.svg" width="30" height="34" alt=""><span>Write to Freedom</span></a><span class="divider" aria-hidden="true">/</span><h1 aria-current="page">Dashboard</h1></nav>
-  <nav class="section-nav" aria-label="Novel sections"><a href="/characters/">Characters</a><a href="/factions/">Factions</a><a href="/locations/">Locations</a><a href="/timeline/">Timeline</a></nav>
- </header>
- <main id="dashboard" tabindex="-1">
-  <p id="load-status" class="load-status" role="status">Loading your novel…</p>
-  <div id="load-error" class="load-error" role="alert" hidden><p></p><button type="button" id="retry">Try again</button></div>
-  <div id="dashboard-rows" aria-busy="true"></div>
-  <noscript><p>Enable JavaScript to load your dashboard, or <a href="/characters/">open your characters</a>.</p></noscript>
- </main>
+<body class="workspace">
+  <a class="skip-link" href="#dashboard">Skip to dashboard</a>
+  <aside class="workspace-sidebar" aria-label="Workspace sidebar">
+    <a class="workspace-brand" href="/" aria-label="Write to Freedom home"><img src="/crest.svg" width="32" height="36" alt=""><span>Write to<br>Freedom</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="true" aria-controls="workspace-navigation" hidden>Menu</button>
+    <nav id="workspace-navigation" aria-label="Novel sections">
+      <div class="nav-group"><p class="nav-label">Overview</p><a class="nav-link active" href="/dashboard/" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span>Dashboard</a></div>
+      <div class="nav-group"><p class="nav-label">Worldbuilding</p>
+        <a class="nav-link" href="/characters/"><span class="nav-icon" aria-hidden="true">♙</span>Characters</a>
+        <a class="nav-link" href="/factions/"><span class="nav-icon" aria-hidden="true">⚑</span>Factions</a>
+        <a class="nav-link" href="/locations/"><span class="nav-icon" aria-hidden="true">⌖</span>Locations</a>
+      </div>
+      <div class="nav-group"><p class="nav-label">Structure</p><a class="nav-link" href="/timeline/"><span class="nav-icon" aria-hidden="true">↔</span>Timeline</a></div>
+      <details class="upcoming"><summary>Upcoming modules</summary><p>Still in development</p><ul><li>Chapters</li><li>Scenes</li><li>Story Arcs</li><li>Story Beats</li><li>Lore</li></ul></details>
+    </nav>
+    <p class="sidebar-note">Your novel. One workspace.</p>
+  </aside>
+  <div class="workspace-canvas">
+    <header class="workspace-topbar"><span>My workspace</span><span class="workspace-context">Novel overview</span></header>
+    <main id="dashboard" tabindex="-1">
+      <div class="workspace-heading"><div><p class="workspace-eyebrow">Overview</p><h1>Your novel at a glance</h1></div><a class="workspace-action" href="/characters/">Open characters <span aria-hidden="true">↗</span></a></div>
+      <search class="workspace-search" aria-label="Search your novel">
+        <label class="sr-only" for="novel-search">Search characters, factions, and locations</label>
+        <span class="search-symbol" aria-hidden="true">⌕</span>
+        <input id="novel-search" type="search" placeholder="Search characters, factions, and locations…" aria-controls="search-results" aria-describedby="search-hint" autocomplete="off" disabled>
+        <kbd aria-hidden="true">⌘ K</kbd>
+      </search>
+      <p id="search-hint" class="search-hint">Search names and profile summaries across your world.</p>
+      <section id="search-results" class="search-results" aria-label="Search results" hidden><p id="search-status" role="status"></p><ul id="search-list"></ul></section>
+      <div id="dashboard-content">
+        <section id="workspace-stats" class="workspace-stats" aria-label="Novel totals" hidden>
+          <a href="/characters/"><span>Characters</span><strong data-count="characters">—</strong></a>
+          <a href="/factions/"><span>Factions</span><strong data-count="factions">—</strong></a>
+          <a href="/locations/"><span>Locations</span><strong data-count="locations">—</strong></a>
+          <a href="/timeline/"><span>Story dates</span><strong data-count="dates">—</strong></a>
+        </section>
+        <p id="load-status" class="load-status" role="status">Loading your novel…</p>
+        <div id="load-error" class="load-error" role="alert" hidden><p></p><button type="button" id="retry">Try again</button></div>
+        <div id="dashboard-rows" aria-busy="true"></div>
+      </div>
+      <noscript><p>Enable JavaScript to load your overview. Your directories are available from the navigation.</p></noscript>
+    </main>
+  </div>
 </body>
 </html>

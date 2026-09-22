@@ -1,4 +1,5 @@
 import {createQuestionBanner} from './question-banner.js';
+import {updateWorkspace} from './workspace.js';
 const rows=document.querySelector('#dashboard-rows'),status=document.querySelector('#load-status'),errorBox=document.querySelector('#load-error');
 const tones=['clay','jade','blue','violet','gold'];
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
@@ -27,7 +28,7 @@ function rail(title,records,render,href,emptyText='Nothing here yet.'){
  prev.addEventListener('click',()=>list.scrollBy({left:-page()}));next.addEventListener('click',()=>list.scrollBy({left:page()}));list.addEventListener('scroll',update,{passive:true});
  const observer=new ResizeObserver(update);observer.observe(list);cleanup.push(()=>observer.disconnect());requestAnimationFrame(update);return section;
 }
-function render(data){cleanup.forEach(fn=>fn());cleanup=[];const questions=createQuestionBanner(data.questions,{el,tone,initial});cleanup.push(questions.destroy);rows.replaceChildren(
+function render(data){updateWorkspace(data);cleanup.forEach(fn=>fn());cleanup=[];const questions=createQuestionBanner(data.questions,{el,tone,initial});cleanup.push(questions.destroy);rows.replaceChildren(
  questions.element,
  rail('Characters',data.characters,characterCard,'/characters/','Your characters will appear here.'),
  rail('Factions',data.factions,factionCard,'/factions/','Your houses, families, and alliances will appear here.'),
