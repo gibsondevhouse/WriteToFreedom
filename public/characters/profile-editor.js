@@ -1,4 +1,4 @@
-import {initCharacterNotes} from './note-editor.js?v=2';
+import {initCharacterNotes} from './note-editor.js?v=3';
 import {attributeGroups} from './attributes.js?v=section-attributes-1';
 import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
 import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';

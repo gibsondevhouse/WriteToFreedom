@@ -65,3 +65,29 @@ test('note metadata rejects unsafe links and oversized tags without accepting ar
  const clean=validateNotes([{...note,links:[{kind:'character',id:'claude',href:'javascript:alert(1)'}],tags:['#history','history']}],{});
  assert.deepEqual(clean[0].links,[{kind:'character',id:'claude'}]);assert.deepEqual(clean[0].tags,['history']);
 });
+
+test('inline note pills save their positions in prose, render as blue links, and remove backlinks when deleted',async()=>{
+ const db=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())db.exec(readFileSync('drizzle/'+file,'utf8'));
+ const worker=createWorker({}),env={DB:d1Adapter(db)};
+ const request=(path,method='GET',body)=>worker.fetch(new Request('https://novel.example'+path,{method,headers:{origin:'https://novel.example','content-type':'application/json','oai-authenticated-user-id':'author'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
+ try{
+  let character=await (await request('/api/characters/gemini')).json();
+  const content=[{text:'Ask '},{text:'Shona',ref:{kind:'character',id:'claude'}},{text:' about '},{text:'The House of Ember',ref:{kind:'faction',id:'sample-ember'}},{text:' before returning.'}];
+  const note={id:crypto.randomUUID(),field:'arc',position:0,text:content.map(p=>p.text).join(''),content};
+  const result=await request('/api/characters/gemini','PUT',{...character,arc:'[1]'+character.arc,notes:[note]});assert.equal(result.status,200);character=await result.json();assert.deepEqual(character.notes[0].content,content);assert.equal(character.notes[0].links.length,2);
+  const page=await (await request('/characters/gemini/')).text();assert.ok(page.includes('Ask <a class="note-inline-link" href="/characters/claude/">Shona</a> about <a class="note-inline-link" href="/factions/sample-ember/">The House of Ember</a> before returning.'));assert.ok(!page.includes('class="note-chip"'));
+  const invalid=await request('/api/characters/gemini','PUT',{...character,notes:[{...character.notes[0],text:'Different text'}]});assert.equal(invalid.status,400);
+  const foreign=await request('/api/characters/gemini','PUT',{...character,notes:[{...character.notes[0],content:[{text:note.text,ref:{kind:'character',id:crypto.randomUUID()}}]}]});assert.equal(foreign.status,400);
+  const edited=await request('/api/characters/gemini','PUT',{...character,notes:[{...character.notes[0],text:'The promise remains.',content:[{text:'The promise remains.'}]}]});assert.equal(edited.status,200);assert.deepEqual((await edited.json()).notes[0].links,[]);
+  const faction=await (await request('/factions/sample-ember/')).text();assert.ok(!faction.includes('Ask Shona about'));
+ }finally{db.close();}
+});
+test('legacy connections become inline references without duplicating names, and repeated inline references stay one connection',async()=>{
+ const {noteContent,contentReferences}=await import('../public/characters/note-content.js');
+ const ref={kind:'character',id:'claude'},faction={kind:'faction',id:'sample-ember'},targets=[{...ref,label:'Shona'},{...faction,label:'The House of Ember'}];
+ const parts=noteContent({text:'Ask Shona.',links:[ref,faction]},targets);
+ assert.deepEqual(parts,[{text:'Ask '},{text:'Shona',ref},{text:'.'},{text:' '},{text:'The House of Ember',ref:faction}]);
+ assert.deepEqual(contentReferences([{text:'Shona',ref},{text:' and '},{text:'Shona',ref}]),[ref]);
+ const n={id:crypto.randomUUID(),field:'arc',position:null,text:'<script>bad</script>',content:[{text:'<script>bad</script>',ref:{...ref,href:'javascript:bad()'}}]};
+ assert.deepEqual(validateNotes([n],{})[0].content[0].ref,ref);
+});

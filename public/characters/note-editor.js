@@ -1,3 +1,4 @@
+import {createInlineNoteEditor} from './inline-note-editor.js';
 import {createNoteConnections} from './note-connections.js';
 import {noteFields,noteMarker,moveNoteAnchors} from './notes.js';
 import {resize} from '../profiles/controls.js?v=worlds-1';
@@ -10,12 +11,12 @@ export function initCharacterNotes(form,initial,markDirty,controls,profileData){
  const action=(text,handler,cls='note-action')=>{const b=make('button',cls,text);b.type='button';b.addEventListener('click',handler);return b;};
  const dialog=make('dialog','note-composer');dialog.setAttribute('aria-labelledby','note-composer-title');
  const editor=make('form'),heading=make('h2','','Create a note');heading.id='note-composer-title';
- const context=make('p','note-context'),label=make('label','','Note');label.htmlFor='note-text';
- const input=make('textarea');input.id='note-text';input.required=true;input.maxLength=2000;input.rows=4;input.placeholder="Add a detail, update, or piece of lore…";
+ const context=make('p','note-context'),label=make('label','','Note');label.id='note-text-label';
+ const richBody=createInlineNoteEditor(),input=richBody.element;
  const buttons=make('div','note-composer-actions');
  const cancel=action('Cancel',()=>dialog.close()),submit=make('button','note-submit','Add note');submit.type='submit';
- buttons.append(cancel,submit);editor.append(heading,context,label,input,buttons);dialog.append(editor);document.body.append(dialog);
- const connections=createNoteConnections(editor,input,profileData,()=>notes);
+ buttons.append(cancel,submit);editor.append(heading,context,label,input,richBody.error,buttons);dialog.append(editor);document.body.append(dialog);
+ const connections=createNoteConnections(editor,input,profileData,()=>notes,richBody);
  function fieldInput(field){return form.elements.namedItem(field);}
  function revealSource(source){controls.revealAncestors(source);const field=source.closest('[data-profile-field]');if(field?.hidden){const toggle=form.querySelector('[data-visibility="'+source.name+'"]');if(toggle){toggle.checked=true;toggle.dispatchEvent(new Event('change',{bubbles:true}));}}resize(source);}
  function jump(note){const source=fieldInput(note.field);revealSource(source);source.focus();const position=note.position??0;source.setSelectionRange(position,position+(note.position===null?0:noteMarker(notes.indexOf(note)).length));source.scrollIntoView({block:'center',behavior:'smooth'});}
@@ -32,7 +33,7 @@ export function initCharacterNotes(form,initial,markDirty,controls,profileData){
   if(first){revealSource(first);first.focus();}
  }
  function writeField(field,value){const source=fieldInput(field);moveNoteAnchors(notes,field,source.value,value);source.value=value;previous.set(field,value);resize(source);}
- function showComposer(note=null){editing=note;connections.load(note);heading.textContent=note?'Edit note':'Create a note';submit.textContent=note?'Update note':'Add note';input.value=note?.text||'';input.setCustomValidity('');const source=fieldInput(note?.field||pending.field);context.textContent=source.getAttribute('aria-label');dialog.showModal();input.focus();}
+ function showComposer(note=null){editing=note;heading.textContent=note?'Edit note':'Create a note';submit.textContent=note?'Update note':'Add note';connections.load(note);input.setCustomValidity('');const source=fieldInput(note?.field||pending.field);context.textContent=source.getAttribute('aria-label');dialog.showModal();input.focus();}
  function render(){
   own.replaceChildren();own.hidden=!notes.length;mentions.start=notes.length+1;empty.hidden=!!(notes.length||mentions.children.length);
   notes.forEach((note,index)=>{
@@ -41,7 +42,7 @@ export function initCharacterNotes(form,initial,markDirty,controls,profileData){
    const tools=make('span','authored-note-actions');
    tools.append(action('Edit',()=>{opener=document.activeElement;showComposer(note);}),action('Remove',()=>removeNote(note)));
    if(note.position===null)tools.append(action('Place in text',()=>arm(fieldInput(note.field).closest('.profile-section'),note)));
-   li.append(back,document.createTextNode(' '));if(note.title)li.append(make('strong','note-title',note.title),document.createTextNode('. '));li.append(make('span','reference-text',note.text),tools,connections.renderDetails(note));own.append(li);
+   li.append(back,document.createTextNode(' '));if(note.title)li.append(make('strong','note-title',note.title),document.createTextNode('. '));li.append(connections.renderText(note),tools,connections.renderDetails(note));own.append(li);
   });
   form.querySelectorAll('.field-note-links').forEach(n=>n.remove());
   for(const field of noteFields){const matches=notes.filter(n=>n.field===field);if(!matches.length)continue;
@@ -78,7 +79,7 @@ export function initCharacterNotes(form,initial,markDirty,controls,profileData){
  form.addEventListener('input',event=>{const source=event.target;if(!noteFields.includes(source.name))return;moveNoteAnchors(notes,source.name,previous.get(source.name)||'',source.value);previous.set(source.name,source.value);render();});
  input.addEventListener('input',()=>input.setCustomValidity(''));
  editor.addEventListener('submit',event=>{
-  event.preventDefault();if(!input.value.trim()){input.setCustomValidity('Enter your note.');input.reportValidity();return;}
+  event.preventDefault();if(input.value.length>2000){input.setCustomValidity('Keep notes under 2,000 characters.');input.reportValidity();return;}if(!input.value.trim()){input.setCustomValidity('Enter your note.');input.reportValidity();return;}
   const metadata=connections.read();if(!metadata)return;
   if(editing)Object.assign(editing,{text:input.value.trim(),...metadata});
   else{const source=fieldInput(pending.field),marker=noteMarker(notes.length);if(source.value.length+marker.length>10000){input.setCustomValidity('The source field is full. Shorten it before adding a note marker.');input.reportValidity();return;}

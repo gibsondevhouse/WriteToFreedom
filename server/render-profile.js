@@ -1,3 +1,4 @@
+import {noteContent} from '../public/characters/note-content.js';
 import {referenceKey} from '../public/characters/notes.js';
 import {noteTargets,connectedNotes} from './note-connections.js';
 import {ancestors,typeLabels} from '../public/locations/data.js';
@@ -41,9 +42,10 @@ export function renderProfile(character, cast, factions=[],locations=[],notes=[]
 
 function renderNotes(notes,authored,targets){
  const catalog=new Map(targets.map(t=>[referenceKey(t),t]));
- const detail=note=>`<div class="note-details">${note.type&&note.type!=='detail'?`<span class="note-kind">${escape(note.type)}</span>`:''}${(note.links||[]).map(link=>{const target=catalog.get(referenceKey(link));return target?`<a class="note-chip" href="${escape(target.href)}">${escape(target.label)}</a>`:'<span class="note-chip">Unavailable item</span>';}).join('')}${(note.tags||[]).map(tag=>`<span class="note-tag">#${escape(tag)}</span>`).join('')}</div>`;
+ const inline=note=>noteContent(note,targets).map(part=>{const target=part.ref&&catalog.get(referenceKey(part.ref));return target?`<a class="note-inline-link" href="${escape(target.href)}">${escape(part.text)}</a>`:escape(part.text);}).join('');
+ const detail=note=>note.type&&note.type!=='detail'?`<div class="note-details"><span class="note-kind">${escape(note.type)}</span></div>`:'';
 
- const own=`<ol id="authored-notes" class="profile-references"${authored.length?'':' hidden'}>${authored.map((note,index)=>`<li id="note-${escape(note.id)}"><a class="reference-backlink" href="#field-${escape(note.field)}" aria-label="Return to note ${index+1} in the text">↑</a> ${note.title?`<strong class="note-title">${escape(note.title)}</strong>. `:''}<span class="reference-text">${escape(note.text)}</span>${detail(note)}</li>`).join('')}</ol>`;
- const references=`<ol id="mentioned-notes" class="profile-references" start="${authored.length+1}"${notes.length?'':' hidden'}>${notes.map((note,index)=>`<li id="character-note-${index+1}"><a class="reference-backlink" href="${escape(note.href)}" aria-label="Open source for note ${authored.length+index+1}: ${escape(note.source)}" title="Open source">↑</a> <a class="reference-source" href="${escape(note.href)}">${escape(note.source)}</a>. <span class="reference-label">${escape(note.label)}</span>. <span class="reference-text">${escape(note.text.replace(/\s+/g,' ').trim())}</span></li>`).join('')}</ol>`;
+ const own=`<ol id="authored-notes" class="profile-references"${authored.length?'':' hidden'}>${authored.map((note,index)=>`<li id="note-${escape(note.id)}"><a class="reference-backlink" href="#field-${escape(note.field)}" aria-label="Return to note ${index+1} in the text">↑</a> ${note.title?`<strong class="note-title">${escape(note.title)}</strong>. `:''}<span class="reference-text">${inline(note)}</span>${detail(note)}</li>`).join('')}</ol>`;
+ const references=`<ol id="mentioned-notes" class="profile-references" start="${authored.length+1}"${notes.length?'':' hidden'}>${notes.map((note,index)=>`<li id="character-note-${index+1}"><a class="reference-backlink" href="${escape(note.href)}" aria-label="Open source for note ${authored.length+index+1}: ${escape(note.source)}" title="Open source">↑</a> <a class="reference-source" href="${escape(note.href)}">${escape(note.source)}</a>. <span class="reference-label">${escape(note.label)}</span>. <span class="reference-text">${inline(note)}</span></li>`).join('')}</ol>`;
  return own+references+`<p id="notes-empty" class="reference-empty"${authored.length||notes.length?' hidden':''}>No notes yet.</p>`;
 }
