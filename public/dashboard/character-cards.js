@@ -1,6 +1,7 @@
+import {createAttributeControls} from '../characters/attribute-controls.js';
 import {alignments} from '../characters/template.js?v=character-cards-1';
 import {createConnectionsMap} from './connections-map.js';
-import {attributeGroups,moralityIcons} from '../characters/attributes.js';
+import {moralityIcons} from '../characters/attributes.js';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function button(text,cls,action){const n=el('button',cls,text);n.type='button';n.addEventListener('click',action);return n;}
@@ -76,20 +77,7 @@ function openCharacter(record,view){
  }
  function buildAttributes(){
   const layout=el('div','attribute-stack');
-  const groups=el('div','attribute-groups');
-  for(const group of attributeGroups){
-   const section=el('section','attribute-group '+group.id);section.append(el('h3','',group.title));const grid=el('div','attribute-ring-grid');
-   for(const [key,name]of group.fields){
-    const row=el('div','attribute-dial'),label=el('label','attribute-label',name),number=el('input','attribute-number'),ring=el('div','attribute-ring');
-    number.id='rating-'+key;number.type='number';number.min='0';number.max='99';number.step='1';number.placeholder='—';number.value=draft[key]??'';number.setAttribute('aria-label',name+' rating');label.htmlFor=number.id;
-    const slider=el('input','attribute-adjust');slider.type='range';slider.min='0';slider.max='99';slider.step='1';slider.value=draft[key]??0;slider.setAttribute('aria-label','Adjust '+name.toLowerCase());
-    function paint(){const value=draft[key];ring.style.setProperty('--rating',(value??0)/99*100+'%');row.dataset.unset=String(value===undefined);slider.setAttribute('aria-valuetext',value===undefined?'Not rated':value+' out of 99');}
-    slider.addEventListener('input',()=>{draft[key]=Number(slider.value);number.value=slider.value;paint();markDirty();});
-    number.addEventListener('input',()=>{if(number.value===''){delete draft[key];slider.value='0';}else if(number.validity.valid){draft[key]=Number(number.value);slider.value=number.value;}paint();markDirty();});
-    ring.append(number);paint();row.append(ring,label,slider);grid.append(row);
-   }
-   section.append(grid);groups.append(section);
-  }
+  const groups=createAttributeControls(draft,markDirty);
   layout.append(groups);
   const artwork=el('details','attribute-artwork');artwork.append(el('summary','','Card portrait'));
   const label=el('label','','Portrait image URL'),url=el('input');url.id='attribute-portrait-url';url.type='url';url.value=documentData.portraitUrl||'';url.placeholder='https://…';url.maxLength=2048;url.pattern='https://.*';label.htmlFor=url.id;url.addEventListener('input',markDirty);artwork.append(label,url);layout.append(artwork);

@@ -1,3 +1,4 @@
+@import url("/characters/attribute-controls.css?v=1");
 /* Portrait-led story cards, with affiliation and character-specific actions. */
 .workspace .story-character-card { width:340px; max-width:calc(100vw - 40px); height:440px; padding:0; border:1px solid #ffffff18; border-radius:18px; background:linear-gradient(155deg,var(--tone),#152331 80%); text-align:left; box-shadow:0 10px 30px #0002; }
 .character-profile-link { position:relative; display:flex; flex:1; align-items:flex-end; min-height:0; isolation:isolate; color:#f2f5fb; text-decoration:none; }
@@ -49,19 +50,6 @@ a.character-affiliation:hover strong { color:#a4bdff; }
 .attributes-overlay .character-detail-footer { flex-wrap:wrap; padding:16px 22px; }
 .attributes-overlay .character-detail-notice { order:3; flex-basis:100%; margin:0; }
 .attributes-overlay .attribute-save { margin-left:auto; }
-.attribute-groups { display:flex; flex-direction:column; gap:24px; }
-.attribute-group { --attribute-color:#91b8f1; }
-.attribute-group.mind { --attribute-color:#b8a8e5; }.attribute-group.presence { --attribute-color:#85c6b7; }
-.attribute-group h3 { color:var(--attribute-color); font:600 12px/1.5 Arial,sans-serif; text-transform:uppercase; letter-spacing:.14em; margin:0 0 18px; padding-bottom:8px; border-bottom:1px solid #ffffff16; }
-.attribute-ring-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 12px; }
-.attribute-dial { min-width:0; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.attribute-ring { flex:none; width:82px; max-width:100%; aspect-ratio:1; display:grid; place-items:center; border-radius:50%; padding:6px; background:conic-gradient(var(--attribute-color) var(--rating),#2c3b4e var(--rating)); box-shadow:0 4px 20px #0002; }
-.attribute-number { box-sizing:border-box; width:100%; height:100%; min-width:0; border:0; border-radius:50%; background:#14202d; color:#e5edfa; text-align:center; font:600 22px/1 Arial,sans-serif; padding:0; appearance:textfield; -moz-appearance:textfield; }
-.attribute-number::-webkit-inner-spin-button,.attribute-number::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-.attribute-number::placeholder { color:#6d819b; }
-.attribute-label { font-size:13px; color:#cad8ea; text-align:center; overflow-wrap:anywhere; }
-.attribute-adjust { width:80px; max-width:100%; height:14px; margin:0; accent-color:var(--attribute-color); cursor:pointer; }
-.attribute-dial[data-unset=true] .attribute-adjust { opacity:.45; }
 .attribute-artwork { border-top:1px solid #35465a; padding-top:14px; margin-top:24px; color:#aebfd2; font-size:12px; }
 .attribute-artwork summary { cursor:pointer; font-size:14px; }
 .attribute-artwork label { display:block; margin:14px 0 6px; }
