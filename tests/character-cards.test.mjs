@@ -88,3 +88,23 @@ test('profile notes render numbered references to saved sources and escape their
   const other=await (await request('/characters/claude/','GET',undefined,'other-author')).text();assert.ok(!other.includes('&lt;sealed&gt; ledger'));
  }finally{db.close();}
 });
+
+test('reusable card records match dashboard cards while retaining directory search data and ownership',async()=>{
+ const {db,request}=setup();try{
+  const original=await (await request('/api/characters/claude')).json();
+  await request('/api/characters/claude','PUT',{...original,firstName:'Changed name',biography:'A unique detail for search',alignment:'Morally gray'});
+  const dashboard=await (await request('/api/dashboard')).json();
+  const cards=await (await request('/api/characters?view=cards')).json();
+  const record=cards.characters.find(c=>c.id==='claude');
+  for(const [key,value] of Object.entries(dashboard.characters.find(c=>c.id==='claude')))assert.deepEqual(record[key],value,key+' matches on both surfaces');
+  assert.equal(record.biography,'A unique detail for search');assert.ok(Array.isArray(record.roles));
+  const other=await (await request('/api/characters?view=cards','GET',undefined,'other-author')).json();assert.notEqual(other.characters.find(c=>c.id==='claude').biography,record.biography);
+  const raw=await (await request('/api/characters')).json();assert.equal(typeof raw.characters[0].roles,'string','existing API consumers keep the original contract');
+ }finally{db.close();}
+});
+test('shared card defaults and colors stay stable across rail and grid consumers',async()=>{
+ const {normalizeCard,characterTone}=await import('../public/components/character-card/model.js');
+ const sparse=normalizeCard({id:'new-person',name:'  ',roles:'Explorer · Diplomat'});
+ assert.equal(sparse.name,'Untitled character');assert.equal(sparse.href,'/characters/new-person/');assert.deepEqual(sparse.roles,['Explorer','Diplomat']);assert.deepEqual(sparse.relationships,[]);assert.deepEqual(sparse.mentions,[]);assert.equal(sparse.affiliationCard.name,'Independent');
+ assert.equal(characterTone({id:'claude'}),'clay');assert.equal(characterTone(sparse),characterTone({...sparse,name:'A renamed character'}));assert.equal(characterTone(sparse,'gold'),'gold');assert.equal(characterTone(sparse,'invalid'),characterTone(sparse));
+});

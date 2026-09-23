@@ -1,0 +1,35 @@
+/* Portrait-led story cards, with affiliation and character-specific actions. */
+.story-character-card { --tone:#2b4361; --ink:#bed4f5; box-sizing:border-box; display:flex; flex-direction:column; min-width:0; overflow:hidden; isolation:isolate; font:16px/1.5 Arial,Helvetica,sans-serif; width:var(--character-card-width,340px); max-width:100%; height:var(--character-card-height,440px); padding:0; border:1px solid #ffffff18; border-radius:18px; background:linear-gradient(155deg,var(--tone),#152331 80%); text-align:left; box-shadow:0 10px 30px #0002; }
+.story-character-card .character-profile-link{ position:relative; display:flex; flex:1; align-items:flex-end; min-height:0; isolation:isolate; color:#f2f5fb; text-decoration:none; }
+.story-character-card .character-profile-link:hover{ text-decoration:none; }
+.story-character-card .character-card-art{ position:absolute; z-index:-1; inset:0; display:grid; place-items:start center; overflow:hidden; background:radial-gradient(ellipse at 70% 8%,#ffffff16,transparent 65%); }
+.story-character-card .character-card-art .character-initials{ padding-top:32px; font:120px/1.1 Georgia,serif; color:var(--ink); opacity:.28; }
+.story-character-card .character-card-art img{ position:absolute; width:100%; height:100%; object-fit:cover; object-position:center 25%; }
+.story-character-card .character-card-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 5%,#15233112 30%,#152331c9 63%,#152331 100%); }
+.story-character-card .character-card-copy{ padding:150px 20px 14px; position:relative; min-width:0; width:100%; }
+.story-character-card .character-role { color:#c8d6e7; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.story-character-card .character-name { font:600 24px/1.2 Arial,sans-serif; letter-spacing:-.4px; color:#f5f7fc; margin:0 0 12px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.story-character-card .character-summary { padding:0; font-size:14px; line-height:1.45; color:#c4d0df; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.story-character-card .character-affiliation{ display:flex; align-items:center; flex:none; gap:12px; padding:10px 20px 18px; min-height:80px; background:#152331; color:#dfe8f3; text-decoration:none; }
+.story-character-card .character-affiliation:hover{ text-decoration:none; }
+.story-character-card a.character-affiliation:hover strong{ color:#a4bdff; }
+.story-character-card .affiliation-avatar,.story-character-card .relationship-avatar,.story-character-card .relationship-detail-avatar,.story-character-card .attribute-portrait{ position:relative; display:grid; place-items:center; flex:none; background:linear-gradient(145deg,var(--tone,#354861),#263446); color:var(--ink,#c5dafa); overflow:hidden; }
+.story-character-card .affiliation-avatar{ width:42px; height:42px; border-radius:50%; border:1px solid #ffffff20; font:16px Georgia,serif; }
+.story-character-card .affiliation-avatar img{ position:absolute; width:100%; height:100%; object-fit:contain; }
+.story-character-card .affiliation-copy{ min-width:0; }
+.story-character-card .affiliation-copy strong{ display:block; font-size:14px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.story-character-card .affiliation-kind{ display:block; font-size:12px; color:#9eb0c6; margin-bottom:3px; }
+.story-character-card .character-actions{ display:grid; grid-template-columns:44px 1fr 66px 88px; height:48px; flex:none; border-top:1px solid #ffffff17; background:#ffffff07; }
+.story-character-card .character-actions button{ display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; padding:0 8px; border:0; border-radius:0; border-right:1px solid #ffffff13; background:transparent; color:#e3eaf5; font:600 13px Arial,sans-serif; cursor:pointer; }
+.story-character-card .character-actions button:last-child{ border-right:0; }
+.story-character-card .character-actions button:hover{ background:#ffffff12; }
+.story-character-card .character-actions .morality-action{ color:var(--ink); font-size:22px; }
+.story-character-card .character-actions svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.story-character-card .relationship-faces{ display:flex; align-items:center; padding-left:5px; }
+.story-character-card .relationship-avatar{ width:22px; height:22px; margin-left:-5px; border-radius:50%; border:2px solid #27384b; font:10px Arial,sans-serif; background:#546883; }
+.story-character-card .relationship-avatar:nth-child(2){ background:#725b68; }.story-character-card .relationship-avatar:nth-child(3) { background:#3c706b; }
+.story-character-card .relationship-avatar img,.story-character-card .relationship-detail-avatar img,.story-character-card .attribute-portrait img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.story-character-card.clay{--tone:#624a42;--ink:#edd0bf}.story-character-card.jade{--tone:#214b48;--ink:#b4dfd5}.story-character-card.blue{--tone:#2b4361;--ink:#bed4f5}.story-character-card.violet{--tone:#423858;--ink:#d6c9ec}.story-character-card.gold{--tone:#59492e;--ink:#e6d5ab}
+.story-character-card:hover{border-color:#8ca5c36b}.story-character-card :is(a,button):focus-visible{outline:2px solid #a4bdff;outline-offset:-3px}.story-character-card .character-affiliation{box-sizing:border-box}.story-character-card .character-profile-link{min-width:0}
+@media(max-width:760px){.story-character-card{width:var(--character-card-width,310px)}}
+.story-character-card *{box-sizing:border-box}

@@ -7,8 +7,10 @@
   <title>Characters — Write to Freedom</title>
   <link rel="icon" href="../crest.svg" type="image/svg+xml">
   <link rel="stylesheet" href="characters.css">
-  <link rel="stylesheet" href="character-cards.css">
-  <script src="characters.js" type="module"></script>
+  <link rel="stylesheet" href="character-cards.css?v=shared-cards-1">
+  <link rel="stylesheet" href="/components/character-card/card.css?v=1">
+  <link rel="stylesheet" href="/components/character-card/details.css?v=1">
+  <script src="characters.js?v=shared-cards-1" type="module"></script>
 </head>
 <body class="character-directory">
   <header class="site-header"><nav class="directory-breadcrumb" aria-label="Breadcrumb"><a class="brand" href="../"><img src="../crest.svg" width="32" height="36" alt=""><span>Write to Freedom</span></a><span class="breadcrumb-divider" aria-hidden="true">/</span><h1 id="page-title" aria-current="page">Characters</h1></nav></header>
@@ -16,7 +18,7 @@
     <section class="page-heading" aria-labelledby="page-title">
       <p class="eyebrow">PEOPLE &amp; RELATIONSHIPS</p>
       <p class="intro">Every story begins with someone.</p>
-      <p id="storage-error" role="alert" hidden></p>
+      <p id="storage-error" role="alert" hidden></p><button id="retry-characters" type="button" hidden>Try again</button>
     </section>
     <section class="cast" aria-label="Character directory">
       <div class="directory-controls">

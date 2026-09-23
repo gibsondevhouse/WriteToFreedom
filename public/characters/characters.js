@@ -1,3 +1,4 @@
+import {createCharacterCard} from '../components/character-card/card.js?v=1';
 import { characters, selectCharacters } from './data.js';
 
 const list = document.querySelector('#character-list');
@@ -8,7 +9,7 @@ const clear = document.querySelector('#clear-search');
 const count = document.querySelector('#result-count');
 const empty = document.querySelector('#empty-state');
 let reversed = false;
-let records = [...characters];
+let records = [];
 const newButton = document.querySelector('#new-character');
 const storageError = document.querySelector('#storage-error');
 let pendingId;
@@ -18,8 +19,8 @@ async function api(url,options={}) {
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to load your characters.');return data;
 }
-function normalize(character) { const seed=characters.find(c=>c.id===character.id);return {...character,name:character.name.trim()||'Untitled character',initials:character.name.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'?',roles:character.roles.trim()?character.roles.split(/\s*[·,;]\s*/).filter(Boolean):['Draft character'],provider:seed?.provider||'',color:seed?.color||'blue',title:character.title||'Character in development',summary:character.summary||'A blank character, ready for you to bring to life.'}; }
-async function loadSavedCharacters() {try{const data=await api('/api/characters');records=data.characters.map(normalize);render();}catch(e){showStorageError(e.message+' Your sample cast is still available.');}}
+function normalize(character){return {...character,provider:characters.find(c=>c.id===character.id)?.provider||''};}
+async function loadSavedCharacters(){list.setAttribute('aria-busy','true');storageError.hidden=true;document.querySelector('#retry-characters').hidden=true;try{const data=await api('/api/characters?view=cards');records=data.characters.map(normalize);render();}catch(e){showStorageError(e.message);document.querySelector('#retry-characters').hidden=false;if(!records.length){count.textContent='Unable to load characters';empty.hidden=true;}}finally{list.setAttribute('aria-busy','false');}}
 newButton.addEventListener('click',async()=>{
  newButton.disabled=true;newButton.textContent='Creating…';storageError.hidden=true;pendingId??=crypto.randomUUID();
  try{const character=await api('/api/characters',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});location.assign('/characters/'+encodeURIComponent(character.id)+'/');}
@@ -33,34 +34,15 @@ function element(tag, className, text) {
   return node;
 }
 
-function createCharacter(character, index) {
-  const row = element('li', 'character-row character-card');
-  const article = element('article', 'character');
-  article.id = character.id;
-  const summary = element('a', 'character-summary profile-link');
-  summary.href = `${character.id}/`;
-  const heading = element('div', 'character-heading');
-  const avatar = element('span', `avatar ${character.color}`, character.initials);
-  avatar.setAttribute('aria-hidden', 'true');
-  const info = element('div', 'character-info');
-  const labels = element('div', 'character-labels');
-  [...character.roles,character.provider].filter(Boolean).forEach(label => labels.append(element('span', 'character-label', label)));
-  info.append(element('h2', '', `${index + 1}. ${character.name}`), labels);
-  const affiliationImage = element('span', 'affiliation-placeholder');
-  affiliationImage.setAttribute('role', 'img');
-  affiliationImage.setAttribute('aria-label', (character.affiliation || 'House, alliance, or family') + ' image placeholder');
-  affiliationImage.title = (character.affiliation || 'House / alliance / family') + ' — image placeholder';
-  affiliationImage.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 5-5 3 3 4-6 5 8"/></svg>';
-  heading.append(avatar, info, affiliationImage);
-  summary.append(heading);
-  article.append(summary); row.append(article);
-  return row;
+function createCharacter(character){
+ const row=element('li','character-card-item');
+ row.append(createCharacterCard(character,{headingLevel:2,onUpdate:updated=>Object.assign(character,updated)}));return row;
 }
 
 function render() {
   const matches = selectCharacters(search.value, sort.value, reversed, records);
   list.replaceChildren(...matches.map(createCharacter));
-  count.textContent = search.value.trim() ? `${matches.length} of ${records.length} characters` : `1–${records.length} of ${records.length} characters`;
+  count.textContent = search.value.trim() ? `${matches.length} of ${records.length} characters` : (records.length?`1–${records.length} of ${records.length} characters`:'0 characters');
   clear.hidden = !search.value;
   empty.hidden = matches.length > 0;
   list.hidden = matches.length === 0;
@@ -85,7 +67,8 @@ function resetSearch() { search.value = ''; render(); search.focus(); }
 clear.addEventListener('click', resetSearch);
 document.querySelector('#reset-search').addEventListener('click', resetSearch);
 window.addEventListener('hashchange', showLinkedCharacter);
-render();
+count.textContent='Loading characters…';
+document.querySelector('#retry-characters').addEventListener('click',loadSavedCharacters);
 showLinkedCharacter();
 loadSavedCharacters();
 window.addEventListener('pageshow',event=>{if(event.persisted){newButton.disabled=false;newButton.textContent='+ New character';pendingId=undefined;loadSavedCharacters();}});

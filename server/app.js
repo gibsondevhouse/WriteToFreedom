@@ -4,7 +4,7 @@ import {validateRatings} from '../public/characters/attributes.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
 import {workspaceShell} from './workspace-shell.js';
 import {timelineRoute} from './timeline-routes.js';
-import {dashboardRoute} from './dashboard-routes.js';
+import {dashboardRoute,dashboardData} from './dashboard-routes.js';
 import {locationCatalog,defaultCountry} from './countries.js';
 import {defaultCity} from './cities.js';
 import {characterMentions} from './character-card-data.js';
@@ -92,7 +92,15 @@ function createAppWorker(assets) { return {async fetch(request,env) {
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
    if(request.method==='GET') {
     const factions=await factionCatalog(db,owner);
-    if(!id) return json({characters:attachFactionNames(characterCast(await db.list(owner)),factions)});
+    if(!id){
+     const saved=await db.list(owner),cast=attachFactionNames(characterCast(saved),factions);
+     if(url.searchParams.get('view')==='cards'){
+      const [locations,countries,cities]=await Promise.all([locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+      const cards=dashboardData({characters:saved,factions,locations,countries,cities}).characters;
+      return json({characters:cast.map(c=>({...c,...cards.find(card=>card.id===c.id)}))});
+     }
+     return json({characters:cast});
+    }
     const character=await db.get(owner,id)||sampleCharacter(id);return character?json(attachFactionNames([character],factions)[0]):json({error:'Character not found.'},404);
    }
    if(!['POST','PUT'].includes(request.method)) return json({error:'Method not allowed.'},405);

@@ -1,4 +1,4 @@
-import {createCharacterCard} from './character-cards.js?v=5';
+import {createCharacterCard} from '../components/character-card/card.js?v=1';
 import {createQuestionBanner} from './question-banner.js';
 import {updateWorkspace} from './workspace.js?v=shared-1';
 const rows=document.querySelector('#dashboard-rows'),status=document.querySelector('#load-status'),errorBox=document.querySelector('#load-error');
@@ -8,7 +8,7 @@ function tone(record){const seed={claude:0,gpt:1,deepseek:2,gemini:3};return ton
 function initial(record){return record.name.trim().charAt(0).toLocaleUpperCase()||'?';}
 function cover(record){const node=el('div','cover'),mark=el('span','monogram',initial(record));mark.setAttribute('aria-hidden','true');node.append(mark);if(record.image){try{const url=new URL(record.image);if(url.protocol==='https:'){const image=el('img');image.src=url.href;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove(),{once:true});node.append(image);}}catch{}}return node;}
 function cardLink(record,cls){const link=el('a',`card ${cls} ${tone(record)}`);link.href=record.href;return link;}
-function characterCard(record){return createCharacterCard(record,tone(record));}
+function characterCard(record){return createCharacterCard(record);}
 function factionCard(record){
  const link=cardLink(record,'faction-card'),art=cover(record),body=el('div','card-copy');
  body.append(el('p','eyebrow',record.type||'Faction'),el('h3','',record.name));if(record.title)body.append(el('p','motto',record.title));
@@ -42,5 +42,3 @@ async function load(){if(loading)return;loading=true;errorBox.hidden=true;rows.s
  catch(error){status.hidden=true;errorBox.querySelector('p').textContent=error.message;errorBox.hidden=false;}finally{loading=false;rows.setAttribute('aria-busy','false');}
 }
 document.querySelector('#retry').addEventListener('click',load);window.addEventListener('pageshow',event=>{if(event.persisted)load();});load();
-
-document.addEventListener('character-card-updated',event=>{const card=[...document.querySelectorAll('#rail-characters > li')].find(li=>li.querySelector('.character-profile-link')?.getAttribute('href')===event.detail.href);if(card)card.replaceChildren(characterCard(event.detail));});

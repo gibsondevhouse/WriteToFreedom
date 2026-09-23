@@ -16,22 +16,8 @@
 .archive-button{justify-self:start;display:flex;align-items:center;gap:8px;min-height:34px;padding:5px 12px;font-size:13px;color:#a6b5c8}
 .archive-button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6}
 .archive-button:disabled{opacity:.65;cursor:default}.archive-button:disabled:hover{background:transparent}
-.character-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;padding:0;border:0;border-radius:0;background:transparent}
-.character-card-grid .character-card{min-width:0;border:1px solid #35414c;border-radius:5px;background:#141e28;overflow:hidden}
-.character-card-grid .character-card+.character-card{border-top:1px solid #35414c}
-.character-card .character,.character-card .character-summary{height:100%}
-.character-card .character-summary{display:flex;align-items:center;min-height:0;padding:11px 15px}
-.character-card .character-heading{width:100%;gap:12px}
-.character-card .avatar{flex:0 0 54px;height:54px;font-size:22px}
-.character-card .character-info h2{font-size:18px;line-height:1.35;margin:0 0 7px;overflow-wrap:anywhere}
-.character-labels{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
-.character-label{font-size:11px;line-height:1.35;font-weight:500;color:#c9d4e3;background:#283644;border:1px solid #3b4b5d;border-radius:20px;padding:3px 7px;max-width:100%;overflow-wrap:anywhere}
-.affiliation-placeholder{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;border:1px dashed #536477;border-radius:3px;background:#101a24;color:#73879e}
-.affiliation-placeholder svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round}
-.character-card:hover{border-color:#657e9e;background:#182632}
-.character-card .profile-link:focus-visible{outline:2px solid #9ab7ff;outline-offset:-3px;border-radius:4px}
-@media(max-width:1000px){.character-card .character-summary{padding:10px 12px}.character-card .character-heading{gap:10px}.character-card .avatar{flex-basis:48px;height:48px;font-size:21px}.character-card .character-info h2{font-size:17px}.affiliation-placeholder{width:40px;height:40px;flex-basis:40px}}
+.character-directory .character-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:18px;padding:0;border:0;border-radius:0;background:transparent;list-style:none}
+.character-card-item{min-width:0;--character-card-width:100%}
 @media(max-width:700px){.directory-controls{grid-template-columns:1fr 1fr;gap:12px}.directory-controls .search-box{grid-column:1/-1;grid-row:1}.directory-controls .archive-button{grid-column:1;grid-row:2}.directory-controls .new-character-button{grid-column:2;grid-row:2}.directory-breadcrumb{gap:10px}.directory-breadcrumb h1{font-size:23px}.breadcrumb-divider{font-size:20px}}
-@media(max-width:640px){.character-card-grid{grid-template-columns:1fr;gap:10px}.character-card .character-summary{padding:10px 12px}.character-directory .page-heading{padding:22px 0 18px}}
+@media(max-width:640px){.character-card-grid{grid-template-columns:1fr;gap:10px}.character-directory .page-heading{padding:22px 0 18px}}
 @media(max-width:380px){.directory-breadcrumb .brand{font-size:16px}.directory-breadcrumb h1{font-size:20px}.directory-breadcrumb{gap:8px}.directory-breadcrumb .brand img{width:23px;height:28px}}
-@media(prefers-reduced-motion:no-preference){.character-card{transition:background .15s,border-color .15s}}
