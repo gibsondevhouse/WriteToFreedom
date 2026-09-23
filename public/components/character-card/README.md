@@ -1,6 +1,6 @@
 # Character card
 
-Use this component for character cards in rails or grids. The dashboard and character directory both use it. Keep the portrait/gradient, role, name, two-line summary, affiliation, and four-action footer together; container layout belongs to the consuming page.
+Use this component for character cards in rails or grids. The dashboard and character directory both use it. Keep the portrait/gradient, role, name, affiliation, and four-action footer together; container layout belongs to the consuming page.
 
 ```html
 <link rel="stylesheet" href="/components/character-card/card.css">

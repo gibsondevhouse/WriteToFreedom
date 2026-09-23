@@ -24,7 +24,6 @@ export function createCharacterCard(data,options={}){
  card.dataset.characterId=record.id;
  const art=picture(record,'character-card-art'),copy=el('div','character-card-copy');
  copy.append(el('p','character-role',record.roles.join(' · ')||record.storyRole||'Character'),el(options.headingLevel===2?'h2':'h3','character-name',record.name));
- if(record.title||record.summary)copy.append(el('p','character-summary',record.summary||record.title));
  const power=characterPower(record.attributeRatings),badge=el('span','character-power');
  profile.setAttribute('aria-label','Open '+record.name+' profile. '+powerDescription(power));
  badge.title=powerDescription(power);badge.setAttribute('aria-label',badge.title);
