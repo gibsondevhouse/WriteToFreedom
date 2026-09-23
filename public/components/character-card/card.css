@@ -6,9 +6,9 @@
 .story-character-card .character-card-art .character-initials{ padding-top:32px; font:120px/1.1 Georgia,serif; color:var(--ink); opacity:.28; }
 .story-character-card .character-card-art img{ position:absolute; width:100%; height:100%; object-fit:cover; object-position:center 25%; }
 .story-character-card .character-card-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 5%,#15233112 30%,#152331c9 63%,#152331 100%); }
-.story-character-card .character-card-copy{ padding:150px 20px 14px; position:relative; min-width:0; width:100%; }
+.story-character-card .character-card-copy{ padding:150px 20px 6px; position:relative; min-width:0; width:100%; }
 .story-character-card .character-role { color:#c8d6e7; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.story-character-card .character-name { font:600 24px/1.2 Arial,sans-serif; letter-spacing:-.4px; color:#f5f7fc; margin:0 0 12px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.story-character-card .character-name { font:600 24px/1.2 Arial,sans-serif; letter-spacing:-.4px; color:#f5f7fc; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .story-character-card .character-affiliation{ display:flex; align-items:center; flex:none; gap:12px; padding:10px 20px 18px; min-height:80px; background:#152331; color:#dfe8f3; text-decoration:none; }
 .story-character-card .character-affiliation:hover{ text-decoration:none; }
 .story-character-card a.character-affiliation:hover strong{ color:#a4bdff; }
@@ -38,3 +38,5 @@
 .story-character-card .affiliation-picker:hover{box-shadow:0 0 0 2px #a4bdff}
 .story-character-card .affiliation-copy{color:inherit;text-decoration:none}
 .story-character-card a.affiliation-copy:hover strong{color:#a4bdff}
+
+.story-character-card .character-power svg{width:11px;height:11px;flex:none;fill:currentColor;stroke:none}

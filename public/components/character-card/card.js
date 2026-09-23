@@ -13,7 +13,7 @@ function picture(record,cls){
 }
 function icon(type){
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
- const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',type==='notes'?'M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5':'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-1a2.5 2.5 0 1 0 0-5M2 20v-3a6 6 0 0 1 12 0v3m2-7a5 5 0 0 1 6 5v2');svg.append(path);return svg;
+ const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',type==='power'?'M13 2 4 14h7l-1 8 10-13h-7l1-7Z':type==='notes'?'M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5':'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-1a2.5 2.5 0 1 0 0-5M2 20v-3a6 6 0 0 1 12 0v3m2-7a5 5 0 0 1 6 5v2');svg.append(path);return svg;
 }
 export function createCharacterCard(data,options={}){
  const record=normalizeCard(data),tone=characterTone(record,options.tone);
@@ -27,7 +27,7 @@ export function createCharacterCard(data,options={}){
  const power=characterPower(record.attributeRatings),badge=el('span','character-power');
  profile.setAttribute('aria-label','Open '+record.name+' profile. '+powerDescription(power));
  badge.title=powerDescription(power);badge.setAttribute('aria-label',badge.title);
- badge.append(el('span','','Power'),el('strong','',power.score===null?'—':power.score.toLocaleString('en-US')+(power.provisional?'*':'')));
+ badge.append(icon('power'),el('strong','',power.score===null?'—':power.score.toLocaleString('en-US')+(power.provisional?'*':'')));
  profile.append(art,badge,copy);
  const affiliation=record.affiliationCard,owner=el('div','character-affiliation');
  const ownerText=el(affiliation.href?'a':'span','affiliation-copy');if(affiliation.href)ownerText.href=affiliation.href;ownerText.append(el('span','affiliation-kind',affiliation.label),el('strong','',affiliation.name));const choose=button('','affiliation-picker',()=>open('connection'));choose.setAttribute('aria-label','Change featured item for '+record.name);choose.title='Change featured item';choose.setAttribute('aria-haspopup','dialog');choose.append(picture(affiliation,'affiliation-avatar'));owner.append(choose,ownerText);
