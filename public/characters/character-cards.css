@@ -21,3 +21,5 @@
 @media(max-width:700px){.directory-controls{grid-template-columns:1fr 1fr;gap:12px}.directory-controls .search-box{grid-column:1/-1;grid-row:1}.directory-controls .archive-button{grid-column:1;grid-row:2}.directory-controls .new-character-button{grid-column:2;grid-row:2}.directory-breadcrumb{gap:10px}.directory-breadcrumb h1{font-size:23px}.breadcrumb-divider{font-size:20px}}
 @media(max-width:640px){.character-card-grid{grid-template-columns:1fr;gap:10px}.character-directory .page-heading{padding:22px 0 18px}}
 @media(max-width:380px){.directory-breadcrumb .brand{font-size:16px}.directory-breadcrumb h1{font-size:20px}.directory-breadcrumb{gap:8px}.directory-breadcrumb .brand img{width:23px;height:28px}}
+
+@media(max-width:600px){.character-directory .list-toolbar{flex-wrap:wrap;padding:14px 0;gap:8px}.character-directory .sort-controls{margin-left:auto}}

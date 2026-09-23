@@ -1,3 +1,4 @@
+import {characterPower,powerDescription} from '../../characters/power.js';
 import {openCharacter} from './details.js';
 import {normalizeCard,characterTone} from './model.js';
 import {moralityIcons} from '../../characters/attributes.js?v=section-attributes-1';
@@ -24,9 +25,13 @@ export function createCharacterCard(data,options={}){
  const art=picture(record,'character-card-art'),copy=el('div','character-card-copy');
  copy.append(el('p','character-role',record.roles.join(' · ')||record.storyRole||'Character'),el(options.headingLevel===2?'h2':'h3','character-name',record.name));
  if(record.title||record.summary)copy.append(el('p','character-summary',record.summary||record.title));
- profile.append(art,copy);
- const affiliation=record.affiliationCard,owner=el(affiliation.href?'a':'div','character-affiliation');if(affiliation.href)owner.href=affiliation.href;
- const ownerText=el('span','affiliation-copy');ownerText.append(el('span','affiliation-kind',affiliation.label),el('strong','',affiliation.name));owner.append(picture(affiliation,'affiliation-avatar'),ownerText);
+ const power=characterPower(record.attributeRatings),badge=el('span','character-power');
+ profile.setAttribute('aria-label','Open '+record.name+' profile. '+powerDescription(power));
+ badge.title=powerDescription(power);badge.setAttribute('aria-label',badge.title);
+ badge.append(el('span','','Power'),el('strong','',power.score===null?'—':power.score.toLocaleString('en-US')+(power.provisional?'*':'')));
+ profile.append(art,badge,copy);
+ const affiliation=record.affiliationCard,owner=el('div','character-affiliation');
+ const ownerText=el(affiliation.href?'a':'span','affiliation-copy');if(affiliation.href)ownerText.href=affiliation.href;ownerText.append(el('span','affiliation-kind',affiliation.label),el('strong','',affiliation.name));const choose=button('','affiliation-picker',()=>open('connection'));choose.setAttribute('aria-label','Change featured item for '+record.name);choose.title='Change featured item';choose.setAttribute('aria-haspopup','dialog');choose.append(picture(affiliation,'affiliation-avatar'));owner.append(choose,ownerText);
  const actions=el('div','character-actions');
  const moral=button(moralityIcons[record.alignment]||'?', 'morality-action',()=>open('morality'));moral.title=record.alignment||'Moral alignment not set';moral.setAttribute('aria-label',`${record.name}: ${moral.title}. Choose moral alignment`);
  const relations=button('', 'relationships-action',()=>open('relationships'));relations.title='Relationships';relations.setAttribute('aria-label',`${record.relationships.length} relationships for ${record.name}`);

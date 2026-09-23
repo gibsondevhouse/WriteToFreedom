@@ -1,3 +1,5 @@
+import {noteTargets} from './note-connections.js';
+import {referenceKey,cleanNoteReference} from '../public/characters/notes.js';
 import {templateSections} from '../public/characters/template.js';
 import {factionSections} from '../public/factions/template.js';
 import {countrySections} from '../public/locations/countries/template.js';
@@ -24,8 +26,9 @@ export function characterCardDetails(character,{cast,factions,countries,location
     if(!outgoing.length&&!incoming.length)return [];
     return [{id:other.id,name:other.name||'Untitled character',image:other.portraitUrl||'',href:href('character',other.id),connections:[...outgoing.map(r=>({type:r.type||'Connection',description:r.description,direction:'outgoing'})),...incoming.map(r=>({type:r.type||'Connection',description:r.description,direction:'incoming'}))]}];
   });
+  const featured=character.cardConnection&&cardConnectionOptions(character,{cast,factions,locations,countries,cities:profiles.city}).find(option=>referenceKey(option.ref)===referenceKey(character.cardConnection));
   const mentions=characterMentions(character,profiles);
-  return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},affiliationCard:affiliation,relationships,mentions};
+  return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},cardConnection:character.cardConnection||null,defaultAffiliationCard:affiliation,affiliationCard:featured||affiliation,relationships,mentions};
 }
 
 export function characterMentions(character,profiles,{includeOwn=true}={}){
@@ -43,4 +46,12 @@ export function characterMentions(character,profiles,{includeOwn=true}={}){
     }
   }
   return mentions;
+}
+
+// A presentation choice, independent of the character's faction and relationships.
+export function cardConnectionOptions(character,{cast,factions,locations,countries=[],cities=[]}) {
+ return noteTargets(cast,factions,locations).filter(item=>!(item.kind==='character'&&item.id===character.id)).map(item=>{
+  const source=item.kind==='character'?cast.find(c=>c.id===item.id):item.kind==='faction'?factions.find(f=>f.id===item.id):item.kind==='location'?[...countries,...cities, ...locations].find(l=>l.id===item.id):null;
+  return {ref:cleanNoteReference(item),name:item.label,label:item.kind==='character'?'Character':item.kind==='faction'?(source?.type||'Faction'):item.kind==='location'?(item.detail||'Place'):item.group==='Lore'?'Lore':'Note',group:item.group,image:source?.portraitUrl||source?.imageUrl||source?.flagUrl||source?.coatOfArmsUrl||source?.skylineUrl||'',href:item.href};
+ });
 }

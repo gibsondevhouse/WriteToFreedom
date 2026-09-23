@@ -108,3 +108,37 @@ test('shared card defaults and colors stay stable across rail and grid consumers
  assert.equal(sparse.name,'Untitled character');assert.equal(sparse.href,'/characters/new-person/');assert.deepEqual(sparse.roles,['Explorer','Diplomat']);assert.deepEqual(sparse.relationships,[]);assert.deepEqual(sparse.mentions,[]);assert.equal(sparse.affiliationCard.name,'Independent');
  assert.equal(characterTone({id:'claude'}),'clay');assert.equal(characterTone(sparse),characterTone({...sparse,name:'A renamed character'}));assert.equal(characterTone(sparse,'gold'),'gold');assert.equal(characterTone(sparse,'invalid'),characterTone(sparse));
 });
+
+test('power is bounded, exponential, monotonic, and honest about incomplete attributes',async()=>{
+ const {characterPower}=await import('../public/characters/power.js');
+ const {attributeKeys}=await import('../public/characters/attributes.js');
+ const ratings=value=>Object.fromEntries(attributeKeys.map(key=>[key,value]));
+ assert.equal(characterPower({}).score,null);
+ assert.deepEqual(characterPower(ratings(0)),{score:0,rated:20,total:20,provisional:false});
+ assert.equal(characterPower(ratings(99)).score,9999);
+ const low=characterPower(ratings(20)).score,mid=characterPower(ratings(40)).score,high=characterPower(ratings(60)).score;
+ assert.ok(high-mid>mid-low);assert.ok(characterPower({strength:99}).score<low);assert.ok(characterPower({strength:99}).provisional);
+ assert.equal(characterPower({strength:100,speed:-1,unknown:99}).score,null);
+ let previous=-1;for(let rating=0;rating<=99;rating++){const score=characterPower(ratings(rating)).score;assert.ok(score>previous&&score<=9999);previous=score;}
+});
+
+test('featured items persist independently, validate ownership, and work across both card surfaces',async()=>{
+ const {db,request}=setup();try{
+  let original=await (await request('/api/characters/claude')).json();
+  const picker=await (await request('/api/characters/claude?view=connections')).json();
+  assert.ok(picker.options.some(option=>option.ref.kind==='faction'));assert.ok(picker.options.some(option=>option.ref.kind==='location'));assert.ok(!picker.options.some(option=>option.ref.kind==='character'&&option.ref.id==='claude'));
+  let response=await request('/api/characters/claude','PUT',{...original,cardConnection:{kind:'character',id:'gemini'}});assert.equal(response.status,200);
+  let saved=await response.json();assert.equal(saved.factionId,original.factionId);assert.deepEqual(saved.relationships,original.relationships);
+  let dashboard=await (await request('/api/dashboard')).json();assert.equal(dashboard.characters.find(c=>c.id==='claude').affiliationCard.name,'Gemini');
+  const cards=await (await request('/api/characters?view=cards')).json();assert.deepEqual(cards.characters.find(c=>c.id==='claude').affiliationCard,dashboard.characters.find(c=>c.id==='claude').affiliationCard);
+  const legacy={...saved,summary:'Edited elsewhere'};delete legacy.cardConnection;
+  response=await request('/api/characters/claude','PUT',legacy);assert.equal(response.status,200);saved=await response.json();assert.equal(saved.cardConnection.id,'gemini');
+  assert.equal((await request('/api/characters/claude','PUT',{...original,cardConnection:null})).status,409);
+  assert.equal((await request('/api/characters/claude','PUT',{...saved,cardConnection:{kind:'character',id:'claude'}})).status,400);
+  const privateId='f591b330-8cb8-4977-b927-c075dd60f197';await request('/api/characters','POST',{id:privateId,name:'Private stranger'},'other-author');
+  assert.equal((await request('/api/characters/claude','PUT',{...saved,cardConnection:{kind:'character',id:privateId}})).status,400);
+  const other=await (await request('/api/characters/claude?view=connections','GET',undefined,'other-author')).json();assert.ok(!other.character.cardConnection);
+  response=await request('/api/characters/claude','PUT',{...saved,cardConnection:null});assert.equal(response.status,200);
+  dashboard=await (await request('/api/dashboard')).json();const card=dashboard.characters.find(c=>c.id==='claude');assert.deepEqual(card.affiliationCard,card.defaultAffiliationCard);
+ }finally{db.close();}
+});

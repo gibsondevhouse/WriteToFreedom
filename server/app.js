@@ -1,5 +1,5 @@
 import {noteTargets,validateNoteConnections} from './note-connections.js';
-import {validateNotes} from '../public/characters/notes.js';
+import {validateNotes,cleanNoteReference,referenceKey} from '../public/characters/notes.js';
 import {validateRatings} from '../public/characters/attributes.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
 import {workspaceShell} from './workspace-shell.js';
@@ -7,7 +7,7 @@ import {timelineRoute} from './timeline-routes.js';
 import {dashboardRoute,dashboardData} from './dashboard-routes.js';
 import {locationCatalog,defaultCountry} from './countries.js';
 import {defaultCity} from './cities.js';
-import {characterMentions} from './character-card-data.js';
+import {characterMentions,cardConnectionOptions,characterCardDetails} from './character-card-data.js';
 import { cityRoute } from './city-routes.js';
 import { countryRoute } from './country-routes.js';
 import { locationRoute } from './location-routes.js';
@@ -50,6 +50,8 @@ function validate(input,current) {
  if(Object.values(output.nationalityContinents).some(id=>typeof id!=='string'))throw new Error('Choose an existing continent.');
  output.notes=validateNotes(Object.hasOwn(input,'notes')?input.notes:(current.notes||[]),output);
  output.attributeRatings=validateRatings(Object.hasOwn(input,'attributeRatings')?input.attributeRatings:(current.attributeRatings||{}));
+ const connection=Object.hasOwn(input,'cardConnection')?input.cardConnection:(current.cardConnection||null);
+ output.cardConnection=connection===null?null:cleanNoteReference(connection);
  const hidden=Object.hasOwn(input,'hiddenFields')?input.hiddenFields:current.hiddenFields||[];
  if(!Array.isArray(hidden)||hidden.length>hideableFields.length||hidden.some(key=>!hideableFields.includes(key)))throw new Error('Invalid field visibility settings.');
  output.hiddenFields=[...new Set(hidden)];
@@ -101,7 +103,14 @@ function createAppWorker(assets) { return {async fetch(request,env) {
      }
      return json({characters:cast});
     }
-    const character=await db.get(owner,id)||sampleCharacter(id);return character?json(attachFactionNames([character],factions)[0]):json({error:'Character not found.'},404);
+    const character=await db.get(owner,id)||sampleCharacter(id);
+    if(character&&url.searchParams.get('view')==='connections'){
+     const [saved,locations,countries,cities]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+     const cast=characterCast(saved),countryProfiles=locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countries.find(c=>c.id===l.id)})),cityProfiles=locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cities.find(c=>c.id===l.id)}));
+     const context={cast,factions,locations,countries:countryProfiles,profiles:{character:cast,faction:factions,country:countryProfiles,city:cityProfiles}};
+     return json({character,defaultAffiliationCard:characterCardDetails(character,context).defaultAffiliationCard,options:cardConnectionOptions(character,{...context,cities:cityProfiles})});
+    }
+    return character?json(attachFactionNames([character],factions)[0]):json({error:'Character not found.'},404);
    }
    if(!['POST','PUT'].includes(request.method)) return json({error:'Method not allowed.'},405);
    if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')) return json({error:'This request could not be verified. Reload and try again.'},403);
@@ -129,7 +138,15 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const savedCast=await db.list(owner),cast=characterCast(savedCast);
     const allowed=new Set(cast.map(c=>c.id));
     const proposedCast=cast.map(c=>c.id===id?{...document,id}:c);
-    try{validateNoteConnections(document.notes,noteTargets(proposedCast,await factionCatalog(db,owner),locations),current.notes||[]);}catch(error){return json({error:error.message},400);}
+    try{
+     const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations);
+     validateNoteConnections(document.notes,targets,current.notes||[]);
+     if(document.cardConnection){
+      const key=referenceKey(document.cardConnection);
+      if(document.cardConnection.kind==='character'&&document.cardConnection.id===id)throw new Error('Choose another item to feature on this card.');
+      if(key!==(current.cardConnection&&referenceKey(current.cardConnection))&&!targets.some(target=>referenceKey(target)===key))throw new Error('Choose an existing item from your world.');
+     }
+    }catch(error){return json({error:error.message},400);}
     if(document.relationships.some(r=>r.targetId===id||!allowed.has(r.targetId)))return json({error:'Choose another existing character for each relationship.'},400);
     if(!Number.isInteger(input.version))return json({error:'Reload this character before saving.'},400);
     const updated=await db.save(owner,id,input.version,document);

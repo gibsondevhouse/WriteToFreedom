@@ -33,3 +33,9 @@
 .story-character-card:hover{border-color:#8ca5c36b}.story-character-card :is(a,button):focus-visible{outline:2px solid #a4bdff;outline-offset:-3px}.story-character-card .character-affiliation{box-sizing:border-box}.story-character-card .character-profile-link{min-width:0}
 @media(max-width:760px){.story-character-card{width:var(--character-card-width,310px)}}
 .story-character-card *{box-sizing:border-box}
+.story-character-card .character-power{position:absolute;top:16px;right:16px;display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid #ffffff24;border-radius:20px;background:#101a26c9;color:#dce7f7;font:11px/1.4 Arial,sans-serif;backdrop-filter:blur(8px)}
+.story-character-card .character-power strong{font-size:14px;font-variant-numeric:tabular-nums;color:#f3f7ff}
+.story-character-card .affiliation-picker{flex:none;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;color:inherit}
+.story-character-card .affiliation-picker:hover{box-shadow:0 0 0 2px #a4bdff}
+.story-character-card .affiliation-copy{color:inherit;text-decoration:none}
+.story-character-card a.affiliation-copy:hover strong{color:#a4bdff}
