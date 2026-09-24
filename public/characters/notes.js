@@ -3,7 +3,7 @@ export const noteFields=templateSections.flatMap(s=>s.fields.filter(f=>f[2]==='t
 export const referenceKey=ref=>[ref.kind,ref.characterId||'',ref.id].join(':');
 export const noteTypes=['detail','update','lore'];
 export function cleanNoteReference(link){
-    if(!link||!['character','location','faction','note'].includes(link.kind)||typeof link.id!=='string'||!/^[a-z0-9-]{1,80}$/i.test(link.id)||(link.kind==='note'&&(typeof link.characterId!=='string'||!/^[a-z0-9-]{1,80}$/i.test(link.characterId))))throw new Error('Choose a valid linked item.');
+    if(!link||!['character','location','faction','note','lore'].includes(link.kind)||typeof link.id!=='string'||!/^[a-z0-9-]{1,80}$/i.test(link.id)||(link.kind==='note'&&(typeof link.characterId!=='string'||!/^[a-z0-9-]{1,80}$/i.test(link.characterId))))throw new Error('Choose a valid linked item.');
     return {kind:link.kind,id:link.id,...(link.kind==='note'?{characterId:link.characterId}:{})};
 }
 export const noteMarker=index=>'['+(index+1)+']';

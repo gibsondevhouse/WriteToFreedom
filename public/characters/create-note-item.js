@@ -1,3 +1,4 @@
+import {loreTypes,loreHref} from '../lore/template.js';
 import {locationHref} from '../locations/data.js';
 import {locationTypes,typeLabels,parentChoices,parentTypes,requiresParent,areaTypes} from '../locations/data.js?v=worlds-1';
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -9,7 +10,8 @@ export function createNoteItemButton(initial,connections,addNote){
  type.id='note-item-type';name.id='note-item-name';parent.id='note-item-parent';area.id='note-item-area';text.id='note-item-text';
  name.required=true;name.maxLength=160;name.autocomplete='off';text.maxLength=2000;text.rows=3;
  const field=(caption,input)=>{const wrap=node('div',undefined,'note-item-field'),label=node('label',caption);label.htmlFor=input.id;wrap.append(label,input);return wrap;};
- for(const [value,label] of [['character','Character'],['faction','Faction'],['note','Note'],['lore','Lore entry']])type.append(new Option(label,value));
+ for(const [value,label] of [['character','Character'],['faction','Faction'],['note','Character note']])type.append(new Option(label,value));
+ const loreGroup=node('optgroup');loreGroup.label='Lore';for(const [value,label] of Object.entries(loreTypes))loreGroup.append(new Option(label,'lore-'+value));type.append(loreGroup);
  const places=node('optgroup');places.label='Places';for(const value of locationTypes)places.append(new Option(typeLabels[value],value));type.append(places);
  for(const value of areaTypes)area.append(new Option(value,value));
  const parentField=field('Belongs to',parent),areaField=field('Area type',area),textField=field('Note',text);
@@ -18,8 +20,8 @@ export function createNoteItemButton(initial,connections,addNote){
  const actions=node('div',undefined,'note-composer-actions'),back=node('button','Cancel','note-action'),save=node('button','Create and insert','note-submit');back.type='button';save.type='submit';actions.append(back,save);
  form.append(heading,fields,hint,error,actions);dialog.append(form);document.body.append(dialog);
  let saving=false,requestId=null;
- function configure(){const kind=type.value,isNote=['note','lore'].includes(kind),isPlace=locationTypes.includes(kind);
-  textField.hidden=!isNote;text.disabled=!isNote;text.required=isNote;name.maxLength=isNote?120:160;
+ function configure(){const kind=type.value,isNote=kind==='note',isLore=kind.startsWith('lore-'),isPlace=locationTypes.includes(kind);
+  textField.hidden=!(isNote||isLore);text.disabled=textField.hidden;text.required=isNote;name.maxLength=isNote?120:160;
   areaField.hidden=kind!=='area';area.disabled=areaField.hidden;
   parentField.hidden=!isPlace||!parentTypes[kind]?.length;parent.disabled=parentField.hidden;parent.required=isPlace&&requiresParent(kind);
   parent.replaceChildren(new Option(parent.required?'Choose a parent location…':'No parent location',''));
@@ -34,13 +36,14 @@ export function createNoteItemButton(initial,connections,addNote){
  async function api(path,payload){const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Keep this note open and try again after signing in.');const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not create this item. Your note is still here.');return result;}
  form.addEventListener('submit',async e=>{
   e.preventDefault();if(saving)return;const label=name.value.trim();if(!label){name.setCustomValidity('Enter a name or title.');name.reportValidity();return;}
-  const kind=type.value,isNote=['note','lore'].includes(kind);if(isNote&&!text.value.trim()){text.setCustomValidity('Enter the note or lore detail.');text.reportValidity();return;}
+  const kind=type.value,isNote=kind==='note';if(isNote&&!text.value.trim()){text.setCustomValidity('Enter the note or lore detail.');text.reportValidity();return;}
   if(!form.reportValidity())return;error.hidden=true;
   try{connections.checkInsert(label);}catch(e){error.textContent=e.message;error.hidden=false;return;}
   saving=true;fields.disabled=true;back.disabled=true;save.disabled=true;save.textContent='Creating…';requestId??=crypto.randomUUID();
   let target;
   try{
-   if(isNote){target=addNote({id:requestId,title:label,text:text.value.trim(),type:kind==='lore'?'lore':'detail'});}
+   if(isNote){target=addNote({id:requestId,title:label,text:text.value.trim(),type:'detail'});}
+   else if(kind.startsWith('lore-')){const created=await api('/api/lore',{id:requestId,name:label,type:kind.slice(5),introduction:text.value.trim()});target={kind:'lore',id:created.id,label:created.name,group:'Lore',detail:loreTypes[created.type],href:loreHref(created)};}
    else if(kind==='character'){const created=await api('/api/characters',{id:requestId,name:label});target={kind:'character',id:created.id,label:created.name,group:'Characters',href:'/characters/'+created.id+'/'};if(!initial.cast.some(c=>c.id===created.id))initial.cast.push({id:created.id,name:created.name});}
    else if(kind==='faction'){const created=await api('/api/factions',{id:requestId,name:label});target={kind:'faction',id:created.id,label:created.name,group:'Factions',href:'/factions/'+created.id+'/'};if(!initial.factions.some(f=>f.id===created.id))initial.factions.push(created);}
    else {const created=await api('/api/locations',{id:requestId,name:label,type:kind,parentId:parent.disabled?null:parent.value||null,...(kind==='area'?{areaType:area.value}:{})});initial.locations||=[];if(!initial.locations.some(l=>l.id===created.id))initial.locations.push(created);target={kind:'location',id:created.id,label:created.name,group:'Places',detail:typeLabels[created.type],href:locationHref(created)};}

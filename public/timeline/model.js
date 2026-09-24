@@ -2,17 +2,18 @@ import {locationTemplates} from '../locations/template.js';
 import {locationPaths,typePlurals} from '../locations/data.js';
 // Timeline coordinates use astronomical years (0 = 1 BCE). Original date text is
 // always retained; coarse dates are positioned at their midpoint, never invented days.
-export const types={character:'Characters',faction:'Factions',...typePlurals};
-export const kinds={birth:'Births',death:'Deaths',founded:'Foundings',settled:'Settlements',incorporated:'Charters',population:'Population records',formation:'Formations',discovery:'Discoveries',abandonment:'Abandonments',restoration:'Restorations'};
+export const types={character:'Characters',faction:'Factions',lore:'Lore',...typePlurals};
+export const kinds={origin:'Origins',birth:'Births',death:'Deaths',founded:'Foundings',settled:'Settlements',incorporated:'Charters',population:'Population records',formation:'Formations',discovery:'Discoveries',abandonment:'Abandonments',restoration:'Restorations'};
 import {months,leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
 export {leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
 const fields={
+ lore:[['originDate','origin','Origin / first appearance']],
  ...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.dates])),
  character:[['birthDate','birth','Born'],['deathDate','death','Died']],
  faction:[['founded','founded','Founded']],country:[['founded','founded','Established'],['populationDate','population','Population recorded']],
  city:[['settled','settled','First settled'],['incorporated','incorporated','Chartered'],['populationDate','population','Population recorded']]
 };
-const paths={...locationPaths,character:'/characters/',faction:'/factions/'};
+const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/'};
 export function collectTimeline(catalogs){
  const events=[],unplaced=[],counts={};let undated=0;
  for(const [type,records] of Object.entries(catalogs)){

@@ -20,8 +20,8 @@ export async function timelineRoute(request,env){
  if(request.method!=='GET')return json({error:'Method not allowed.'},405);
  try{
   const db=repository(env.DB);
-  const [characters,factions,locations,countries,cities]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+  const [characters,factions,locations,countries,cities,lore]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner)]);
   const countryProfiles=new Map(countries.map(c=>[c.id,c])),cityProfiles=new Map(cities.map(c=>[c.id,c]));
-  return json(collectTimeline({...locationProfileGroups(locations),character:characterCast(characters),faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryProfiles.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityProfiles.get(l.id)}))}));
+  return json(collectTimeline({...locationProfileGroups(locations),lore,character:characterCast(characters),faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryProfiles.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityProfiles.get(l.id)}))}));
  }catch(error){console.error('Timeline request failed',error.message);return json({error:'Your timeline could not be loaded. Please try again.'},503);}
 }

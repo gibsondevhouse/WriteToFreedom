@@ -1,3 +1,8 @@
+import {dashboardPages} from './dashboard-pages.js';
+import {renderDashboardPage} from './dashboard-shell.js';
+import {directoryPages} from './directory-pages.js';
+import {renderDirectoryPage} from './directory-shell.js';
+import {loreRoute} from './lore-routes.js';
 import {locationProfileRoute} from './location-profile-routes.js';
 import {locationTemplates,locationProfileGroups} from '../public/locations/template.js';
 import {locationPaths} from '../public/locations/data.js';
@@ -81,6 +86,25 @@ function validate(input,current) {
 function createAppWorker(assets) { return {async fetch(request,env) {
  // Canonicalize/delegate specific location routes before broad APIs and assets.
  const url=new URL(request.url);const path=url.pathname;
+ // Dashboard definitions all share one complete main-area shell.
+ const dashboard=dashboardPages.get(path);
+ if(dashboard){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return new Response(request.method==='HEAD'?null:renderDashboardPage(dashboard),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});
+ }
+ if(dashboardPages.has(path+'/')){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return Response.redirect(url.origin+path+'/'+url.search,308);
+ }
+ const directory=directoryPages.get(path);
+ if(directory){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return new Response(request.method==='HEAD'?null:renderDirectoryPage(directory),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});
+ }
+ if(directoryPages.has(path+'/')){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return Response.redirect(url.origin+path+'/'+url.search,308);
+ }
  if(/^\/locations\/countries\/(?:sample-kingdom|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
  if(/^\/locations\/countries\/[^/]+\/$/.test(path)||path.startsWith('/api/countries/'))return countryRoute(request,env);
  if(/^\/locations\/cities\/(?:sample-capital|[0-9a-f-]{36})$/i.test(path))return Response.redirect(url.origin+path+'/',308);
@@ -88,6 +112,8 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  const locationPage=Object.keys(locationTemplates).some(type=>path.startsWith(locationPaths[type])&&/^[^/]+\/?$/.test(path.slice(locationPaths[type].length)));
  if(locationPage&&!path.endsWith('/'))return Response.redirect(url.origin+path+'/'+url.search,308);
  if(locationPage||/^\/api\/locations\/[^/]+\/?$/.test(path))return locationProfileRoute(request,env);
+ if(/^\/lore\/[0-9a-f-]{36}$/i.test(path))return Response.redirect(url.origin+path+'/'+url.search,308);
+ if(/^\/lore\/[^/]+\/$/.test(path)||path==='/api/lore'||/^\/api\/lore\/[^/]+\/?$/.test(path))return loreRoute(request,env);
  if(path==='/api/timeline')return timelineRoute(request,env);
  if(path==='/api/dashboard')return dashboardRoute(request,env);
  if(path==='/api/locations')return locationRoute(request,env);
@@ -112,11 +138,11 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const factions=await factionCatalog(db,owner);
     const character=attachFactionNames([await db.get(owner,profile[1])||sampleCharacter(profile[1])].filter(Boolean),factions)[0];
     if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
-    const [savedCast,locations,countries,cities]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+    const [savedCast,locations,countries,cities,lore]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner)]);
     const cast=attachFactionNames(characterCast(savedCast),factions);
     const countryMap=new Map(countries.map(p=>[p.id,p])),cityMap=new Map(cities.map(p=>[p.id,p]));
-    const notes=characterMentions(character,{...locationProfileGroups(locations),character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))},{includeOwn:false});
-    return new Response(renderProfile(character,cast,factions,locations,notes),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    const notes=characterMentions(character,{...locationProfileGroups(locations),lore,character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))},{includeOwn:false});
+    return new Response(renderProfile(character,cast,factions,locations,notes,lore),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
    }
    const id=path.split('/')[3];
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
@@ -126,8 +152,8 @@ function createAppWorker(assets) { return {async fetch(request,env) {
      const saved=await db.list(owner),cast=attachFactionNames(characterCast(saved),factions);
      // Display projection replaces raw roles/relationships; never use it as a PUT body.
      if(url.searchParams.get('view')==='cards'){
-      const [locations,countries,cities]=await Promise.all([locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
-      const cards=dashboardData({characters:saved,factions,locations,countries,cities}).characters;
+      const [locations,countries,cities,lore]=await Promise.all([locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner)]);
+      const cards=dashboardData({characters:saved,factions,locations,countries,cities,lore}).characters;
       return json({characters:cast.map(c=>({...c,...cards.find(card=>card.id===c.id)}))});
      }
      return json({characters:cast});
@@ -135,9 +161,9 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const character=await db.get(owner,id)||sampleCharacter(id);
     // Featured-item picker receives a writable document plus separate display options.
     if(character&&url.searchParams.get('view')==='connections'){
-     const [saved,locations,countries,cities]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner)]);
+     const [saved,locations,countries,cities,lore]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner)]);
      const cast=characterCast(saved),countryProfiles=locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countries.find(c=>c.id===l.id)})),cityProfiles=locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cities.find(c=>c.id===l.id)}));
-     const context={cast,factions,locations,countries:countryProfiles,profiles:{...locationProfileGroups(locations),character:cast,faction:factions,country:countryProfiles,city:cityProfiles}};
+     const context={cast,factions,locations,lore,countries:countryProfiles,profiles:{...locationProfileGroups(locations),lore,character:cast,faction:factions,country:countryProfiles,city:cityProfiles}};
      return json({character,defaultAffiliationCard:characterCardDetails(character,context).defaultAffiliationCard,options:cardConnectionOptions(character,{...context,cities:cityProfiles})});
     }
     return character?json(attachFactionNames([character],factions)[0]):json({error:'Character not found.'},404);
@@ -171,7 +197,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     // Include draft notes when validating links created within the same character save.
     const proposedCast=cast.map(c=>c.id===id?{...document,id}:c);
     try{
-     const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations);
+     const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations,await db.listLore(owner));
      validateNoteConnections(document.notes,targets,current.notes||[]);
      if(document.cardConnection){
       const key=referenceKey(document.cardConnection);

@@ -19,6 +19,10 @@ export function repository(binding) {
  if (!binding) throw new Error('Character storage is unavailable.');
  const decode = row => {if(!row)return null;const doc=normalizeCharacter(JSON.parse(row.document));return {...doc,id:doc.sampleId||row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at};};
  return {
+  async listLore(owner) {return (await binding.prepare('SELECT * FROM lore_entries WHERE owner_id = ? ORDER BY updated_at DESC, id').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at}));},
+  async getLore(owner,id) {const row=await binding.prepare('SELECT * FROM lore_entries WHERE owner_id = ? AND id = ?').bind(owner,id).first();return row?{...JSON.parse(row.document),id:row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at}:null;},
+  async createLore(owner,id,document) {const now=new Date().toISOString();await binding.prepare('INSERT INTO lore_entries (id, owner_id, document, version, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?) ON CONFLICT(id) DO NOTHING').bind(id,owner,JSON.stringify(document),now,now).run();return this.getLore(owner,id);},
+  async saveLore(owner,id,version,document) {const result=await binding.prepare('UPDATE lore_entries SET document = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND id = ? AND version = ?').bind(JSON.stringify(document),new Date().toISOString(),owner,id,version).run();return result.meta.changes?this.getLore(owner,id):null;},
   async listCityProfiles(owner) {return (await binding.prepare('SELECT * FROM city_profiles WHERE owner_id = ?').bind(owner).all()).results.map(row=>({...JSON.parse(row.document),id:row.location_id,version:row.version}));},
   async saveCity(owner,id,version,document) {
    const encoded=JSON.stringify(document),now=new Date().toISOString();

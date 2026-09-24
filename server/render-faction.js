@@ -2,7 +2,7 @@ import {renderConnectedNotes} from './note-connections.js';
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import { factionSections, factionTypes, factionStatuses } from '../public/factions/template.js';
 /** Compose faction HTML with cast-derived members and linked notes; no fetching or saving. */
-export function renderFaction(faction,cast){
+export function renderFaction(faction,cast,lore=[]){
  const initials=escape((faction.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(n=>n[0]).join('').toUpperCase());
  const field=createFieldRenderer(faction,{options:(key,type)=>type==='character'?cast.map(c=>[c.id,c.name||'Untitled character']):type==='select'?(key==='type'?factionTypes:factionStatuses).map(v=>[v,v]):null,links:{founderId:'/characters/',leaderId:'/characters/'}});
  const members=cast.filter(c=>c.factionId===faction.id);
@@ -15,5 +15,5 @@ export function renderFaction(faction,cast){
   renderInfoGroup('Leadership','identity-leadership',fields(['founderId','leaderId']))+
   renderInfoGroup('Location & headquarters','identity-location',fields(['location','headquarters']))+
   `<a class="member-count" href="#members">${members.length} affiliated ${members.length===1?'character':'characters'}</a>`;
- return renderProfilePage({record:faction,type:'faction',collection:'Factions',collectionUrl:'/factions/',infobox,content:body+renderConnectedNotes(cast,{kind:'faction',id:faction.id},faction),script:'/factions/profile.js',styles:['/characters/profile-notes.css','/factions/profile.css']});
+ return renderProfilePage({record:faction,type:'faction',collection:'Factions',collectionUrl:'/factions/',infobox,content:body+renderConnectedNotes(cast,{kind:'faction',id:faction.id},faction,lore),script:'/factions/profile.js',styles:['/characters/profile-notes.css','/factions/profile.css']});
 }

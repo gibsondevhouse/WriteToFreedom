@@ -50,6 +50,13 @@
       "when": 1789961858501,
       "tag": "0006_flippant_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790210000235,
+      "tag": "0007_red_sandman",
+      "breakpoints": true
     }
   ]
 }

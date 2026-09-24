@@ -144,3 +144,13 @@ export function updateWorkspace(data) {
   searchError = '';
   search();
 }
+
+// A page can save without navigating away (for example, a quick Lore note).
+// Let any in-flight read settle before invalidating its potentially stale result.
+window.addEventListener('workspace:changed', async () => {
+  await loadingCatalog;
+  catalog = undefined;
+  searchError = '';
+  search();
+  if (input.value.trim()) ensureCatalog();
+});

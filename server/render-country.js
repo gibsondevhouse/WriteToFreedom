@@ -3,7 +3,7 @@ import {ancestors,parentChoices,locationHref} from '../public/locations/data.js'
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import {countrySections,validImageUrl} from '../public/locations/countries/template.js';
 /** Compose country HTML with scoped world/city choices, descendants and linked notes; no persistence. */
-export function renderCountry(country,locations,cast){
+export function renderCountry(country,locations,cast,lore=[]){
  const cities=locations.filter(l=>l.type==='city'&&l.parentId===country.id),cityIds=new Set(cities.map(c=>c.id)),landmarks=locations.filter(l=>l.type==='landmark'&&ancestors(l,locations).some(a=>cityIds.has(a.id)));
  const field=createFieldRenderer(country,{required:['name'],options:(key,type)=>{const list=type==='world'?parentChoices('country',locations,country.id):type==='city'?cities:type==='character'?cast:null;return list?list.map(c=>[c.id,c.name||'Untitled character']):null;},links:{leaderId:'/characters/'}});
  function media(key,label){const value=country[key]||'',visible=value&&validImageUrl(value);return `<figure class="country-media${key==='mapUrl'?' country-map':''}"><img data-image="${key}" alt="${escape(label)}" referrerpolicy="no-referrer"${visible?` src="${escape(value)}"`:' hidden'}><figcaption><details${visible?'':' open'}><summary>${label}</summary>${field([key,label+' image URL','url'])}</details><small class="image-error" data-image-error="${key}" hidden>Image unavailable. Check its URL.</small></figcaption></figure>`;}
@@ -18,5 +18,5 @@ export function renderCountry(country,locations,cast){
   renderInfoGroup('Geography & population','identity-geography',fields(['parentId','capitalId','largestCityId','area','population','populationDate']))+
   renderInfoGroup('Economy & time','identity-economy',fields(['currency','timeZone']))+
   `<a class="places-count" href="#places">${cities.length} ${cities.length===1?'city':'cities'} · ${landmarks.length} ${landmarks.length===1?'landmark':'landmarks'}</a>`;
- return renderProfilePage({record:country,type:'country',collection:'Locations',collectionUrl:'/locations/',infobox,content:body+renderConnectedNotes(cast,{kind:'location',id:country.id},country),script:'/locations/countries/profile.js',styles:['/characters/profile-notes.css','/locations/countries/profile.css'],boxClass:'country-infobox'});
+ return renderProfilePage({record:country,type:'country',collection:'Locations',collectionUrl:'/locations/',infobox,content:body+renderConnectedNotes(cast,{kind:'location',id:country.id},country,lore),script:'/locations/countries/profile.js',styles:['/characters/profile-notes.css','/locations/countries/profile.css'],boxClass:'country-infobox'});
 }

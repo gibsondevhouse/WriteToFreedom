@@ -1,3 +1,4 @@
+import {loreMentionSections,loreTypes,loreHref} from '../public/lore/template.js';
 import {locationTemplates} from '../public/locations/template.js';
 import {locationPaths} from '../public/locations/data.js';
 import {noteTargets} from './note-connections.js';
@@ -8,8 +9,8 @@ import {countrySections} from '../public/locations/countries/template.js';
 import {citySections} from '../public/locations/cities/template.js';
 import {ancestors} from '../public/locations/data.js';
 
-const schemas={...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.sections])),character:templateSections,faction:factionSections,country:countrySections,city:citySections};
-const paths={...locationPaths,character:'/characters/',faction:'/factions/'};
+const schemas={lore:loreMentionSections,...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.sections])),character:templateSections,faction:factionSections,country:countrySections,city:citySections};
+const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/'};
 const href=(kind,id)=>paths[kind]+encodeURIComponent(id)+'/';
 function mentionsName(text,name) {
   if (!name?.trim()) return false;
@@ -34,7 +35,7 @@ export function characterCardDetails(character,{cast,factions,countries,location
     if(!outgoing.length&&!incoming.length)return [];
     return [{id:other.id,name:other.name||'Untitled character',image:other.portraitUrl||'',href:href('character',other.id),connections:[...outgoing.map(r=>({type:r.type||'Connection',description:r.description,direction:'outgoing'})),...incoming.map(r=>({type:r.type||'Connection',description:r.description,direction:'incoming'}))]}];
   });
-  const featured=character.cardConnection&&cardConnectionOptions(character,{cast,factions,locations,countries,cities:profiles.city}).find(option=>referenceKey(option.ref)===referenceKey(character.cardConnection));
+  const featured=character.cardConnection&&cardConnectionOptions(character,{cast,factions,locations,countries,cities:profiles.city,lore:profiles.lore||[]}).find(option=>referenceKey(option.ref)===referenceKey(character.cardConnection));
   const mentions=characterMentions(character,profiles);
   return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},cardConnection:character.cardConnection||null,defaultAffiliationCard:affiliation,affiliationCard:featured||affiliation,relationships,mentions};
 }
@@ -49,6 +50,7 @@ export function characterMentions(character,profiles,{includeOwn=true}={}){
       if(type!=='textarea'||!source[key]?.trim()||!mentionsName(source[key],character.name))continue;
       mentions.push({source:source.name||'Untitled '+kind,label,kind,text:source[key],href:href(kind,source.id)+(source.hiddenFields?.includes(key)?'':'#field-'+key)});
     }
+    if(kind==='lore')for(const connection of source.connections||[])if(connection.target.kind==='character'&&connection.target.id===character.id)mentions.push({source:source.name,label:connection.relationship,kind,text:source.summary||source.introduction||connection.relationship,href:loreHref(source)+'#connections'});
     if(kind==='character')for(const note of source.notes||[]){if(mentionsName(note.text,character.name)||(note.links||[]).some(l=>l.kind==='character'&&l.id===character.id))mentions.push({source:source.name||'Untitled character',label:note.title||'Note',kind,text:note.text,...(note.content?{content:note.content,links:note.links}:{}),href:href(kind,source.id)+'#note-'+note.id});}
     if(kind==='character')for(const relationship of source.relationships||[]){
       if(relationship.description?.trim()&&(relationship.targetId===character.id||mentionsName(relationship.description,character.name)))mentions.push({source:source.name||'Untitled character',label:'Relationship notes',kind,text:relationship.description,href:href(kind,source.id)+(source.hiddenFields?.includes('relationships')?'':'#relationships')});
@@ -59,9 +61,9 @@ export function characterMentions(character,profiles,{includeOwn=true}={}){
 
 // A presentation choice, independent of the character's faction and relationships.
 /** Build available featured-item references from the owner's catalogs; excludes the character itself. */
-export function cardConnectionOptions(character,{cast,factions,locations,countries=[],cities=[]}) {
- return noteTargets(cast,factions,locations).filter(item=>!(item.kind==='character'&&item.id===character.id)).map(item=>{
-  const source=item.kind==='character'?cast.find(c=>c.id===item.id):item.kind==='faction'?factions.find(f=>f.id===item.id):item.kind==='location'?[...countries,...cities, ...locations].find(l=>l.id===item.id):null;
-  return {ref:cleanNoteReference(item),name:item.label,label:item.kind==='character'?'Character':item.kind==='faction'?(source?.type||'Faction'):item.kind==='location'?(item.detail||'Place'):item.group==='Lore'?'Lore':'Note',group:item.group,image:source?.portraitUrl||source?.imageUrl||source?.flagUrl||source?.coatOfArmsUrl||source?.skylineUrl||'',href:item.href};
+export function cardConnectionOptions(character,{cast,factions,locations,countries=[],cities=[],lore=[]}) {
+ return noteTargets(cast,factions,locations,lore).filter(item=>!(item.kind==='character'&&item.id===character.id)).map(item=>{
+  const source=item.kind==='character'?cast.find(c=>c.id===item.id):item.kind==='faction'?factions.find(f=>f.id===item.id):item.kind==='lore'?lore.find(r=>r.id===item.id):item.kind==='location'?[...countries,...cities, ...locations].find(l=>l.id===item.id):null;
+  return {ref:cleanNoteReference(item),name:item.label,label:item.kind==='lore'?loreTypes[source.type]:item.kind==='character'?'Character':item.kind==='faction'?(source?.type||'Faction'):item.kind==='location'?(item.detail||'Place'):item.group==='Lore'?'Lore':'Note',group:item.group,image:source?.portraitUrl||source?.imageUrl||source?.flagUrl||source?.coatOfArmsUrl||source?.skylineUrl||'',href:item.href};
  });
 }

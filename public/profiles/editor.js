@@ -3,15 +3,15 @@ import {initProfileControls,resize} from './controls.js?v=profile-reading-1';
 
 // Entity adapters supply only their field names, endpoint, and image constraints.
 /**
- * Page-lifetime save controller for faction and location profile adapters.
+ * Page-lifetime save controller for faction, location and Lore profile adapters.
  * Assumes one shared profile form and all configured fields/preview hooks exist.
  * Holds dirty/saving/version state, commits choices, PUTs the allowlisted fields
  * and hiddenFields, and retains drafts on failure. Installs Ctrl/Cmd+S and an
  * unload warning; returns no teardown/controller. Character saving is separate.
- * @param {object} config fieldNames, endpoint, type, optional imageFields/validImageUrl and onSaved(data).
+ * @param {object} config fieldNames, endpoint, type, optional imageFields/validImageUrl, readExtra() and onSaved(data).
  * @returns {void}
  */
-export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],validImageUrl=()=>false,onSaved=()=>{}}){
+export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],validImageUrl=()=>false,onSaved=()=>{},readExtra=()=>({})}){
  const form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields'),save=document.querySelector('#save-character'),status=document.querySelector('#save-status'),error=document.querySelector('#editor-error');
  let version=Number(form.dataset.version),dirty=false,saving=false;
  function update(){
@@ -26,7 +26,8 @@ export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],valid
  form.addEventListener('input',event=>{resize(event.target);markDirty();});form.addEventListener('change',markDirty);
  form.addEventListener('submit',async event=>{
   event.preventDefault();if(saving||!controls.commitChoices()||!form.reportValidity())return;
-  const payload={...Object.fromEntries(fieldNames.map(key=>[key,controls.choiceValues.has(key)?controls.choiceValues.get(key):form.elements.namedItem(key).value])),hiddenFields:controls.hiddenFields(),version};
+  let extra;try{extra=readExtra();}catch(e){error.hidden=false;error.textContent=e.message;return;}
+  const payload={...Object.fromEntries(fieldNames.map(key=>[key,controls.choiceValues.has(key)?controls.choiceValues.get(key):form.elements.namedItem(key).value])),...extra,hiddenFields:controls.hiddenFields(),version};
   saving=true;fields.disabled=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
   try{
    const response=await fetch(endpoint+'/'+form.dataset.id,{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
@@ -35,6 +36,7 @@ export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],valid
    version=data.version;dirty=false;form.elements.namedItem('name').value=data.name;update();
    const country=form.elements.namedItem('parentId');if(country)document.querySelectorAll('[data-country-link]').forEach(link=>{link.href=locationHref({type:'country',id:data.parentId});link.textContent=country.selectedOptions[0]?.textContent||'Country';});
    status.textContent='Saved';
+   window.dispatchEvent(new Event('workspace:changed'));
    onSaved(data);
   }catch(e){error.hidden=false;error.textContent=e.message;status.textContent='Not saved — your changes are still here';}
   finally{saving=false;fields.disabled=false;save.disabled=false;}

@@ -1,0 +1,38 @@
+/* Three-part review-card geometry: 144px preview, 53px identity, 48px actions. */
+.note-card { width:min(336px,calc(100vw - 40px)); height:245px; flex:none; background:rgba(0,0,0,.3); border:0; color:#edf2f8; }
+.note-card svg { width:24px; height:24px; flex:none; fill:none; stroke:currentColor; stroke-width:1.65; stroke-linecap:round; stroke-linejoin:round; }
+.note-card-main { display:grid; grid-template-columns:96px minmax(0,1fr); gap:8px; height:144px; flex:none; }
+.note-card .cover { height:144px; border-radius:8px; background:linear-gradient(155deg,var(--tone),#172330); }
+.note-card .monogram { font-size:3rem; opacity:.55; }
+.note-card-copy { min-width:0; display:flex; flex-direction:column; padding:8px; }
+.note-card-preview { min-height:0; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+.note-card .note-card-kind { display:flex; align-items:center; justify-content:center; gap:8px; height:24px; font-size:.6875rem; letter-spacing:1.3px; text-transform:uppercase; color:#b9c6d7; }
+.note-card-excerpt { max-width:100%; font-size:.875rem; line-height:18px; color:#d4dbe4; overflow-wrap:anywhere; white-space:pre-line; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.note-card-empty { color:#bac5d3; }
+.note-card .note-card-title { flex:none; height:18px; font-size:.875rem; font-weight:400; line-height:18px; color:#a9b4c2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.note-card-main:hover .note-card-title { color:#fff; }
+.note-card-identity { height:53px; flex:none; display:flex; align-items:center; gap:12px; padding:8px; border-top:1px solid #ffffff1a; }
+.note-card-source { display:flex; align-items:center; gap:12px; min-width:0; flex:1; }
+.note-card-source-mark { display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:50%; color:var(--ink); background:var(--tone); font-size:1.25rem; }
+.note-card-source-mark svg { width:21px; height:21px; }
+.note-card-context { min-width:0; }
+.note-card-source-name { font-size:.875rem; font-weight:500; line-height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.note-card-date { display:block; color:#a9b4c2; font-size:.75rem; font-weight:600; line-height:16px; }
+.note-card-more { position:relative; flex:none; }
+.note-card-icon-action { display:grid; place-items:center; width:40px; height:40px; border-radius:5px; color:#edf2f8; cursor:pointer; }
+.note-card-more>summary { width:32px; height:32px; list-style:none; }
+.note-card-more>summary::-webkit-details-marker { display:none; }
+.note-card-more>summary svg { width:16px; height:16px; stroke-width:4; }
+.note-card-icon-action:hover,.note-card-more[open]>summary { background:#ffffff12; }
+.note-card-icon-action.is-pinned svg { fill:var(--ink); color:var(--ink); }
+.note-card-menu { position:absolute; z-index:2; right:0; bottom:calc(100% + 2px); width:192px; padding:4px; border:1px solid #425064; border-radius:6px; background:#202a37; box-shadow:0 6px 20px #0008; }
+.note-card-menu a { display:block; padding:5px 8px; border-radius:3px; font-size:.8125rem; line-height:18px; }
+.note-card-menu a:hover { background:#ffffff14; }
+.note-card-actions { height:48px; flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 8px; }
+.note-card-action-links { display:flex; gap:4px; }
+.note-card-connections { display:flex; align-items:center; gap:4px; min-width:40px; height:40px; color:#d4dbe4; font-size:.875rem; }
+.note-card-connections:hover { color:#fff; }
+.note-card-connection-badge { display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:#314963; color:#c9d9ee; }
+.note-card-connection-badge svg { width:14px; height:14px; stroke-width:1.8; }
+.note-card :is(a,summary):focus-visible { outline-offset:-2px; }
+@media(max-width:359px) { .note-card-main { grid-template-columns:80px minmax(0,1fr); } }

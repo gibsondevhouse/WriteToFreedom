@@ -8,7 +8,7 @@ import {dashboardData} from '../server/dashboard-routes.js';
 const origin='https://novel.example';
 function setup(){
  const sqlite=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));
- const worker=createWorker({'/dashboard/index.html':{content:readFileSync('public/dashboard/index.html','utf8'),type:'text/html'}}),env={DB:d1Adapter(sqlite)};
+ const worker=createWorker({}),env={DB:d1Adapter(sqlite)};
  return async(path,method='GET',body,owner='author-a')=>worker.fetch(new Request(origin+path,{method,headers:{...(owner?{'oai-authenticated-user-id':owner}:{}),...(body===undefined?{}:{origin,'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
 }
 test('dashboard requires identity, is read-only, and never invents story dates',async()=>{

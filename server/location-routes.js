@@ -20,7 +20,7 @@ export async function locationRoute(request,env){
  const owner=request.headers.get('oai-authenticated-user-id');if(!owner)return json({error:'Sign in to access your locations.'},401);
  try{
   const db=repository(env.DB),records=await locationCatalog(db,owner);
-  if(request.method==='GET'){const cast=characterCast(await db.list(owner));return json({locations:records.map(l=>({...l,linkedNotes:connectedNotes(cast,{kind:'location',id:l.id})}))});}
+  if(request.method==='GET'){const cast=characterCast(await db.list(owner)),lore=await db.listLore(owner);return json({locations:records.map(l=>({...l,linkedNotes:connectedNotes(cast,{kind:'location',id:l.id},lore)}))});}
   if(!['POST','PUT'].includes(request.method))return json({error:'Method not allowed.'},405);
   const url=new URL(request.url);if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>4096)return json({error:'Location details are too long.'},413);

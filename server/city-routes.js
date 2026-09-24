@@ -24,7 +24,7 @@ export async function cityRoute(request,env){
   const db=repository(env.DB),locations=await locationCatalog(db,owner),location=locations.find(l=>l.id===id&&l.type==='city');
   if(!location)return json({error:'City not found.'},404);
   const current=(await db.listCityProfiles(owner)).find(p=>p.id===id)||defaultCity(location),cast=characterCast(await db.list(owner));
-  if(profile){if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);return new Response(request.method==='HEAD'?null:renderCity(current,locations,cast),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});}
+  if(profile){if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);return new Response(request.method==='HEAD'?null:renderCity(current,locations,cast,await db.listLore(owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});}
   if(request.method==='GET')return json(current);
   if(request.method!=='PUT')return json({error:'Method not allowed.'},405);
   if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);

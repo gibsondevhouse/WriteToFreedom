@@ -10,7 +10,7 @@ test('every directory and entity profile receives one shared sidebar and header 
   const sqlite = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort()) sqlite.exec(readFileSync('drizzle/'+file,'utf8'));
   const assets = {};
-  for (const path of ['/', '/dashboard/', '/characters/', '/factions/', '/locations/', '/timeline/']) {
+  for (const path of ['/timeline/']) {
     assets[path+'index.html'] = {content:readFileSync('public'+path+'index.html','utf8'),type:'text/html'};
   }
   const worker = createWorker(assets);

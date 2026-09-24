@@ -1,12 +1,13 @@
 # Write to Freedom
 
-Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, and a timeline derived from their story dates. It uses plain HTML, CSS, and browser JavaScript, with server-rendered entity profiles and a Cloudflare-compatible Worker backed by D1.
+Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, lore, and a timeline derived from their story dates. It uses plain HTML, CSS, and browser JavaScript, with server-rendered entity profiles and a Cloudflare-compatible Worker backed by D1.
 
 This README is the developer entry point: it describes how to run the project, how requests and data move through it, which modules own each behavior, and the constraints to preserve when extending it.
 
 For detailed implementation contracts, use these companion references:
 
 - [Routing and request contracts](docs/routing.md): dispatch precedence, handler annotations, projections, validation/write boundaries, redirects, and method differences.
+- [Reusable dashboard shell](docs/dashboard-shell.md): complete page definitions, slots, actions, loading/retry, sections, and lifecycle for Home, Lore, and future dashboards.
 - [Component boundaries and extension contracts](docs/components.md): shared renderers, DOM hooks, browser adapters, state and cleanup ownership, cards, notes, and workspace navigation.
 - [Character-card integration](public/components/character-card/README.md): component usage, data shape, styling, callbacks, and featured-item behavior.
 
@@ -32,14 +33,15 @@ For detailed implementation contracts, use these companion references:
 
 The implemented application includes:
 
-- **Dashboard and workspace:** overview rails, rotating open questions, shared navigation, and catalog search across characters, factions, and locations.
+- **Dashboard and workspace:** overview rails, rotating open questions, shared navigation, and catalog search across characters, factions, locations, and standalone lore.
 - **Characters:** searchable and sortable card directory, blank or named creation, editable profiles, structured identity, relationships, attributes and derived power, portrait artwork, faction/location references, authored notes, and featured card items.
 - **Factions:** directory, blank or named creation, editable profiles, character-linked founders and leaders, and membership derived from character faction selections.
 - **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types.
+- **Lore:** a dashboard built from the home dashboard’s shared cards, scrolling rails, and question banner; Notes, Artifacts, Relics, Books, Jewels, and Species collections; quick notes, editable standalone profiles, pinned/featured entries, connections, and backlinks. Existing character notes remain discoverable without moving their content.
 - **Timeline:** read-only visualization of saved profile dates, with filtering, pan/zoom controls, clustering, and links back to the source fields.
 - **Shared profile controls:** explicit saving, version conflict handling, field visibility, collapsible sections, custom dropdown values where supported, and a precision-aware date picker.
 
-Story Arcs, Chapters, Scenes, Story Beats, and the standalone Lore module remain upcoming. Lore entries can already be authored as linked character notes. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
+Story Arcs, Chapters, Scenes, and Story Beats remain upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
 
 The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding includes an original African-inspired white SVG crest in `public/crest.svg`.
 
@@ -65,6 +67,7 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Useful entry points are:
 - [Characters](http://127.0.0.1:4173/characters/)
 - [Factions](http://127.0.0.1:4173/factions/)
 - [Locations](http://127.0.0.1:4173/locations/)
+- [Lore](http://127.0.0.1:4173/lore/)
 - [Timeline](http://127.0.0.1:4173/timeline/)
 
 `npm ci` installs the versions recorded in `package-lock.json`. Use `npm install` when intentionally changing dependencies, and commit the resulting lockfile changes with `package.json`.
@@ -124,18 +127,18 @@ Tests import server and shared source modules directly, so they do not require a
 ├── drizzle/                     # Ordered SQL migrations and generator metadata
 ├── drizzle.config.ts            # SQLite dialect, schema path, migration output
 ├── public/
-│   ├── index.html               # Root dashboard entry document
-│   ├── styles.css               # Root entry styling
+│   ├── styles.css               # Shared dashboard theme
 │   ├── crest.svg                # Shared branding
 │   ├── workspace-shell.css      # Shared sidebar/topbar layout
 │   ├── workspace-state.js       # Early device-preference restoration
-│   ├── dashboard/               # Overview rails, questions, shell search/controller
+│   ├── dashboard/               # Reusable main-area shell, cards, questions, search
 │   ├── components/character-card/ # Canonical card, dialogs, graph and styles
 │   ├── characters/              # Directory, templates, seeds, character editor
 │   ├── factions/                # Directory, template, profile adapter/styles
 │   ├── locations/               # Directory, hierarchy helpers, location editor
 │   │   ├── countries/           # Country template, profile adapter/styles
 │   │   └── cities/              # City template, profile adapter/styles
+│   ├── lore/                    # Lore dashboard, templates and profile adapter
 │   ├── profiles/                # Shared controls, styling, dates, editor behavior
 │   └── timeline/                # Timeline page, model, rendering and interaction
 ├── scripts/
@@ -145,11 +148,13 @@ Tests import server and shared source modules directly, so they do not require a
 ├── server/
 │   ├── app.js                   # Outer shell wrapper, dispatcher, character API/assets
 │   ├── workspace-shell.js       # Shared HTML navigation wrapper
+│   ├── dashboard-shell.js       # Complete reusable dashboard HTML frame
+│   ├── dashboard-pages.js       # Home/Lore definitions and route aliases
 │   ├── dashboard-routes.js      # Dashboard API and reusable data projection
 │   ├── character-card-data.js   # Card affiliations, connections and mentions
 │   ├── note-connections.js      # Note targets, backlinks and reference validation
 │   ├── db.js                    # Owner-scoped repository and versioned writes
-│   ├── *-routes.js              # Faction, location, country, city, timeline APIs
+│   ├── *-routes.js              # Faction, location, country, city, Lore, timeline APIs
 │   ├── render-*.js              # Entity-specific server-rendered profiles
 │   ├── profile-components.js    # Shared profile HTML components
 │   ├── sample-characters.js     # Sample character construction and cast merging
@@ -186,7 +191,7 @@ Browser modules remain individual served assets. They are not separately transpi
 
 The outer Worker then decorates non-HEAD HTML responses with `workspaceShell`, preserving status and headers except the now-invalid content length. JSON and other responses pass through. The wrapper is idempotent for HTML already marked `data-app-shell`. See [dispatch order and edge cases](docs/routing.md#dispatch-order-is-part-of-the-contract) before adding routes; path strictness and HEAD handling are not uniform across handlers.
 
-Directory pages are static HTML shells with browser scripts that fetch their catalogs. Character, faction, and all ten location profiles are rendered by the Worker with their current content and choices, then enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the editor.
+Directories retain static HTML with browser scripts that fetch their catalogs. Home and Lore use `renderDashboardPage` and page definitions, with `initDashboardShell` owning loading, errors, refresh and section cleanup. Their shared stylesheet dependency is automatic; see the [dashboard shell contract](docs/dashboard-shell.md). Character, faction, Lore, and all ten location profiles are rendered by the Worker with their current content and choices, then enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the editor.
 
 Static assets use `Cache-Control: no-cache`; private JSON responses and successful dynamic profile responses use `Cache-Control: no-store`. Rendered text is escaped through the server rendering code. Preserve those boundaries when adding fields or new markup.
 
@@ -229,6 +234,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 | `locations` | Private place names, types, direct parents, creation times | Primary ID and owner scope. |
 | `country_profiles` | Editable country JSON documents | Unique owner/location pair and integer version. |
 | `city_profiles` | Editable city JSON documents, including country selection | Unique owner/location pair and integer version. |
+| `lore_entries` | Standalone Lore JSON documents with primary type, collections, fields and connections | Primary UUID, owner scope, integer version and timestamps; added in migration `0007`. |
 | `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair and integer version. |
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
@@ -241,7 +247,7 @@ Sample characters, factions, and locations are source-defined defaults. Catalog 
 
 Sample character URLs use stable IDs (`claude`, `gpt`, `deepseek`, `gemini`). When an author saves a sample, `server/db.js` derives an owner-specific storage ID from the author and sample ID and retains the public sample ID in the document. Other sample profiles use owner/entity pairs in their profile tables. Editing a sample therefore affects only that author's view.
 
-New custom entities use client-generated UUIDs. Character creation is idempotent for an owner and ID, allowing the client to retry the same request without creating duplicate drafts. Faction creation also supports normalized name deduplication; location creation returns an existing owned record when retried with the same ID.
+New custom entities use client-generated UUIDs. Character creation is idempotent for an owner and ID, allowing the client to retry the same request without creating duplicate drafts. Faction creation also supports normalized name deduplication; location and Lore creation return an existing owned record when retried with the same ID.
 
 ### Optimistic concurrency
 
@@ -277,6 +283,8 @@ The local migration runner executes `.sql` files in filename order and records a
 | `/characters/{id}/` | Editable character article. |
 | `/factions/` | Faction directory. |
 | `/factions/{id}/` | Editable faction article. |
+| `/lore/` | Lore dashboard; optional `?collection=notes` (or another collection). |
+| `/lore/{id}/` | Editable standalone Lore profile. |
 | `/locations/` | Combined place directory and area/landmark editor. |
 | `/locations/countries/{id}/` | Editable country article. |
 | `/locations/cities/{id}/` | Editable city article. |
@@ -307,7 +315,11 @@ Use canonical trailing-slash page URLs. The router redirects supported noncanoni
 | `PUT` | `/api/countries/{id}` | Saves editable country fields, visibility, and `version`. |
 | `GET` | `/api/cities/{id}` | Returns the city profile for an existing city location. |
 | `PUT` | `/api/cities/{id}` | Saves editable city fields, required country `parentId`, visibility, and `version`. |
-| `GET` | `/api/dashboard` | Returns `{ questions, characters, factions, locations, timeline }`; also supplies shell search. |
+| `GET` | `/api/lore` | Returns `{ entries, notes, questions }` for the owner’s Lore dashboard; `notes` are contextual character notes. |
+| `POST` | `/api/lore` | Creates an entry with UUID `id`, primary `type`, required `name`, and optional template fields; owner/ID retries are idempotent. |
+| `GET` | `/api/lore/{id}` | Returns a full standalone Lore document. |
+| `PUT` | `/api/lore/{id}` | Saves validated fields, collections, connections, visibility, pin/feature choices and `version`; omitted fields are preserved. |
+| `GET` | `/api/dashboard` | Returns `{ questions, characters, factions, locations, lore, timeline }`; also supplies shell search. |
 | `GET` | `/api/timeline` | Returns `{ events, unplaced, undated, counts }`; derives data on each request. |
 
 All location creation goes through `/api/locations`; profile endpoints handle reads and updates. There are no separate country/city collection creation routes. Use the entity templates for exact field lists rather than maintaining a second schema in client code.
@@ -350,9 +362,9 @@ API errors generally return JSON in the form `{ "error": "Human-readable message
 | `413` | Request text exceeds the route's size limit. |
 | `503` | Storage or route processing failed; inspect server logs for the underlying error. |
 
-Current request-body limits are 180,000 characters for characters, 250,000 for factions, 550,000 for location profiles, and 4,096 for location directory mutations. These checks use JavaScript string length after reading the body; they are not byte-accurate transport limits.
+Current request-body limits are 180,000 characters for characters, 250,000 for factions, 550,000 for location and Lore profiles, and 4,096 for location directory mutations. These checks use JavaScript string length after reading the body; they are not byte-accurate transport limits.
 
-Most profile text fields allow up to 10,000 characters, name fields up to 160, and location image URLs up to 2,048. Character relationships are capped at 100 entries. Validation is entity-specific; the route handlers remain the authority for precise rules.
+Most profile text fields allow up to 10,000 characters, name fields up to 160, and location/Lore image URLs up to 2,048. Character relationships are capped at 100 entries. Validation is entity-specific; the route handlers remain the authority for precise rules.
 
 ## Domain rules
 
@@ -370,9 +382,19 @@ Faction founders and leaders link to characters. Membership is derived from char
 
 ### Character cards, attributes, and notes
 
+Characters, Factions, and Locations use the reusable [directory shell](docs/directory-shell.md) for their page frame, search, sort/view controls, result counts, responsive grid or list, empty/error states and load lifecycle. Each supplies its own configuration, data adapter and entry component; Locations also supplies type filters and its creation dialog.
+
 Dashboard and directory cards use the canonical component in `public/components/character-card/`. The server supplies artwork, incoming/outgoing connections, mentions, and a featured item through shared projections. Card dialogs fetch a fresh ordinary character document before editing so enriched display fields never replace the saved relationship schema. Attribute ratings determine power at read/render time; power is not stored independently.
 
-Characters can own structured notes with source markers, linked world items, and note/lore types. Notes save in the character document, while character/faction/location creation from a note composer persists the new entity immediately. `cardConnection` is a presentation choice independent of faction membership and citizenship. See the [component guide](docs/components.md) for state ownership, note anchors, and save boundaries.
+Characters can own structured notes with source markers, linked world items, and note/lore types. Notes save in the character document, while character/faction/location/standalone Lore creation from a note composer persists the new entity immediately. `cardConnection` is a presentation choice independent of faction membership and citizenship. See the [component guide](docs/components.md) for state ownership, note anchors, and save boundaries.
+
+### Lore entries and collections
+
+`public/lore/template.js` defines six primary types: note, artifact, relic, book, jewel, and species. Every entry has one immutable primary type and one stable profile URL. Artifacts, relics, books, and jewels can also appear in the other object collections; this does not duplicate their documents or timeline events. Notes and species keep their own collection.
+
+Common fields cover description, story significance, truth, beliefs, knowledge, history, a story date, and open questions. Type-specific sections add note content/sources, object details, relic traditions, book contents, jewel materials, or species biology. Fields are optional except the name, and visibility never deletes their values. HTTPS image previews reuse the profile controls.
+
+Connections pair an owner-scoped character, faction, location, embedded character note, or Lore reference with an author-written relationship such as “owned by” or “describes”. Backlinks are derived on read. Lore is included in character mentions, featured character connections, home questions/search, and the timeline. Quick-note text is searchable beyond its shortened card summary. Existing embedded notes keep their original character storage and anchors. There are no fabricated Lore samples.
 
 ### Location hierarchy
 
@@ -399,7 +421,7 @@ All location profiles accept optional HTTPS image URLs for their supported image
 
 ## Shared profile system
 
-The character profile is the design baseline for characters, factions, and all location types. Extend the shared components before copying markup or implementing another set of controls.
+The character profile is the design baseline for characters, factions, all location types, and Lore. Extend the shared components before copying markup or implementing another set of controls.
 
 | Module | Responsibility |
 | --- | --- |
@@ -408,7 +430,7 @@ The character profile is the design baseline for characters, factions, and all l
 | `public/profiles/editor.css` | Shared editable fields, save controls, and editor presentation. |
 | `public/profiles/controls.js` | Disclosures, field visibility, custom choices, focus, validation reveal, textarea sizing, hash navigation. |
 | `public/profiles/viewport.js` | Active-heading tracking for the sticky article bar. |
-| `public/profiles/editor.js` | Shared faction/location saving and image previews, with an optional `onSaved` callback. |
+| `public/profiles/editor.js` | Shared faction/location/Lore saving and image previews, with optional `readExtra` and `onSaved` hooks. |
 | `public/profiles/choices.js` | Reusable dropdown suggestions. |
 | `public/profiles/schema.js` | Field visibility allowlists and validation helpers. |
 | `public/profiles/dates.js` | Story-date parsing, formatting, precision, and calendar arithmetic. |
@@ -416,11 +438,11 @@ The character profile is the design baseline for characters, factions, and all l
 | Entity `template.js` files | Entity field lists, defaults, options, and visibility definitions. |
 | Entity renderers and profile scripts | Domain-specific composition and editor configuration. |
 
-The character editor in `public/characters/profile-editor.js` uses the shared controls while retaining specialized relationship and inline faction-creation behavior. Faction, country, city, and the shared location profile script configure `initProfileEditor`. The old character profile CSS paths are compatibility imports of the shared styles.
+The character editor in `public/characters/profile-editor.js` uses the shared controls while retaining specialized relationship and inline faction-creation behavior. Faction, country, city, Lore, and the shared location profile script configure `initProfileEditor`. The old character profile CSS paths are compatibility imports of the shared styles.
 
 ### Interaction and layout contract
 
-Inside the shared workspace shell, all twelve profile types share profile breadcrumbs, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus.
+Inside the shared workspace shell, characters, factions, all ten location types, and the six Lore types share profile breadcrumbs, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus.
 
 Field visibility is persisted as `hiddenFields` independently of the content values. Hidden fields and collapsed controls remain mounted, and their values survive saving and reopening. Collapsing a section is temporary page state; it must not delete fields or silently alter their visibility preference. Hash navigation and validation should reveal the relevant controls when necessary.
 
@@ -479,6 +501,7 @@ These profiles reuse `location_details`; no new table or migration is required. 
 | Continent | `populationDate` when `population` is present |
 | Area | `founded`, `populationDate` when `population` is present |
 | Landmark | `founded`, `abandoned`, `restored` |
+| Lore (all six types) | `originDate`, once per entry regardless of collections |
 
 There is no timeline table, synchronization job, or timeline write endpoint. An edit or cleared date is reflected on the next read. Event IDs derive from entity type, entity ID, and source field, and links target that field's profile anchor. `undated` counts records without qualifying nonempty source dates; `unplaced` retains qualifying dates the parser cannot position.
 
@@ -493,7 +516,9 @@ The suite uses the built-in Node test runner and strict assertions. Database-bac
 | Test file | Main coverage |
 | --- | --- |
 | `tests/workspace-shell.test.mjs` | Shared shell injection, sidebar preferences, mobile/desktop navigation behavior. |
+| `tests/dashboard-shell.test.mjs` | Reusable frame/routes, automatic styles, queued refresh, failure retention, retry, cancellation and cleanup. |
 | `tests/dashboard.test.mjs` | Owner-scoped overview projection, cards, questions, and derived events. |
+| `tests/lore.test.mjs` | All six types, render/save/reopen, privacy, concurrent saves, overlapping collections, character notes, backlinks, search, mentions and timeline. |
 | `tests/dashboard-search.test.mjs` | Catalog search semantics. |
 | `tests/character-cards.test.mjs` | Shared cards, projections, actions, artwork, ratings, featured items. |
 | `tests/connections-map.test.mjs` | Connection graph derivation and layout. |
@@ -537,7 +562,7 @@ Wire the route in `createWorker`, add request-level tests using the existing fix
 
 ### Change shared profile behavior
 
-Start with `server/profile-components.js` and `public/profiles/`. Check the change against all twelve profile types, including the specialized character editor. Keep domain-specific behavior in adapters: faction membership remains derived, countries constrain city selections, cities require countries, and area/landmark ancestry remains intact.
+Start with `server/profile-components.js` and `public/profiles/`. Check the change against character, faction, all ten location types, and all six Lore templates, including the specialized character editor. Keep domain-specific behavior in adapters: faction membership remains derived, countries constrain city selections, cities require countries, and area/landmark ancestry remains intact.
 
 ### Extend timeline behavior
 

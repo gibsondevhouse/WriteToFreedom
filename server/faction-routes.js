@@ -27,7 +27,7 @@ export async function factionRoute(request,env){
    if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);
    if(!current)return new Response('Faction not found. Return to /factions/',{status:404});
    const cast=attachFactionNames(characterCast(await db.list(owner)),factions);
-   return new Response(request.method==='HEAD'?null:renderFaction(current,cast),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+   return new Response(request.method==='HEAD'?null:renderFaction(current,cast,await db.listLore(owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
   }
   if(request.method==='GET')return id?(current?json(current):json({error:'Faction not found.'},404)):json({factions});
   if(!['POST','PUT'].includes(request.method))return json({error:'Method not allowed.'},405);

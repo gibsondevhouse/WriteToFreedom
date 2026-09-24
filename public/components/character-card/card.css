@@ -19,9 +19,9 @@
 .story-character-card .affiliation-copy strong{ display:block; font-size:14px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .story-character-card .affiliation-kind{ display:block; font-size:12px; color:#9eb0c6; margin-bottom:3px; }
 .story-character-card .character-actions{ display:grid; grid-template-columns:44px 1fr 66px 88px; height:48px; flex:none; border-top:1px solid #ffffff17; background:#ffffff07; }
-.story-character-card .character-actions button{ display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; padding:0 8px; border:0; border-radius:0; border-right:1px solid #ffffff13; background:transparent; color:#e3eaf5; font:600 13px Arial,sans-serif; cursor:pointer; }
-.story-character-card .character-actions button:last-child{ border-right:0; }
-.story-character-card .character-actions button:hover{ background:#ffffff12; }
+.story-character-card .character-actions :is(button,a){ display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; padding:0 8px; border:0; border-radius:0; border-right:1px solid #ffffff13; background:transparent; color:#e3eaf5; font:600 13px Arial,sans-serif; cursor:pointer; text-decoration:none; }
+.story-character-card .character-actions :is(button,a):last-child{ border-right:0; }
+.story-character-card .character-actions :is(button,a):hover{ background:#ffffff12; }
 .story-character-card .character-actions .morality-action{ color:var(--ink); font-size:22px; }
 .story-character-card .character-actions svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex:none; }
 .story-character-card .relationship-faces{ display:flex; align-items:center; padding-left:5px; }

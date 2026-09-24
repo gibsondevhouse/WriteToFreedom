@@ -8,6 +8,8 @@ This guide describes the routing implemented in `server/`, including dispatch or
 | --- | --- | --- |
 | `createWorker(assets)` | [server/app.js](../server/app.js) | Public Worker factory; wraps HTML responses with shared workspace navigation. |
 | `createAppWorker(assets)` | [server/app.js](../server/app.js) | Internal ordered dispatcher; owns redirects, character handling, and static asset fallback. |
+| `renderDashboardPage(config)` | [server/dashboard-shell.js](../server/dashboard-shell.js) | Complete public dashboard frame from registered page definitions; data loads through private APIs. |
+| `renderDirectoryPage(config)` | [server/directory-shell.js](../server/directory-shell.js) | Complete public directory frame from registered page definitions; data loads through private APIs. |
 | `validate(input, current)` | [server/app.js](../server/app.js) | Builds a character document and validates its shape; throws validation errors for the caller to return as `400`. |
 | `factionRoute(request, env)` | [server/faction-routes.js](../server/faction-routes.js) | Faction collection, profile JSON, and profile HTML. |
 | `locationProfileRoute(request, env)` | [server/location-profile-routes.js](../server/location-profile-routes.js) | Shared full profiles for the eight location types other than country/city. |
@@ -15,6 +17,7 @@ This guide describes the routing implemented in `server/`, including dispatch or
 | `countryRoute(request, env)` | [server/country-routes.js](../server/country-routes.js) | Existing country profile reads, rendering, and updates. |
 | `cityRoute(request, env)` | [server/city-routes.js](../server/city-routes.js) | Existing city profile reads, rendering, and updates. |
 | `dashboardRoute(request, env)` | [server/dashboard-routes.js](../server/dashboard-routes.js) | Authenticated, read-only dashboard aggregation. |
+| `loreRoute(request, env)` | [server/lore-routes.js](../server/lore-routes.js) | Standalone Lore collection/item JSON and profile HTML. |
 | `timelineRoute(request, env)` | [server/timeline-routes.js](../server/timeline-routes.js) | Authenticated, read-only story-event derivation. |
 
 `assets` is an object whose keys are URL paths and whose values are `{ content, type }`, populated by the build script. `env.DB` is the D1-compatible binding. All request handlers return a Web `Response` through an asynchronous `fetch` call. The outer factory forwards `ctx`, but the internal dispatcher currently uses only `request` and `env`.
@@ -41,25 +44,31 @@ The shell wrapper preserves response status and headers except `content-length`,
 
 ## Dispatch order is part of the contract
 
-The dispatcher uses sequential conditionals, not a router framework or declarative route registry. The first matching branch wins. The following table follows source order; read it before adding a broad prefix match.
+The dispatcher checks the dashboard and directory page registries first, then uses sequential conditionals for domain routes. The first matching branch wins. The following table follows source order; read it before adding a broad prefix match.
 
 | Order | Match | Action |
 | --- | --- | --- |
-| 1 | `/locations/countries/{sample-kingdom or UUID-shaped ID}` without trailing slash | `308` to the slash form. |
-| 2 | `/locations/countries/{any single segment}/` or prefix `/api/countries/` | Delegate to `countryRoute`. |
-| 3 | `/locations/cities/{sample-capital or UUID-shaped ID}` without trailing slash | `308` to the slash form. |
-| 4 | `/locations/cities/{any single segment}/` or prefix `/api/cities/` | Delegate to `cityRoute`. |
-| 5 | A shared location profile path without trailing slash | `308` to the slash form, preserving its query string. |
-| 6 | A shared location profile path with slash or `/api/locations/{id}` with optional slash | Delegate to `locationProfileRoute`. |
-| 7 | Exactly `/api/timeline` | Delegate to `timelineRoute`. |
-| 8 | Exactly `/api/dashboard` | Delegate to `dashboardRoute`. |
-| 9 | Exactly `/api/locations` | Delegate to `locationRoute`. |
-| 10 | `/characters/edit/` or `/characters/edit/index.html` | Read query `id`; `302` to its profile if syntactically supported, otherwise the directory. |
-| 11 | Supported character ID without slash, optionally followed by `/index.html` | `308` to `/characters/{id}/`. |
-| 12 | Supported faction ID without slash, optionally followed by `/index.html` | `308` to `/factions/{id}/`. |
-| 13 | `/api/factions`, prefix `/api/factions/`, or `/factions/{any single segment}/` | Delegate to `factionRoute`. |
-| 14 | `/api/characters`, prefix `/api/characters/`, or a supported character profile path | Handle character requests inline. |
-| 15 | Remaining requests | Static method gate, directory redirect, asset lookup, or `404`. |
+| 1 | Registered dashboard alias (`/`, `/index.html`, `/dashboard/`, `/dashboard/index.html`, `/lore/`, `/lore/index.html`) | GET/HEAD render the shared frame; other methods return `405`. |
+| 2 | Registered dashboard without its trailing slash | GET/HEAD receive `308`, preserving the query string. |
+| 3 | Registered directory alias (`/characters/`, `/factions/`, `/locations/`, and their `index.html` aliases) | GET/HEAD render the shared directory frame; other methods return `405`. |
+| 4 | Registered directory without its trailing slash | GET/HEAD receive `308`, preserving the query string. |
+| 5 | `/locations/countries/{sample-kingdom or UUID-shaped ID}` without trailing slash | `308` to the slash form. |
+| 6 | `/locations/countries/{any single segment}/` or prefix `/api/countries/` | Delegate to `countryRoute`. |
+| 7 | `/locations/cities/{sample-capital or UUID-shaped ID}` without trailing slash | `308` to the slash form. |
+| 8 | `/locations/cities/{any single segment}/` or prefix `/api/cities/` | Delegate to `cityRoute`. |
+| 9 | A shared location profile path without trailing slash | `308` to the slash form, preserving its query string. |
+| 10 | A shared location profile path with slash or `/api/locations/{id}` with optional slash | Delegate to `locationProfileRoute`. |
+| 11 | `/lore/{UUID-shaped ID}` without trailing slash | `308` to the slash form, preserving the query string. |
+| 12 | `/lore/{id}/`, exactly `/api/lore`, or `/api/lore/{id}` with optional slash | Delegate to `loreRoute`. |
+| 13 | Exactly `/api/timeline` | Delegate to `timelineRoute`. |
+| 14 | Exactly `/api/dashboard` | Delegate to `dashboardRoute`. |
+| 15 | Exactly `/api/locations` | Delegate to `locationRoute`. |
+| 16 | `/characters/edit/` or `/characters/edit/index.html` | Read query `id`; `302` to its profile if syntactically supported, otherwise the directory. |
+| 17 | Supported character ID without slash, optionally followed by `/index.html` | `308` to `/characters/{id}/`. |
+| 18 | Supported faction ID without slash, optionally followed by `/index.html` | `308` to `/factions/{id}/`. |
+| 19 | `/api/factions`, prefix `/api/factions/`, or `/factions/{any single segment}/` | Delegate to `factionRoute`. |
+| 20 | `/api/characters`, prefix `/api/characters/`, or a supported character profile path | Handle character requests inline. |
+| 21 | Remaining requests | Static method gate, directory redirect, asset lookup, or `404`. |
 
 Supported character samples are `claude`, `gpt`, `deepseek`, and `gemini`; faction samples are `sample-ember`, `sample-lantern`, `sample-archive`, and `sample-horizon`. Character IDs are checked against `idPattern` or known samples after API dispatch. The canonicalization regexes use the looser `[0-9a-f-]{36}` shape and do not prove record existence.
 
@@ -70,7 +79,8 @@ Supported character samples are `claude`, `gpt`, `deepseek`, and `gemini`; facti
 - Country/city profile `/index.html` forms are not special-cased like character/faction profiles.
 - API item handlers obtain IDs using `pathname.split('/')`. Some prefix-matched API paths with additional segments can consequently reach an item handler. There is no universal strict path-shape validator.
 - Static directory redirects preserve `url.search`. Explicit entity and legacy-editor redirects construct new paths without preserving unrelated query parameters.
-- Redirect checks occur before identity and method checks. A redirect response does not establish authorization or entity existence.
+- Entity redirect checks occur before identity and method checks; dashboard redirects apply a GET/HEAD method gate first. A redirect response does not establish authorization or entity existence.
+- Characters, Factions, and Locations directories and their `index.html` aliases are generated from `directoryPages` through `renderDirectoryPage` before profile/static routing. They accept HTML `GET`/`HEAD`, reject other methods, and missing-slash redirects keep query strings intact. Their private collection APIs remain owner-scoped. See the [directory shell](directory-shell.md).
 - Static fallback accepts `GET` and `HEAD` only. A slash-ended path maps to `path + 'index.html'`; a directory asset found at `path + '/index.html'` causes a `308`; otherwise unknown assets return text `404`.
 
 These describe existing behavior, not a recommended pattern for new endpoints. Tightening path matching or changing redirect query handling is a separate behavior change and should receive request-level tests.
@@ -199,17 +209,28 @@ City updates additionally reject negative versions and compare the current versi
 
 A country read overlays a saved document onto defaults; a city read currently selects the saved document or defaults wholesale. Keep that distinction in mind when adding defaulted fields to older stored documents.
 
+## Lore routing in detail
+
+`loreRoute` serves GET/POST `/api/lore`, GET/PUT `/api/lore/{id}`, and GET/HEAD `/lore/{id}/`. Identity and method checks precede storage access. Item lookup is owner-scoped; unknown/private IDs return `404`. HTML HEAD returns no body. API HEAD and unsupported collection/item methods return `405`.
+
+The collection GET returns `{ entries, notes, questions }`. Entries are standalone card projections; contextual notes are read-only projections of the owner’s character documents with original anchors. Item GET returns the writable Lore document. HTML rendering loads owner-scoped target catalogs and derives incoming links.
+
+POST accepts a client UUID, an allowlisted primary type, a nonblank name, and template fields. An already owned ID returns its existing record with `201`, allowing safe retries. PUT requires a positive version; a stale version returns `409`, backed by a conditional repository update. Partial updates preserve omitted fields. Type and ID stay immutable. Collection membership must retain the primary collection and respect the note/species versus object collection rules.
+
+Writes require same-origin JSON, cap the raw body at 550,000 characters, and validate fields, HTTPS images, visibility, boolean dashboard flags, and at most 60 unique connections. Each connection requires an owner-scoped target and a nonempty relationship of at most 160 characters; self-links are rejected. Previously saved unresolved links may be retained. Storage is `lore_entries`, introduced by additive migration `0007_red_sandman.sql`; no character note is moved or copied into it.
+
 ## Dashboard and timeline routing in detail
 
-`dashboardRoute` and `timelineRoute` are GET-only and side-effect-free. Each loads five inputs concurrently: saved characters, faction catalog, location catalog, country profiles, and city profiles. The catalog helpers themselves may issue additional reads; this is not a five-statement transaction or a guaranteed atomic snapshot.
+`dashboardRoute` and `timelineRoute` are GET-only and side-effect-free. Each loads saved characters, faction and location catalogs, country/city profiles, and standalone Lore concurrently. Catalog helpers may issue additional reads; this is not a transaction or a guaranteed atomic snapshot.
 
-`dashboardData({ characters, factions, locations, countries, cities })` is a synchronous, database-independent projection. It returns:
+`dashboardData({ characters, factions, locations, countries, cities, lore = [] })` is a synchronous, database-independent projection. It returns:
 
 - `questions`: nonempty question fields split into prompts; hidden question fields link to the profile without a field hash.
 - `characters`: rich shared-card records from `characterCardDetails`.
 - `factions`: profile cards and derived member counts.
 - `locations`: profile links for all ten types, with summaries, images, and ancestry labels.
-- `timeline`: the result of `collectTimeline` over the same profile catalogs.
+- `lore`: one card per standalone entry, with collections, full authored search text and profile links.
+- `timeline`: the result of `collectTimeline` over the same profile catalogs, including Lore origin dates.
 
 `timelineRoute` calls `collectTimeline` directly and returns `{ events, unplaced, undated, counts }`. Both projections are derived on demand; neither writes a cache table. Dashboard shell search uses `/api/dashboard`, not a separate `/api/search` route.
 
@@ -227,4 +248,4 @@ When adding a route:
 6. Test method behavior, missing identity, another owner's IDs, malformed data, stale updates, redirects, and response shape as applicable.
 7. Update the route inventory here and the API summary in the README.
 
-Existing coverage lives in the domain test files, `tests/dashboard.test.mjs`, `tests/dashboard-search.test.mjs`, `tests/workspace-shell.test.mjs`, `tests/world-locations.test.mjs`, `tests/character-cards.test.mjs`, and `tests/cursor-notes.test.mjs`. Coverage of a normal GET/PUT path should not be mistaken for exhaustive coverage of the matching and method edge cases listed above.
+Existing coverage lives in the domain test files, `tests/dashboard.test.mjs`, `tests/dashboard-search.test.mjs`, `tests/workspace-shell.test.mjs`, `tests/world-locations.test.mjs`, `tests/character-cards.test.mjs`, and `tests/cursor-notes.test.mjs`, and `tests/lore.test.mjs`. Coverage of a normal GET/PUT path should not be mistaken for exhaustive coverage of the matching and method edge cases listed above.

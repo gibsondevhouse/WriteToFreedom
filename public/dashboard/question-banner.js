@@ -5,15 +5,22 @@
  * @returns {{element: HTMLElement, destroy: Function}} Call destroy before replacing
  * the banner so background work and document/media subscriptions are released.
  */
-export function createQuestionBanner(records,{el,tone,initial}){
+export function createQuestionBanner(records,{el,tone,initial,idPrefix='',emptyState}={}){
+ const prefix=idPrefix?idPrefix+'-':'';
  const slides=[];
  const prompts=records.map(record=>(record.prompts||[record.question]).filter(Boolean));
  // Alternate profiles between questions so long lists don't dominate the rotation.
  for(let round=0;round<Math.max(0,...prompts.map(list=>list.length));round++)records.forEach((record,i)=>{if(prompts[i][round])slides.push({...record,question:prompts[i][round]});});
- const section=el('section','rail-section question-section'),header=el('div','rail-header'),heading=el('div','rail-title'),title=el('h2','','Open questions');title.id='open-questions-title';section.setAttribute('aria-labelledby',title.id);heading.append(title,el('span','rail-count',String(slides.length)));header.append(heading);section.append(header);
- if(!slides.length){section.append(el('p','empty-row','Your profiles have no open questions. Add unresolved questions in a profile to keep them in view here.'));return {element:section,destroy(){}};}
+ const section=el('section','rail-section question-section'),header=el('div','rail-header'),heading=el('div','rail-title'),title=el('h2','','Open questions');title.id=prefix+'open-questions-title';section.setAttribute('aria-labelledby',title.id);heading.append(title,el('span','rail-count',String(slides.length)));header.append(heading);section.append(header);
+ if(!slides.length){
+  const banner=el('div','question-banner question-banner-empty'),stage=el('div','question-stage'),slide=el('div','question-slide'),copy=el('div','question-copy');
+  copy.append(el('p','question-kind','No open questions yet'),el('h3','question-text',emptyState?.title||'Keep your story’s mysteries in view.'),el('p','question-description',emptyState?.description||'Add unresolved questions in a profile. They’ll appear here as you build your world.'));
+  slide.append(copy);stage.append(slide);banner.append(stage);
+  if(emptyState?.action){const footer=el('div','question-controls'),button=el('button','question-profile-link',emptyState.action.label);button.type='button';button.addEventListener('click',emptyState.action.onClick);footer.append(button);banner.append(footer);}
+  section.append(banner);return {element:section,destroy(){}};
+ }
  const banner=el('div','question-banner'),stage=el('div','question-stage'),footer=el('div','question-controls'),link=el('a','question-profile-link','Open profile ↗'),transport=el('div','question-transport'),count=el('span','question-position'),live=el('span','sr-only');
- banner.setAttribute('role','region');banner.setAttribute('aria-roledescription','carousel');banner.setAttribute('aria-label','Open questions');stage.id='question-stage';stage.setAttribute('aria-live','off');live.setAttribute('aria-live','polite');live.setAttribute('aria-atomic','true');
+ banner.setAttribute('role','region');banner.setAttribute('aria-roledescription','carousel');banner.setAttribute('aria-label','Open questions');stage.id=prefix+'question-stage';stage.setAttribute('aria-live','off');live.setAttribute('aria-live','polite');live.setAttribute('aria-atomic','true');
  const button=(name,glyph)=>{const node=el('button','question-control',glyph);node.type='button';node.setAttribute('aria-label',name);node.title=name;node.setAttribute('aria-controls',stage.id);return node;};
  const pause=button('Pause slideshow','Ⅱ'),prev=button('Previous question','‹'),next=button('Next question','›');
  transport.append(count);if(slides.length>1)transport.append(pause,prev,next);footer.append(link,transport);banner.append(stage,footer,live);section.append(banner);

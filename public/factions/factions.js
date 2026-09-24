@@ -1,15 +1,35 @@
-const list=document.querySelector('#faction-list'),search=document.querySelector('#faction-search'),sort=document.querySelector('#sort-order'),direction=document.querySelector('#sort-direction'),clear=document.querySelector('#clear-search'),count=document.querySelector('#result-count'),empty=document.querySelector('#empty-state'),newButton=document.querySelector('#new-faction'),error=document.querySelector('#storage-error');
-let records=[],reversed=false,pendingId;
+import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
+
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
-async function api(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load factions.');return data;}
-function render(){
- const query=search.value.trim().toLocaleLowerCase(),matches=records.filter(f=>JSON.stringify(f).toLocaleLowerCase().includes(query));
- if(sort.value==='name')matches.sort((a,b)=>(a.name||'Untitled faction').localeCompare(b.name||'Untitled faction'));
- if(sort.value==='type')matches.sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));if(reversed)matches.reverse();
- list.replaceChildren(...matches.map((f,i)=>{const row=node('li','character-row'),article=node('article','character'),link=node('a','character-summary profile-link'),heading=node('div','character-heading'),name=f.name||'Untitled faction';link.href='/factions/'+f.id+'/';const initials=name.replace(/^The /,'').split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),avatar=node('span','avatar blue',initials),info=node('div','character-info'),arrow=node('span','profile-arrow','›');avatar.setAttribute('aria-hidden','true');arrow.setAttribute('aria-hidden','true');info.append(node('h2','',`${i+1}. ${name}`),node('p','roles',[f.type,f.status,f.location].filter(Boolean).join(' · ')||'Faction in development'),node('p','character-title',f.motto||f.purpose||''));heading.append(avatar,info,arrow);link.append(heading,node('p','biography-preview',f.summary||f.introduction||'A blank faction, ready to take its place in your world.'));article.append(link);row.append(article);return row;}));
- count.textContent=query?`${matches.length} of ${records.length} factions`:records.length?`1–${records.length} of ${records.length} factions`:'0 factions';clear.hidden=!search.value;empty.hidden=matches.length>0;list.hidden=!matches.length;
-}
-async function load(){count.textContent='Loading factions…';error.hidden=true;try{records=(await api('/api/factions')).factions;render();}catch(e){error.textContent=e.message;error.hidden=false;count.textContent='Unable to load factions';}}
-newButton.addEventListener('click',async()=>{newButton.disabled=true;newButton.textContent='Creating…';error.hidden=true;pendingId??=crypto.randomUUID();try{const faction=await api('/api/factions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,blank:true})});location.assign('/factions/'+faction.id+'/');}catch(e){error.textContent=e.message;error.hidden=false;newButton.disabled=false;newButton.textContent='+ New faction';}});
-search.addEventListener('input',render);sort.addEventListener('change',render);direction.addEventListener('click',()=>{reversed=!reversed;direction.setAttribute('aria-pressed',String(reversed));direction.setAttribute('aria-label',reversed?'Restore forward list order':'Reverse list order');render();});
-function reset(){search.value='';render();search.focus();}clear.addEventListener('click',reset);document.querySelector('#reset-search').addEventListener('click',reset);window.addEventListener('pageshow',event=>{if(event.persisted){newButton.disabled=false;newButton.textContent='+ New faction';pendingId=undefined;load();}});load();
+const directory=initDirectoryShell({
+ async load(options){return (await fetchDirectory('/api/factions',options)).factions;},
+ select(records,{query,sort,reversed}){
+  const needle=query.trim().toLocaleLowerCase(),matches=records.filter(f=>JSON.stringify(f).toLocaleLowerCase().includes(needle));
+  if(sort==='name')matches.sort((a,b)=>(a.name||'Untitled faction').localeCompare(b.name||'Untitled faction'));
+  if(sort==='type')matches.sort((a,b)=>(a.type||'').localeCompare(b.type||'')||(a.name||'').localeCompare(b.name||''));
+  return reversed?matches.reverse():matches;
+ },
+ renderItem(f,filters,index){
+  const article=node('article','faction-entry'),link=node('a','faction-summary'),heading=node('div','faction-heading'),name=f.name||'Untitled faction';
+  link.href='/factions/'+encodeURIComponent(f.id)+'/';
+  const initials=name.replace(/^The /,'').split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),avatar=node('span','faction-avatar',initials),info=node('div','faction-info'),arrow=node('span','faction-arrow','›');
+  avatar.setAttribute('aria-hidden','true');arrow.setAttribute('aria-hidden','true');
+  info.append(node('h2','',`${index+1}. ${name}`),node('p','faction-meta',[f.type,f.status,f.location].filter(Boolean).join(' · ')||'Faction in development'),node('p','faction-motto',f.motto||f.purpose||''));
+  heading.append(avatar,info,arrow);
+  link.append(heading,node('p','faction-preview',f.summary||f.introduction||'A blank faction, ready to take its place in your world.'));
+  article.append(link);return article;
+ }
+});
+
+const newButton=document.querySelector('#new-faction');
+let pendingId,creating=false;
+newButton.addEventListener('click',async()=>{
+ if(creating)return;creating=true;newButton.disabled=true;newButton.textContent='Creating…';directory.clearError();pendingId??=crypto.randomUUID();
+ try{
+  const response=await fetch('/api/factions',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,blank:true})});
+  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
+  const faction=await response.json();if(!response.ok)throw new Error(faction.error||'Unable to create your faction.');
+  location.assign('/factions/'+encodeURIComponent(faction.id)+'/');
+ }catch(error){directory.showError(error);creating=false;newButton.disabled=false;newButton.textContent='+ New faction';}
+});
+window.addEventListener('pageshow',event=>{if(event.persisted){creating=false;pendingId=undefined;newButton.disabled=false;newButton.textContent='+ New faction';}});

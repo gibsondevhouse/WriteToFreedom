@@ -28,6 +28,10 @@ Click the small affiliation portrait to choose any existing character, faction, 
 
 Power is derived in `public/characters/power.js` from all 20 equally weighted attribute ratings. With `x = sum(ratings) / (20 × 99)`, the score is `round(9999 × (exp(4x) − 1) / (exp(4) − 1))`, capped at 9999. All zeros score 0, all 99s score 9999, and gains increase exponentially toward the top. Missing ratings contribute zero to a provisional score marked with an asterisk and explained in the badge title and attributes dialog; no ratings show a dash. Power is never saved independently, so changing ratings cannot leave a stale stored score.
 
+## Shared visual frame
+
+`frame.js` exports `createStoryCardFrame(record, options)` and `storyCardPicture(record, className)`. The frame owns artwork, role/title, optional badge, detail row and footer markup. Adapters supply the detail and action nodes and retain their own state/navigation behavior. Both this Character adapter and Lore’s `lore-card/card.js` (Jewels and Species) use it and the same `card.css`; footer actions can be links or buttons.
+
 ## Implementation contracts
 
 See the [component guide](../../../docs/components.md#reusable-character-cards) for state ownership, dialog loading/saving, DOM lifecycle, host callbacks, and compatibility modules. The [routing guide](../../../docs/routing.md#character-routing-in-detail) documents the ordinary document and card/connection projections.

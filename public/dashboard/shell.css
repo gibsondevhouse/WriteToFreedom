@@ -1,0 +1,31 @@
+/* One dependency for the complete dashboard visual system, in cascade order. */
+@import url('./dashboard.css');
+@import url('../styles.css?v=shared-1');
+@import url('../components/character-card/card.css?v=2');
+@import url('../components/character-card/details.css?v=1');
+@import url('../components/note-card/card.css?v=2');
+@import url('../components/artifact-card/card.css?v=1');
+@import url('../components/book-cover-card/card.css?v=3');
+@import url('../components/lore-card/card.css?v=1');
+
+.dashboard-shell { min-width:0; }
+.dashboard-shell .dashboard-heading-copy { min-width:0; }
+.dashboard-shell .dashboard-description { margin:8px 0 0; color:var(--muted); font-size:1rem; }
+.dashboard-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.dashboard-actions .workspace-action { justify-content:center; }
+.dashboard-shell .workspace-action:disabled { cursor:default; opacity:.55; }
+.dashboard-shell [data-dashboard-slot]:empty { display:none; }
+.dashboard-shell .rail-empty { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.rail-empty p { margin:0; }
+.rail-empty .workspace-action { flex:none; }
+.question-banner-empty .question-kind { margin-bottom:12px; }
+.question-banner-empty .question-description { margin:12px 0 0; max-width:620px; color:#b9cad6; font-size:1rem; line-height:1.6; }
+.question-banner-empty .question-profile-link { border:0; }
+.dashboard-breadcrumbs ol { display:flex; flex-wrap:wrap; gap:10px; list-style:none; padding:0; margin:0 0 18px; color:var(--muted); font-size:.875rem; }
+.dashboard-breadcrumbs li+li::before { content:'/'; margin-right:10px; color:#6e8098; }
+.dashboard-breadcrumbs a:hover { color:var(--link); }
+.dashboard-shell .dashboard-empty { margin-bottom:28px; padding:30px; }
+.dashboard-empty h2 { color:#edf2f8; font:1.5rem/1.3 Georgia,serif; margin:0 0 10px; }
+.dashboard-empty p { margin:0; max-width:550px; font-size:1rem; }
+.dashboard-empty .dashboard-actions { margin-top:20px; }
+@media(max-width:540px) { .dashboard-shell .dashboard-empty { padding:24px 20px; } }

@@ -1,0 +1,32 @@
+/* Shared portrait shelf for Books and Relics. Captions sit outside the artwork. */
+.book-cover-shelf .rail { gap:30px; }
+.book-cover-card {
+ width:min(165px,calc(100vw - 40px));
+ height:auto;
+ border:0;
+ border-radius:0;
+ background:transparent;
+ overflow:visible;
+}
+.book-cover-card .cover {
+ width:100%;
+ aspect-ratio:2 / 3;
+ flex:none;
+ border-radius:4px;
+ background:linear-gradient(150deg,var(--tone),#172330);
+}
+.book-cover-card .monogram { font-size:4rem; opacity:.5; }
+.book-cover-copy { min-width:0; padding:8px 4px 0; }
+.book-cover-card h3,
+.book-cover-card .book-cover-meta {
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ font-size:.8125rem;
+ font-weight:400;
+ line-height:24px;
+}
+.book-cover-card .book-cover-meta { color:var(--muted); }
+.card.book-cover-card:focus-visible { outline:none; }
+.book-cover-card:is(:hover,:focus-visible) .cover { outline:2px solid var(--link); outline-offset:-2px; }
+.book-cover-card:hover h3 { color:#fff; }

@@ -9,7 +9,7 @@ export function renderLocationAncestry(record,locations){
 }
 
 /** All eight types share this shell; the template owns their field differences. */
-export function renderLocation(record,locations,cast){
+export function renderLocation(record,locations,cast,lore=[]){
  const template=locationTemplates[record.type];
  const field=createFieldRenderer(record,{
   required:['name',...(requiresParent(record.type)?['parentId']:[]),...(record.type==='area'?['areaType']:[])],
@@ -32,6 +32,6 @@ export function renderLocation(record,locations,cast){
   template.infoGroups.map(group=>renderInfoGroup(group.title,group.id,group.fields.map(field).join(''))).join('')+
   `<a class="places-count" href="#places">${children.length} ${children.length===1?'location':'locations'} within</a>`;
  return renderProfilePage({record,type:record.type,collection:'Locations',collectionUrl:'/locations/',infobox,
-  content:content+renderConnectedNotes(cast,{kind:'location',id:record.id},record),script:'/locations/profile.js',
+  content:content+renderConnectedNotes(cast,{kind:'location',id:record.id},record,lore),script:'/locations/profile.js',
   styles:['/characters/profile-notes.css','/locations/countries/profile.css','/locations/profile.css'],boxClass:'country-infobox location-infobox'});
 }

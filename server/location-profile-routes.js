@@ -22,7 +22,7 @@ export async function locationProfileRoute(request,env){
   const current=defaultLocation(location);
   if(html){
    if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);
-   return new Response(request.method==='HEAD'?null:renderLocation(current,locations,characterCast(await db.list(owner))),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+   return new Response(request.method==='HEAD'?null:renderLocation(current,locations,characterCast(await db.list(owner)),await db.listLore(owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
   }
   if(request.method==='GET')return json(responseRecord(current,locations));
   if(request.method!=='PUT')return json({error:'Method not allowed.'},405);

@@ -23,7 +23,7 @@ HTTP handlers + owner-scoped repository
                       +--> specialized note/attribute UI
                       +--> API saves
 
-static directory/dashboard document + workspaceShell
+renderDirectoryPage / renderDashboardPage / legacy static pages + workspaceShell
     |
     +--> page controller fetches data and owns list/rail layout
             +--> createCharacterCard (reusable DOM factory)
@@ -39,12 +39,15 @@ Shared data modules such as templates, dates, notes validation, attribute valida
 | Workspace navigation HTML | `server/workspace-shell.js` | Outer `createWorker`, every HTML page. |
 | Workspace layout/preferences/search UI | `public/workspace-shell.css`, `public/workspace-state.js`, `public/dashboard/workspace.js` | Dashboard, directories, profiles, timeline. |
 | Dashboard data projection | `server/dashboard-routes.js`, `server/character-card-data.js` | Dashboard endpoint and character cards view. |
-| Dashboard rails and question rotation | `public/dashboard/dashboard.js`, `question-banner.js` | Dashboard entry pages. |
+| Complete dashboard frame and lifecycle | `server/dashboard-shell.js`, `server/dashboard-pages.js`, `public/dashboard/shell.js`, `shell.css` | Home, Lore, and future dashboard pages; see [shell contract](dashboard-shell.md). |
+| Shared dashboard cards/rails and question rotation | `public/dashboard/components.js`, `question-banner.js`, `dashboard.css` | Home and Lore dashboards. |
+| Lore dashboard and profile composition | `public/lore/`, `server/lore.js`, `server/render-lore.js` | Standalone Lore, collections and contextual character-note projections. |
+| Directory frame and lifecycle | `server/directory-shell.js`, `public/directory/` | Characters, Factions, Locations; reusable for other collection pages. |
 | Character-card markup and dialogs | `public/components/character-card/` | Dashboard and character directory. |
-| Profile HTML primitives | `server/profile-components.js` | Shared character, faction, country, city, and location renderers. |
+| Profile HTML primitives | `server/profile-components.js` | Shared character, faction, country, city, location, and Lore renderers. |
 | Field lists/defaults/options | Entity `template.js` files; `public/profiles/choices.js` | Renderers, validators, editors, derived models. |
 | Shared profile interaction | `public/profiles/controls.js`, `viewport.js`, `date-picker.js` | All profile editors. |
-| Generic profile saving | `public/profiles/editor.js` | Faction, country, city, and shared location adapters. |
+| Generic profile saving | `public/profiles/editor.js` | Faction, country, city, shared location, and Lore adapters. |
 | Character-specific saving | `public/characters/profile-editor.js` | Character profile only. |
 | Authored notes and links | `public/characters/note-*.js`, `notes.js`, `server/note-connections.js` | Character editor, linked-note displays, card projections. |
 | Attributes and derived power | `public/characters/attributes.js`, `attribute-controls.js`, `power.js` | Character profile and card dialogs. |
@@ -78,7 +81,7 @@ Active navigation is selected by path prefix; `/` and `/index.html` use the Dash
 | `document.documentElement.dataset.sidebar` | Persistent desktop expanded/collapsed state. |
 | `document.documentElement.dataset.mobileNav` | Temporary mobile drawer state. |
 
-Search loads `/api/dashboard` lazily on input/focus, caches the catalog in module memory, and retries after a failed load. `updateWorkspace(data)` lets the dashboard provide its already-fetched catalog. `searchCatalog(data, query)` searches characters, factions, and locations using all query terms; the UI shows at most 50 results. It is not a full search of every note, timeline event, or database field.
+Search loads `/api/dashboard` lazily on input/focus, caches the catalog in module memory, and retries after a failed load. `updateWorkspace(data)` lets the dashboard provide its already-fetched catalog. A `workspace:changed` event invalidates the cache after an in-page save. `searchCatalog(data, query)` searches characters, factions, locations, and standalone Lore using all query terms; the UI shows at most 50 results. Lore includes authored field text in its search projection; embedded character notes are searched within the Lore dashboard. Workspace search does not scan every character field or timeline event.
 
 Desktop collapse persists across navigation and storage events. Mobile expansion is independent and closes on Escape, outside clicks, and breakpoint changes. The controller installs document/window listeners once and has no teardown API; do not initialize duplicate copies on the same page.
 
@@ -167,7 +170,7 @@ The initializer installs page/global listeners and observers indirectly and does
 
 Source: [public/profiles/editor.js](../public/profiles/editor.js).
 
-The faction, country, city, and shared location profile scripts pass `fieldNames`, API collection `endpoint`, singular `type`, and optional `imageFields`/`validImageUrl`. The initializer reads the page's form hooks, calls shared controls, and holds `version`, `dirty`, and `saving` in its closure. It returns no controller object. An optional `onSaved(data)` callback receives the successful response; the shared location adapter uses its derived ancestry to refresh navigation without reloading.
+The faction, country, city, Lore, and shared location profile scripts pass `fieldNames`, API collection `endpoint`, singular `type`, and optional `imageFields`/`validImageUrl`. The initializer reads the page's form hooks, calls shared controls, and holds `version`, `dirty`, and `saving` in its closure. It returns no controller object. An optional `readExtra()` hook serializes domain-specific controls before the request. An optional `onSaved(data)` callback receives the successful response; the shared location adapter uses its derived ancestry to refresh navigation without reloading.
 
 Submit commits custom choices, checks native validity, serializes configured fields plus `hiddenFields` and `version`, disables editing, and sends PUT to `endpoint + '/' + form.dataset.id`. It verifies JSON responses, retains the returned version, updates names/links, and clears dirty state only after success. Errors preserve field values. Finally it restores the controls. Ctrl/Cmd+S submits and `beforeunload` warns for unsaved changes.
 
@@ -193,7 +196,7 @@ Use `/api/characters?view=cards` or dashboard `characters` for cards. Ordinary c
 
 ### `createCharacterCard(data, options = {})`
 
-This DOM factory returns an `HTMLElement` (`article.story-character-card`). It normalizes input, assigns a stable ID-based tone, and builds artwork, name/role, derived power, featured-item row, and action footer. Mounting the card performs no API request; remote image elements may load their URLs.
+This DOM factory returns an `HTMLElement` (`article.story-character-card`). The shared `createStoryCardFrame` in `public/components/character-card/frame.js` owns its artwork, title, detail row and four-action footer; the Character adapter supplies power, affiliation and dialog actions. The shared Lore adapter reuses that frame and canonical CSS for Jewels and Species with Lore navigation actions. It normalizes input, assigns a stable ID-based tone, and builds artwork, name/role, derived power, featured-item row, and action footer. Mounting the card performs no API request; remote image elements may load their URLs.
 
 | Option | Meaning |
 | --- | --- |
@@ -230,7 +233,7 @@ Editable dialogs spread the fetched document into the update, preserving its ver
 
 ## Notes, links, and source anchors
 
-Character notes live in the character document. There is no independent notes/lore CRUD endpoint or table. A lore item here is a note type, even though a standalone Lore module remains upcoming.
+Character notes, including existing notes with the `lore` type, live in the character document. Standalone Lore entries have separate `/api/lore` endpoints and `lore_entries` storage. The Lore dashboard can display both while preserving the character notes’ original identities and save boundaries.
 
 | Module / function | Boundary |
 | --- | --- |
@@ -244,11 +247,11 @@ Character notes live in the character document. There is no independent notes/lo
 
 `initCharacterNotes` returns `{ notes, readyToSave() }`. The parent character editor includes that notes array in its normal PUT payload. `readyToSave()` blocks profile saving while the composer is open and stops an unfinished placement mode otherwise. Adding a note does not by itself issue a character save.
 
-Composer creation of characters, factions, and places uses their existing API endpoints and persists those entities immediately. Creating another note/lore item within the composer adds to the current character draft and still requires saving the character. Do not present every composer action as having the same persistence boundary.
+Composer creation of characters, factions, places, and standalone Lore uses their API endpoints and persists those entities immediately. Creating another character note within the composer adds to the current character draft and still requires saving the character. Do not present every composer action as having the same persistence boundary.
 
 Source markers `[1]`, `[2]`, etc. are positional references into textarea fields. Editing text moves anchors where possible; an invalidated anchor becomes unplaced instead of deleting the note. Removing notes renumbers later markers while updating positions. Preserve stable note UUIDs separately from displayed numbering.
 
-`noteTargets` derives available references from the owner's cast/factions/locations and character notes. `connectedNotes` derives explicit backlinks. `validateNoteConnections` rejects newly selected unavailable targets and self-note links while allowing existing unresolved links to survive edits. Card mentions additionally use textual name matching; explicit backlinks and inferred mentions are different projections.
+`noteTargets` derives available references from the owner's cast/factions/locations, standalone Lore, and character notes. `connectedNotes` derives explicit backlinks. `validateNoteConnections` rejects newly selected unavailable targets and self-note links while allowing existing unresolved links to survive edits. Card mentions additionally use textual name matching; explicit backlinks and inferred mentions are different projections.
 
 ## Dates, reading viewport, and timeline
 
@@ -268,7 +271,7 @@ The timeline page controller owns its filters, viewport, DOM virtualization, ref
 | Card dialog | One open dialog | Close removes DOM/unload listener and restores focus. |
 | Connections map | Returned subtree | No public teardown; interactions belong to subtree. |
 | Question banner | Mounted banner with timers/observers | Returns `{ element, destroy }`; call `destroy()` before replacing. |
-| Dashboard controller | Document plus replaceable rails | Calls previous banner cleanup before rendering new rows. |
+| Dashboard shell controller | Document plus replaceable views | Disposes banners/rails, queues refresh, preserves slots, aborts reads and removes shell listeners on destroy. |
 
 Question rotation pauses according to reduced motion, visibility, hover/focus, and explicit controls. It owns timers, animations, an intersection observer, and document/media listeners; omitting `destroy()` leaks work after a dashboard refresh. This explicit cleanup contract is not present on every other initializer.
 
@@ -278,6 +281,25 @@ For a new field, change the entity template/defaults, its renderer and validatio
 
 For a new profile type, supply a renderer composed from shared profile functions, an owner-scoped handler, a template, and an appropriate browser adapter. Use `initProfileEditor` only if its assumptions fit the new entity. Add the route before static fallback and let the outer Worker add navigation. Avoid adding a second profile form to an existing page without first removing singleton DOM-ID assumptions.
 
-For a reusable visual component, define its data shape, returned DOM or HTML, state ownership, callbacks, CSS scope, network effects, and cleanup. Put cross-page components under `public/components/`; leave page rails, filtering, loading/errors, and page headings in the host. For a new action that writes, start from a fresh plain document and preserve optimistic concurrency.
+For a reusable visual component, define its data shape, returned DOM or HTML, state ownership, callbacks, CSS scope, network effects, and cleanup. Put cross-page components under `public/components/` or their established shared module. For searchable collection pages, use the complete [directory shell](directory-shell.md). For dashboards, use the complete [dashboard shell](dashboard-shell.md) for headings, status, rails and lifecycle; page adapters retain filtering and domain actions. For a new action that writes, start from a fresh plain document and preserve optimistic concurrency.
 
 Verify server rendering and save/reopen in `tests/profile-standard.test.mjs`, shared navigation in `tests/workspace-shell.test.mjs`, card behavior in `tests/character-cards.test.mjs`, graph math in `tests/connections-map.test.mjs`, notes in `tests/cursor-notes.test.mjs`, and dashboard/search in their dedicated suites. These are Node tests and DOM stubs where used; visual behavior, focus, and responsive layout still need browser verification when those behaviors change.
+
+
+## Lore dashboard and profile adapters
+
+`server/dashboard-pages.js` configures Home and Lore through `renderDashboardPage`. The shared browser shell owns `createRails()` and `createQuestionBanner` instances, status, retry, refresh and disposal. Its required stylesheet includes the dashboard theme and canonical card/dialog dependencies in order. Lore adds its capture/filter/dialog styles, and follows Home’s question-banner-then-rails composition. All six collection rows remain visible when empty, with type-specific creation actions. Search and quick-note drafts occupy a persistent toolbar; View all filters the replaceable rows. See the [complete shell contract](dashboard-shell.md) before adding another dashboard.
+
+`public/lore/dashboard.js` loads `/api/lore`, filters six collection projections, captures quick notes, and creates named entries. Collection rows sort pinned entries first, then by most recent save. Featured entries use an explicit profile flag. Quick-note creation uses a retained UUID for safe retries and clears text only after confirmed persistence. Existing character notes link back to their original character anchors. Quick capture expands on demand and retains its draft when collapsed. Questions and all six collections remain visible when empty; featured entries appear when present.
+
+`noteCard(record)` in `public/dashboard/components.js` owns the shared Notes presentation, with styling in `public/components/note-card/card.css`. Three independent regions match the review-card proportions: a 144px image/excerpt preview with its title at the bottom, a 53px source/date row with an ellipsis disclosure, and a 48px icon-action row. The outer article contains separate links for reading, pin/feature settings, and the actual connection count. The menu stays inside the card and closes on Escape. Dispatch on `type === 'note'` for both standalone and character notes. Home, Lore collections, featured entries and filtered results use this renderer. Preserve each character note’s original anchor for its actions; only standalone notes show their own updated date, since character notes have no independent save timestamp.
+
+`loreEntryCard(record, { collection })` centralizes presentation selection for Home and Lore, including featured and filtered rows. Notes use `noteCard`. Explicit Books and Relics shelves use `bookCoverCard`; explicit Artifacts shelves use `artifactCard`; explicit Jewels and Species shelves use `createLoreCard`. Mixed rails choose the shared story frame for primary Jewels and Species, portrait covers for primary Book/Relic types, then landscape tiles for artifacts and other entries included in Artifacts. The same entry retains its name, actual type and profile URL on every shelf. Its shared stylesheet, `public/components/artifact-card/card.css`, provides 280px landscape tiles with 16:9 artwork, a badge showing the real entry type, a decorative gold accent, and a separate name/summary caption. HTTPS images and failed-image fallbacks reuse `cover()`. Other Lore types retain their existing cards.
+
+`bookCoverCard(record)` uses `public/components/book-cover-card/card.css`: 165px-wide, 2:3 covers with 4px corners, a separate single-line title and muted type/status caption, HTTPS images and the shared failed-image monogram. Full titles remain available to assistive technology and on hover. Lore marks its Books/Relics collection rows with `book-cover-shelf` for 30px gaps; scrolling, arrow states and disposal stay in the shared rail. Filtered collection results preserve that shelf format, while Home, Featured and unscoped search use primary-type dispatch. Empty collections keep their real creation action without fabricated entries.
+
+`createLoreCard(record)` in `public/components/lore-card/card.js` uses the same `createStoryCardFrame` and character-card CSS as Home’s characters. It supplies real type/pin/feature metadata, image/name, a description row, and links to pin/feature settings, the actual connection count, story significance and the full Lore profile. Jewels and Species share this component, with a gem or sprout icon and their actual type label. Its minimal stylesheet only adapts these icons and narrow-screen width. The former `jewel-card` paths remain compatibility exports/imports. It performs no writes or character-dialog actions, and its common profile anchors work for other object types placed on the Jewels shelf.
+
+`public/lore/template.js` is the field/default/visibility authority for all six Lore types. `renderLore` composes the existing infobox, article sections, image controls, dates, and save bar. The Lore adapter configures `initProfileEditor`; its `readExtra()` hook serializes collections, pin/feature choices, and typed connections before the shared save begins. The shared editor owns version, dirty state, errors, draft retention, and save shortcuts. Connection search is temporary UI state and must not mark the document dirty.
+
+One object may appear on multiple collection shelves without creating additional records. `noteTargets` exposes its single stable Lore reference; `connectedNotes` adds incoming Lore connections to existing character-note backlinks. Character note composers can create a standalone Lore entry immediately, but adding the reference to the current character remains part of the character’s explicit save.

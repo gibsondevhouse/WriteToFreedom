@@ -13,7 +13,7 @@ export {escape} from './profile-components.js';
  * to profile-editor.js; external mentions exclude own notes to avoid duplication.
  * Returns HTML only: persistence and outer workspace navigation belong elsewhere.
  */
-export function renderProfile(character, cast, factions=[],locations=[],notes=[]) {
+export function renderProfile(character, cast, factions=[],locations=[],notes=[],lore=[]) {
  const color=seeds.find(c=>c.id===character.id)?.color||'blue';
  const initials=escape(character.name.trim().split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?');
  const field=([key,label,type])=>{
@@ -40,11 +40,11 @@ export function renderProfile(character, cast, factions=[],locations=[],notes=[]
   const fields=section.id==='overview'?[section.fields[1],section.fields[0]]:section.fields;
   const content=section.id==='relationships'?`<div data-profile-field="relationships"${character.hiddenFields?.includes('relationships')?' hidden':''}><div id="relationship-fields"></div><button type="button" id="add-relationship" class="quiet-button">+ Add relationship</button></div>`:fields.map(field).join('');
   return renderSection(section,content,character,{fullWidth:section.id==='relationships',allowNotes:section.fields.some(f=>f[2]==='textarea'),menuFields:section.id==='relationships'?[['relationships','Relationship entries']]:section.fields});
- }).join('')+renderSection({id:'notes',title:'Notes',fields:[]},renderNotes(notes,character.notes||[],noteTargets(cast,factions,locations)),character);
+ }).join('')+renderSection({id:'notes',title:'Notes',fields:[]},renderNotes(notes,character.notes||[],noteTargets(cast,factions,locations,lore)),character);
  const identityFields=templateSections[0].fields.filter(f=>f[0]!=='title'&&!humanFields.some(h=>h[0]===f[0]));
  const cardGroups=[{title:'Character information',fields:identityFields},...humanFieldGroups].map((group,index)=>renderInfoGroup(group.title,'identity-group-'+index,group.fields.map(field).join(''))).join('');
  const infobox=renderProfileName(character,'character')+`<div class="epithet-field">${field(templateSections[0].fields.find(f=>f[0]==='title'))}</div><div class="identity-panel ${color}"><span class="monogram" id="monogram">${initials}</span></div>${cardGroups}<small class="name-hint">Dates can use your story’s calendar. Height and weight use the selected units.</small><small class="name-hint">Names can include hyphens and spaces.</small>`;
- return renderProfilePage({record:character,type:'character',collection:'Characters',collectionUrl:'/characters/',infobox,content:body,script:'/characters/profile-editor.js',styles:['/characters/attribute-controls.css','/characters/profile-card.css','/characters/profile-notes.css'],initial:{character,locations,noteTargets:noteTargets(cast,factions,locations),noteBacklinks:Object.fromEntries((character.notes||[]).map(n=>[n.id,connectedNotes(cast,{kind:'note',id:n.id,characterId:character.id})])),cast:cast.map(c=>({id:c.id,name:c.name})),factions}});
+ return renderProfilePage({record:character,type:'character',collection:'Characters',collectionUrl:'/characters/',infobox,content:body,script:'/characters/profile-editor.js',styles:['/characters/attribute-controls.css','/characters/profile-card.css','/characters/profile-notes.css'],initial:{character,locations,noteTargets:noteTargets(cast,factions,locations,lore),noteBacklinks:Object.fromEntries((character.notes||[]).map(n=>[n.id,connectedNotes(cast,{kind:'note',id:n.id,characterId:character.id},lore)])),cast:cast.map(c=>({id:c.id,name:c.name})),factions}});
 }
 
 function renderNotes(notes,authored,targets){
