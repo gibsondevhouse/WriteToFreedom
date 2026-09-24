@@ -13,6 +13,17 @@ async function request(url,options={}){
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load the character. Try again.');return data;
 }
 let activeDialog;
+/**
+ * Open one module-wide modal: morality, attributes, connection, relationships,
+ * or mentions. Editable views fetch a fresh plain document before versioned PUT;
+ * relationships fetch rich cards, while mentions use the supplied snapshot.
+ * Close removes DOM/unload listener and restores focus. Dirty drafts require an
+ * explicit discard; a second open is ignored while a dialog is active.
+ * @param {object} record Rich card record; updated in place after a successful save.
+ * @param {string} view One of the five supported action views.
+ * @param {Function} [onUpdate] Receives updated card state after persistence.
+ * @returns {void}
+ */
 export function openCharacter(record,view,onUpdate){
  if(activeDialog)return;
  const opener=document.activeElement,dialog=el('dialog','character-detail-overlay '+view+'-overlay');activeDialog=dialog;dialog.setAttribute('aria-labelledby','character-detail-title');

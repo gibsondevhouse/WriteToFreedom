@@ -1,0 +1,283 @@
+# Component boundaries and extension contracts
+
+This project uses ES modules, HTML string renderers, and DOM factories rather than a UI framework. Componentization means a module owns a defined piece of rendering or behavior with explicit inputs and effects. It does not imply that every page is a reusable component or that all initializers support repeated mounting.
+
+See the [README](../README.md) for setup, [routing guide](routing.md) for handler contracts, and [character-card reference](../public/components/character-card/README.md) for a minimal card integration example.
+
+## Layers and dependency direction
+
+```text
+HTTP handlers + owner-scoped repository
+    |
+    +--> catalogs/defaults + derived data (server; no DOM)
+    |       +--> dashboardData / characterCardDetails / noteTargets
+    |
+    +--> entity renderer
+            +--> shared profile HTML components
+                    +--> complete profile document
+                              |
+                      workspaceShell (outer Worker)
+                              |
+                    browser page adapter
+                      +--> shared profile controls
+                      +--> specialized note/attribute UI
+                      +--> API saves
+
+static directory/dashboard document + workspaceShell
+    |
+    +--> page controller fetches data and owns list/rail layout
+            +--> createCharacterCard (reusable DOM factory)
+                    +--> dialog controller -> fresh document -> API save
+```
+
+Shared data modules such as templates, dates, notes validation, attribute validation, and graph/timeline models can be imported by both Worker and browser code because their model functions do not need the DOM. Browser controllers may access `document` during module evaluation and must not be imported into server execution paths. Placement under `public/` alone does not make a file browser-only or server-safe; inspect its imports and top-level effects.
+
+## Ownership map
+
+| Concern | Authoritative modules | Consumers |
+| --- | --- | --- |
+| Workspace navigation HTML | `server/workspace-shell.js` | Outer `createWorker`, every HTML page. |
+| Workspace layout/preferences/search UI | `public/workspace-shell.css`, `public/workspace-state.js`, `public/dashboard/workspace.js` | Dashboard, directories, profiles, timeline. |
+| Dashboard data projection | `server/dashboard-routes.js`, `server/character-card-data.js` | Dashboard endpoint and character cards view. |
+| Dashboard rails and question rotation | `public/dashboard/dashboard.js`, `question-banner.js` | Dashboard entry pages. |
+| Character-card markup and dialogs | `public/components/character-card/` | Dashboard and character directory. |
+| Profile HTML primitives | `server/profile-components.js` | Shared character, faction, country, city, and location renderers. |
+| Field lists/defaults/options | Entity `template.js` files; `public/profiles/choices.js` | Renderers, validators, editors, derived models. |
+| Shared profile interaction | `public/profiles/controls.js`, `viewport.js`, `date-picker.js` | All profile editors. |
+| Generic profile saving | `public/profiles/editor.js` | Faction, country, city, and shared location adapters. |
+| Character-specific saving | `public/characters/profile-editor.js` | Character profile only. |
+| Authored notes and links | `public/characters/note-*.js`, `notes.js`, `server/note-connections.js` | Character editor, linked-note displays, card projections. |
+| Attributes and derived power | `public/characters/attributes.js`, `attribute-controls.js`, `power.js` | Character profile and card dialogs. |
+| Place ancestry | `public/locations/data.js`, `server/countries.js` | Location routes, profiles, cards, dashboard. |
+| Story-date interpretation | `public/profiles/dates.js` | Date picker and timeline. |
+| Timeline derivation/view math | `public/timeline/model.js` | Timeline/dashboard routes and timeline browser controller. |
+
+## Workspace shell
+
+### `workspaceShell(html, path)`
+
+Source: [server/workspace-shell.js](../server/workspace-shell.js).
+
+This synchronous function accepts a full HTML document and request pathname and returns an HTML string. It adds the sidebar, topbar search, `.workspace-canvas`, and `.workspace-page`, plus stylesheet and script tags. It performs no fetching or authentication.
+
+It leaves input unchanged when it lacks `<body` or already contains `data-app-shell`. The latter marker prevents double wrapping. The implementation uses string replacement and expects the project's normal lowercase `<body>`, `</head>`, and `</body>` structure; it is not a general HTML parser.
+
+Active navigation is selected by path prefix; `/` and `/index.html` use the Dashboard section. Canonical `/locations/.../` profiles therefore keep Locations active. Add navigation entries to the shell's `sections` definition instead of copying a sidebar into each page.
+
+### Shell browser contract
+
+`public/workspace-state.js` runs as a classic script in the head to restore `data-sidebar` before layout. It reads `wtf-sidebar-collapsed` from localStorage and tolerates blocked storage. This is a device presentation preference, not stored novel content.
+
+`public/dashboard/workspace.js` is a shared page-lifetime controller despite its directory name. It assumes shell elements already exist, including:
+
+| Hook | Role |
+| --- | --- |
+| `#novel-search`, `.workspace-search` | Query input and shortcut display. |
+| `#search-results`, `#search-list`, `#search-status` | Results, accessible status, and result links. |
+| `.sidebar-toggle`, `#workspace-sidebar` | Navigation expansion and focus behavior. |
+| `document.documentElement.dataset.sidebar` | Persistent desktop expanded/collapsed state. |
+| `document.documentElement.dataset.mobileNav` | Temporary mobile drawer state. |
+
+Search loads `/api/dashboard` lazily on input/focus, caches the catalog in module memory, and retries after a failed load. `updateWorkspace(data)` lets the dashboard provide its already-fetched catalog. `searchCatalog(data, query)` searches characters, factions, and locations using all query terms; the UI shows at most 50 results. It is not a full search of every note, timeline event, or database field.
+
+Desktop collapse persists across navigation and storage events. Mobile expansion is independent and closes on Escape, outside clicks, and breakpoint changes. The controller installs document/window listeners once and has no teardown API; do not initialize duplicate copies on the same page.
+
+## Server-rendered profile components
+
+Source: [server/profile-components.js](../server/profile-components.js). These functions return strings and do not query storage or attach browser listeners.
+
+### Escaping and trusted inputs
+
+- `escape(value)` converts nullish values to empty text and escapes HTML text/attribute characters.
+- `jsonData(value)` serializes embedded JSON and escapes `<`, `>`, and `&` so user text cannot terminate the JSON script element.
+- Field keys, section IDs, route prefixes, script/style paths, and supplied markup fragments come from developer-controlled templates. They are not automatically safe destinations for arbitrary user strings.
+- `renderFieldWrapper`, `renderSection`, `renderInfoGroup`, and `renderProfilePage` accept already-rendered HTML fragments. Escape user text before interpolating it into these fragments; escaping a label does not sanitize an entire fragment.
+
+### Function-level contracts
+
+| Function | Inputs and output | Extension constraints |
+| --- | --- | --- |
+| `renderFieldWrapper(record, key, label, type, control)` | Wraps control HTML with a label, `data-profile-field`, and saved visibility. | Choice labels target `choice-{key}`; other labels target `field-{key}`. Hidden controls stay mounted. |
+| `renderChoice(key, label, val, attrs, context)` | Hidden named input, single/multiple selection UI, custom editor; optional continent context. | `key` must exist in `profileChoices`; `attrs` is trusted attribute markup. Multiple values serialize with ` · `. |
+| `renderDateControl(key, label, val, attrs)` | Read-only text input marked `data-date-input`, plus picker icon. | Uses shared `profile-date-picker`; read-only input is edited through the picker. |
+| `createFieldRenderer(record, config)` | Returns a renderer for `[key, label, type]` tuples. | Config provides `options`, `required`, and linked-profile prefixes. `options` should return a fresh array because the renderer can append a preserved custom value. |
+| `renderSection(section, content, record, options)` | Article section, collapsible heading, optional visibility menu and create-note button. | Stable section IDs define `aria-controls`, body IDs, and deep links. `menuFields` can differ from rendered fields. |
+| `renderInfoGroup(title, id, content)` | Collapsible group inside the infobox. | ID is the controlled region's stable identifier. |
+| `renderProfileName(record, type, { official })` | Name heading and `#edit-name` focus button. | Official names use `#official-heading`; normal names use `data-display-name`. |
+| `renderProfilePage(config)` | Full HTML document with form, save bar, infobox, article, footer and initial JSON. | Does not add the workspace shell; outer Worker does that. One profile form is assumed per page. |
+
+`renderProfilePage` requires `record`, `type`, `collection`, `collectionUrl`, `infobox`, `content`, and `script`; optional `styles`, `initial`, and `boxClass` customize it. `initial` defaults to the record. It includes shared profile/editor/date-picker styles and the entity script with `profileRevision` query values. The revision is an asset URL/cache marker, unrelated to a persisted document's optimistic `version`.
+
+### Markup is an interface
+
+Browser editors depend on these exact hooks:
+
+| Hook | Contract |
+| --- | --- |
+| `#profile-form[data-id][data-version]` | Entity identity and initial write version. |
+| `#editor-fields` | Fieldset disabled during shared-editor saves. |
+| `#save-character`, `#save-status`, `#editor-error` | Shared save button/status/error; historical character naming is intentional compatibility. |
+| `#profile-data` | Safely serialized initial JSON for entity-specific consumers. |
+| `#edit-name`, `[data-display-name]` | Name editing focus and live display updates. |
+| `[name="fieldName"]`, `#field-{key}` | Serialization and stable deep-link anchors. |
+| `[data-collapse-target]`, `.collapsible-region` | Accessible section/infobox disclosure. |
+| `[data-profile-field]`, `[data-visibility]` | Saved visibility controls mapped to mounted fields. |
+| `.choice-control`, `[data-choice-field]` | Choice initialization and separate serialized values. |
+| `.article-bar`, `.current-view`, `.profile-content`, `.infobox` | Sticky reading layout and active heading. |
+| `[data-image]`, `[data-image-error]` | Preview and failure feedback for configured image fields. |
+
+Renaming a hook is an interface change spanning server markup, CSS, browser controls, and tests. Entity-specific classes extend the shared layout; they should not duplicate the page skeleton.
+
+## Entity composition and editor adapters
+
+### Renderers
+
+`renderFaction`, `renderCountry`, and `renderCity` configure `createFieldRenderer`, compose infobox and article sections, append derived linked notes, and delegate the complete document to `renderProfilePage`. Their adapters choose valid option lists: faction founders/leaders from the cast, country cities from that country's locations, and city parents from countries.
+
+`renderProfile` for characters uses the same shared primitives but retains specialized field composition, relationship controls, attributes, and authored notes. Its `initial` JSON contains `character`, `locations`, `noteTargets`, `noteBacklinks`, a compact `{ id, name }` cast, and factions. It is intentionally richer than the ordinary record embedded in the other profiles.
+
+Renderers receive already owner-scoped data from routes; they do not authenticate or persist. UI option restrictions supplement server validation and cannot replace it.
+
+### Shared location registry and renderer
+
+`public/locations/template.js` holds the eight location templates other than country/city. The registry derives field names, blank defaults, hideable article fields, image fields, infobox groups, and timeline mappings from each type's definition. `server/render-location.js` uses the same shared HTML primitives as country/city profiles and lists immediate children by type. `public/locations/profile.js` configures the shared editor once using the embedded record's immutable type. Parent options come from the existing hierarchy helpers; ancestry and child links use `locationHref`.
+
+`locationProfileGroups` produces the eight defaulted groups for dashboard questions, timeline events, and character mentions. Saved detail content already arrives through the owner-scoped location catalog. All ten location types share `locationPaths`/`locationHref` for directory rows, note targets, featured connections, derived cards, and source links.
+
+### `initProfileControls(form, markDirty, options)`
+
+Source: [public/profiles/controls.js](../public/profiles/controls.js).
+
+Call once per profile form. It initializes the date picker, choices, disclosures, field visibility, name focus, hash reveal, validation reveal, textarea sizing, and reading viewport. It returns:
+
+| Property | Meaning |
+| --- | --- |
+| `choiceValues` | Map of serialized strings for choice fields. |
+| `commitChoices()` | Commits pending custom editors; returns false when a value cannot be committed. |
+| `hiddenFields()` | Current unchecked visibility keys. |
+| `revealAncestors(target)` | Opens collapsed ancestor regions/details for navigation or validation. |
+
+Options select the name input (`nameField`, default `name`) and pass the mutable `nationalityContinents` map used by custom nationality choices. Character editing uses `firstName` for name focus.
+
+Visibility changes mark the draft dirty through form events or explicit callbacks. Normal hash reveal opens collapsed ancestors but does not generally force a saved hidden field visible. Validation and authored-note source navigation have explicit reveal paths that can change visibility. Derived links to hidden question/mention fields omit the field hash so navigation does not silently undo an author's preference.
+
+The initializer installs page/global listeners and observers indirectly and does not return a destroy function. Its lifetime is the document's lifetime, not repeated rendering into a single-page application.
+
+### `initProfileEditor(config)`
+
+Source: [public/profiles/editor.js](../public/profiles/editor.js).
+
+The faction, country, city, and shared location profile scripts pass `fieldNames`, API collection `endpoint`, singular `type`, and optional `imageFields`/`validImageUrl`. The initializer reads the page's form hooks, calls shared controls, and holds `version`, `dirty`, and `saving` in its closure. It returns no controller object. An optional `onSaved(data)` callback receives the successful response; the shared location adapter uses its derived ancestry to refresh navigation without reloading.
+
+Submit commits custom choices, checks native validity, serializes configured fields plus `hiddenFields` and `version`, disables editing, and sends PUT to `endpoint + '/' + form.dataset.id`. It verifies JSON responses, retains the returned version, updates names/links, and clears dirty state only after success. Errors preserve field values. Finally it restores the controls. Ctrl/Cmd+S submits and `beforeunload` warns for unsaved changes.
+
+The character adapter implements its own save flow because it also serializes relationships, notes, nationality-continent assignments, and attribute ratings, and coordinates inline faction creation. It uses the same controls and page hooks. A new shared save behavior must be reviewed in both save implementations.
+
+## Reusable character cards
+
+Canonical source: [public/components/character-card](../public/components/character-card/README.md).
+
+### Data preparation
+
+`server/character-card-data.js` owns derived card data, not DOM markup:
+
+| Function | Responsibility |
+| --- | --- |
+| `characterCardDetails(character, context)` | Artwork, alignment, attributes, default/featured affiliation, enriched relationships and mentions. |
+| `characterMentions(character, profiles, options)` | Own notes when enabled, name mentions in textarea fields, explicitly linked character notes, and relationship prose. |
+| `cardConnectionOptions(character, context)` | Available character/faction/location/note/lore references, labels, links, and images. |
+
+Default affiliation prioritizes faction, then citizenship or residence-derived country, then free-text affiliation/Independent. `cardConnection` overrides presentation only; it does not change membership or citizenship. References resolve by stable IDs, and missing featured targets fall back to automatic affiliation.
+
+Use `/api/characters?view=cards` or dashboard `characters` for cards. Ordinary character relationships contain `{ targetId, type, description }`; card relationships are one record per connected person with nested directional details. The two shapes are not interchangeable.
+
+### `createCharacterCard(data, options = {})`
+
+This DOM factory returns an `HTMLElement` (`article.story-character-card`). It normalizes input, assigns a stable ID-based tone, and builds artwork, name/role, derived power, featured-item row, and action footer. Mounting the card performs no API request; remote image elements may load their URLs.
+
+| Option | Meaning |
+| --- | --- |
+| `headingLevel` | Exactly `2` selects h2; all other values currently use h3. |
+| `tone` | Optional allowlisted `clay`, `jade`, `blue`, `violet`, or `gold`. |
+| `onAction(view, record)` | Replaces built-in dialog handling for all action views. |
+| `onUpdate(record)` | Called after a built-in dialog saves and the mounted card refreshes. |
+
+Views are `morality`, `relationships`, `mentions`, `attributes`, and `connection`. The fifth is triggered by the featured-item portrait, outside the four-action footer. `onAction` takes over dialog/update responsibility; the factory does not automatically save custom actions.
+
+The factory holds its own normalized record. A built-in save merges returned card state and replaces the original article's children, preserving the article node and its stable ID/tone. There is no public `update()` or `destroy()` method. Hosts that replace catalogs should recreate cards or maintain state through `onUpdate`; do not assume an event bus synchronizes every mounted instance.
+
+Include both `card.css` and `details.css` for default dialogs. Card selectors are scoped to `.story-character-card`; the host owns rail/grid layout. CSS variables control width/height. Legacy `public/dashboard/character-cards.js`, `character-cards.css`, `connections-map.js`, and `connections-model.js` are compatibility adapters/imports; new consumers should use canonical component modules.
+
+### Dialog ownership and save flow
+
+`openCharacter(record, view, onUpdate)` in `details.js` owns one active dialog at module scope. It appends to `document.body`, records the opener, manages dirty/saving state, restores focus on close, removes its unload listener, and clears the active-dialog guard. It returns no public dialog handle.
+
+| View | Data source | Persistence |
+| --- | --- | --- |
+| `mentions` | Existing card `mentions` | Read-only; no refresh request on open. |
+| `relationships` | Fresh `/api/characters?view=cards` | Read-only interactive connections map. |
+| `connection` | Fresh item `?view=connections` | PUT the plain `character` with new `cardConnection`. |
+| `morality` | Fresh ordinary character item | PUT document with new alignment. |
+| `attributes` | Fresh ordinary character item | PUT document with ratings and portrait URL. |
+
+Editable dialogs spread the fetched document into the update, preserving its version and unrelated fields. They do not save the enriched card projection. Conflict errors remain visible in the dialog with the draft retained. Alignment/featured-item dialogs close after success; attributes remain open. Closing a dirty dialog asks whether to discard the unsaved changes.
+
+### Graph and attributes
+
+`connectionGraph(characters, focusId)` accepts rich card records, deduplicates undirected edges while retaining directional details, and returns only the connected component reachable from the focused character. `layoutConnections(graph, focusId)` adds deterministic initial/relaxed coordinates. `createConnectionsMap` returns an interactive DOM subtree with SVG pan, zoom, dragging, selection, and accessible detail controls. These transformations do not write relationships or store graph positions.
+
+`createAttributeControls(draft, markDirty, selectedGroups)` mutates the supplied ratings draft and calls the dirty callback. The profile and dialog own persistence. `characterPower` derives a capped score from the 20 ratings; it is not a saved field. Missing ratings result in provisional display, so consumers must retain the accompanying status rather than displaying a score as complete.
+
+## Notes, links, and source anchors
+
+Character notes live in the character document. There is no independent notes/lore CRUD endpoint or table. A lore item here is a note type, even though a standalone Lore module remains upcoming.
+
+| Module / function | Boundary |
+| --- | --- |
+| `notes.js`: `validateNotes`, `cleanNoteReference`, `referenceKey`, `moveNoteAnchors` | Model validation, canonical references and source-position adjustments; shared with server where appropriate. |
+| `note-content.js` | Structured content/plain text conversion and unique linked references. |
+| `note-editor.js`: `initCharacterNotes` | Source placement, composer lifecycle, marker renumbering, local draft/list rendering. |
+| `note-connections.js`: `createNoteConnections` | Picker metadata, structured links, and rendered linked note details. |
+| `inline-note-editor.js` | Browser rich-text editing and conversion to structured pieces. |
+| `create-note-item.js` | Creation actions offered from the note composer. |
+| `server/note-connections.js` | Catalog targets, explicit backlinks, linked-note HTML, and reference validation. |
+
+`initCharacterNotes` returns `{ notes, readyToSave() }`. The parent character editor includes that notes array in its normal PUT payload. `readyToSave()` blocks profile saving while the composer is open and stops an unfinished placement mode otherwise. Adding a note does not by itself issue a character save.
+
+Composer creation of characters, factions, and places uses their existing API endpoints and persists those entities immediately. Creating another note/lore item within the composer adds to the current character draft and still requires saving the character. Do not present every composer action as having the same persistence boundary.
+
+Source markers `[1]`, `[2]`, etc. are positional references into textarea fields. Editing text moves anchors where possible; an invalidated anchor becomes unplaced instead of deleting the note. Removing notes renumbers later markers while updating positions. Preserve stable note UUIDs separately from displayed numbering.
+
+`noteTargets` derives available references from the owner's cast/factions/locations and character notes. `connectedNotes` derives explicit backlinks. `validateNoteConnections` rejects newly selected unavailable targets and self-note links while allowing existing unresolved links to survive edits. Card mentions additionally use textual name matching; explicit backlinks and inferred mentions are different projections.
+
+## Dates, reading viewport, and timeline
+
+`initDatePicker(form)` creates the shared date dialog for that form. It dispatches input/change events to update the existing field; it does not save to the API. `datePickerPlacement` is pure placement math suitable for unit tests. Date parsing and formatting live in `dates.js` so picker output and timeline interpretation share precision and BCE rules.
+
+`initProfileViewport(form)` observes headings, the sticky bar, content, and infobox. It schedules layout updates with animation frames, updates `--profile-header-height`, toggles `.profile-reading`, and animates the current heading with reduced-motion handling. It registers window/form listeners and a `ResizeObserver` but exposes no teardown API. `sectionAtHeader` is the pure selection helper tested independently.
+
+The timeline page controller owns its filters, viewport, DOM virtualization, refresh requests, and user gestures. The shared model owns `collectTimeline`, filtering, row grouping, anchored zoom, fitting, and ruler density. Keep new rendering behavior out of the server projection, and keep new date semantics out of one-off browser handlers.
+
+## Lifecycle inventory
+
+| Module | State lifetime | Cleanup contract |
+| --- | --- | --- |
+| Workspace controller | Document | No teardown; import once in shell. |
+| Profile controls/editor/viewport/picker | Document/form | No public teardown; initialize once. |
+| Character card | Mounted article and closure | No public teardown; local event handlers leave with nodes. |
+| Card dialog | One open dialog | Close removes DOM/unload listener and restores focus. |
+| Connections map | Returned subtree | No public teardown; interactions belong to subtree. |
+| Question banner | Mounted banner with timers/observers | Returns `{ element, destroy }`; call `destroy()` before replacing. |
+| Dashboard controller | Document plus replaceable rails | Calls previous banner cleanup before rendering new rows. |
+
+Question rotation pauses according to reduced motion, visibility, hover/focus, and explicit controls. It owns timers, animations, an intersection observer, and document/media listeners; omitting `destroy()` leaks work after a dashboard refresh. This explicit cleanup contract is not present on every other initializer.
+
+## Extending without duplicating responsibilities
+
+For a new field, change the entity template/defaults, its renderer and validation, visibility allowlist, and serialization as required. Verify old documents and samples as well as fresh records. Reuse shared field primitives so deep links, choices, date controls, and visibility keep working.
+
+For a new profile type, supply a renderer composed from shared profile functions, an owner-scoped handler, a template, and an appropriate browser adapter. Use `initProfileEditor` only if its assumptions fit the new entity. Add the route before static fallback and let the outer Worker add navigation. Avoid adding a second profile form to an existing page without first removing singleton DOM-ID assumptions.
+
+For a reusable visual component, define its data shape, returned DOM or HTML, state ownership, callbacks, CSS scope, network effects, and cleanup. Put cross-page components under `public/components/`; leave page rails, filtering, loading/errors, and page headings in the host. For a new action that writes, start from a fresh plain document and preserve optimistic concurrency.
+
+Verify server rendering and save/reopen in `tests/profile-standard.test.mjs`, shared navigation in `tests/workspace-shell.test.mjs`, card behavior in `tests/character-cards.test.mjs`, graph math in `tests/connections-map.test.mjs`, notes in `tests/cursor-notes.test.mjs`, and dashboard/search in their dedicated suites. These are Node tests and DOM stubs where used; visual behavior, focus, and responsive layout still need browser verification when those behaviors change.

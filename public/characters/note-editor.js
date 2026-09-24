@@ -4,6 +4,12 @@ import {createNoteConnections} from './note-connections.js';
 import {noteFields,noteMarker,moveNoteAnchors} from './notes.js';
 import {resize} from '../profiles/controls.js?v=worlds-1';
 
+/**
+ * Coordinate authored-note markers, composer, links and the character draft.
+ * Returns a mutable notes array and readyToSave() gate for the parent editor.
+ * Notes persist with the character PUT; nested creation of world entities uses
+ * separate APIs. Initialize once against the profile's notes/field DOM hooks.
+ */
 export function initCharacterNotes(form,initial,markDirty,controls,profileData){
  const notes=initial.map(note=>({...note})),own=document.querySelector('#authored-notes'),mentions=document.querySelector('#mentioned-notes'),empty=document.querySelector('#notes-empty');
  const previous=new Map(noteFields.map(field=>[field,form.elements.namedItem(field)?.value||'']));

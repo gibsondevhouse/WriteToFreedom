@@ -15,6 +15,15 @@ function icon(type){
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
  const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',type==='power'?'M13 2 4 14h7l-1 8 10-13h-7l1-7Z':type==='notes'?'M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5':'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-1a2.5 2.5 0 1 0 0-5M2 20v-3a6 6 0 0 1 12 0v3m2-7a5 5 0 0 1 6 5v2');svg.append(path);return svg;
 }
+/**
+ * Create a reusable article from a rich card record; host owns placement/layout.
+ * No API fetch on construction (image elements may load remotely). Built-in
+ * actions open dialogs and refresh this article's children after successful saves.
+ * onAction replaces that behavior; onUpdate observes built-in saves only.
+ * @param {object} data From dashboard.characters or /api/characters?view=cards.
+ * @param {object} options headingLevel (2 or default 3), tone, onAction, onUpdate.
+ * @returns {HTMLElement} Mounted-state owner; no public update/destroy methods.
+ */
 export function createCharacterCard(data,options={}){
  const record=normalizeCard(data),tone=characterTone(record,options.tone);
  const card=build();

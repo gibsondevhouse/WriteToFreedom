@@ -15,6 +15,16 @@ const iconPaths = {
 };
 function shellIcon(name){return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]}</svg>`;}
 
+/**
+ * Wrap a complete project HTML document once with shared navigation/search.
+ * Pure string transform: no DB, authentication, or browser state. Requires the
+ * normal lowercase head/body closing tags; this is not a general HTML parser.
+ * data-app-shell prevents duplicate injection. Root paths activate Dashboard.
+ * Browser behavior is initialized by the injected workspace scripts.
+ * @param {string} html Full document; fragments without a body pass through.
+ * @param {string} path Request pathname, used only for active navigation.
+ * @returns {string} Decorated HTML, or the unchanged input if already wrapped.
+ */
 export function workspaceShell(html, path) {
   if (!html.includes('<body') || html.includes('data-app-shell')) return html;
   const current = path === '/' || path === '/index.html' ? '/dashboard/' : path;

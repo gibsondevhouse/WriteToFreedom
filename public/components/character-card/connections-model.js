@@ -19,6 +19,7 @@ export function connectionGraph(characters,focusId){
  }
  return {nodes:characters.filter(record=>reached.has(record.id)).map(record=>({id:record.id,name:record.name,href:record.href})),edges:[...edges.values()].filter(edge=>reached.has(edge.source)&&reached.has(edge.target))};
 }
+/** Pure deterministic layout projection; returns new positioned nodes without saving coordinates. */
 export function layoutConnections(graph,focusId){
  const nodes=graph.nodes.map((record,index)=>({...record,x:record.id===focusId?450:450+Math.cos(index*2.39996)*190,y:record.id===focusId?280:280+Math.sin(index*2.39996)*190}));
  const byId=new Map(nodes.map(node=>[node.id,node]));

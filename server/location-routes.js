@@ -1,3 +1,4 @@
+import {locationTemplates} from '../public/locations/template.js';
 import {connectedNotes} from './note-connections.js';
 import {characterCast} from './sample-characters.js';
 import { locationCatalog } from './countries.js';
@@ -5,6 +6,16 @@ import { repository } from './db.js';
 import { locationTypes,areaTypes,parentChoices,requiresParent } from '../public/locations/data.js';
 import { idPattern } from '../public/characters/template.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+/**
+ * Handle exactly /api/locations: GET catalog plus explicit note backlinks, POST
+ * any supported location type, or legacy basic PUTs for types other than country/city.
+ * POST retries an existing owned ID; PUT preserves type and profile content and requires its version.
+ * parentChoices/requiresParent enforce type, ancestry and owner-catalog rules.
+ * No profile HTML or independent country/city document is created here.
+ * @param {Request} request Writes carry id/name/type/parentId and areaType for areas.
+ * @param {{DB: object}} env D1-compatible binding.
+ * @returns {Promise<Response>} JSON record/envelope or error; creation uses 201.
+ */
 export async function locationRoute(request,env){
  const owner=request.headers.get('oai-authenticated-user-id');if(!owner)return json({error:'Sign in to access your locations.'},401);
  try{
@@ -29,7 +40,9 @@ export async function locationRoute(request,env){
   }
   const document={name:input.name.trim().replace(/\s+/g,' '),parentId,...(input.type==='area'?{areaType:input.areaType}:{})};
   if(request.method==='PUT'){
-   const saved=await db.saveLocationDetails(owner,input.id,input.version,document);
+   const template=locationTemplates[existing.type];
+   const preserved=Object.fromEntries([...template.fields,'hiddenFields'].filter(key=>Object.hasOwn(existing,key)).map(key=>[key,existing[key]]));
+   const saved=await db.saveLocationDetails(owner,input.id,input.version,{...preserved,...document});
    return saved?json({...existing,...saved}):json({error:'This location changed in another tab. Close and reopen this editor before saving.'},409);
   }
   const created=await db.createLocation(owner,{id:input.id,type:input.type,...document});

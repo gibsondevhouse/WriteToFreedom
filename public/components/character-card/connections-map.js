@@ -2,6 +2,11 @@ import {connectionGraph,layoutConnections} from './connections-model.js';
 const ns='http://www.w3.org/2000/svg';
 function svgNode(tag,attrs={}){const node=document.createElementNS(ns,tag);for(const [key,value]of Object.entries(attrs))node.setAttribute(key,String(value));return node;}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
+/**
+ * Render an interactive SVG graph from rich card records, scoped to the connected
+ * component containing focusId. Owns local pan/zoom/selection/drag state only;
+ * does not fetch, save relationships, or persist positions. Returns a DOM subtree.
+ */
 export function createConnectionsMap(characters,focusId){
  const graph=layoutConnections(connectionGraph(characters,focusId),focusId),byId=new Map(graph.nodes.map(node=>[node.id,node]));
  const root=el('div','connections-map'),toolbar=el('div','connections-toolbar'),canvas=el('div','connections-canvas'),details=el('aside','connections-detail');details.setAttribute('aria-label','Selected connection');

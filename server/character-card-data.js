@@ -1,3 +1,5 @@
+import {locationTemplates} from '../public/locations/template.js';
+import {locationPaths} from '../public/locations/data.js';
 import {noteTargets} from './note-connections.js';
 import {referenceKey,cleanNoteReference} from '../public/characters/notes.js';
 import {templateSections} from '../public/characters/template.js';
@@ -6,14 +8,20 @@ import {countrySections} from '../public/locations/countries/template.js';
 import {citySections} from '../public/locations/cities/template.js';
 import {ancestors} from '../public/locations/data.js';
 
-const schemas={character:templateSections,faction:factionSections,country:countrySections,city:citySections};
-const paths={character:'/characters/',faction:'/factions/',country:'/locations/countries/',city:'/locations/cities/'};
+const schemas={...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.sections])),character:templateSections,faction:factionSections,country:countrySections,city:citySections};
+const paths={...locationPaths,character:'/characters/',faction:'/factions/'};
 const href=(kind,id)=>paths[kind]+encodeURIComponent(id)+'/';
 function mentionsName(text,name) {
   if (!name?.trim()) return false;
   const escaped=name.trim().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   return new RegExp('(^|[^\\p{L}\\p{N}_])'+escaped+'(?=$|[^\\p{L}\\p{N}_])','iu').test(text);
 }
+/**
+ * Derive display-only card data from owner-scoped catalogs: automatic or featured
+ * affiliation, incoming/outgoing relationships, artwork, ratings and mentions.
+ * No DB/DOM effects. Enriched relationships replace the writable document shape;
+ * consumers must fetch an ordinary character document before editing.
+ */
 export function characterCardDetails(character,{cast,factions,countries,locations,profiles}) {
   const faction=factions.find(f=>f.id===character.factionId);
   const residence=locations.find(l=>l.id===character.residenceId);
@@ -31,6 +39,7 @@ export function characterCardDetails(character,{cast,factions,countries,location
   return {image:character.portraitUrl||'',alignment:character.alignment||'',attributeRatings:character.attributeRatings||{},cardConnection:character.cardConnection||null,defaultAffiliationCard:affiliation,affiliationCard:featured||affiliation,relationships,mentions};
 }
 
+/** Collect own notes (optional), textual name mentions and explicit links with safe profile anchors. */
 export function characterMentions(character,profiles,{includeOwn=true}={}){
   const mentions=[];
   if(includeOwn)for(const note of character.notes||[])mentions.push({source:character.name||'Untitled character',label:'Note',kind:'character',text:note.text,href:href('character',character.id)+'#note-'+note.id});
@@ -49,6 +58,7 @@ export function characterMentions(character,profiles,{includeOwn=true}={}){
 }
 
 // A presentation choice, independent of the character's faction and relationships.
+/** Build available featured-item references from the owner's catalogs; excludes the character itself. */
 export function cardConnectionOptions(character,{cast,factions,locations,countries=[],cities=[]}) {
  return noteTargets(cast,factions,locations).filter(item=>!(item.kind==='character'&&item.id===character.id)).map(item=>{
   const source=item.kind==='character'?cast.find(c=>c.id===item.id):item.kind==='faction'?factions.find(f=>f.id===item.id):item.kind==='location'?[...countries,...cities, ...locations].find(l=>l.id===item.id):null;

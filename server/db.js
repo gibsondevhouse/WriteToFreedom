@@ -7,6 +7,14 @@ async function storageId(owner,id) {
  const hex=hash.map(b=>b.toString(16).padStart(2,'0')).join('');
  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
+/**
+ * Owner-scoped persistence boundary used by routes and catalog aggregators.
+ * Exposes D1 prepared queries and conditional versioned writes; batch operations
+ * keep document/catalog representations together. Does not authenticate requests
+ * or validate domain references: handlers must supply an owner and valid data.
+ * Source samples are merged above this layer; character sample IDs are mapped to
+ * deterministic private storage IDs here. See docs/routing.md for caller contracts.
+ */
 export function repository(binding) {
  if (!binding) throw new Error('Character storage is unavailable.');
  const decode = row => {if(!row)return null;const doc=normalizeCharacter(JSON.parse(row.document));return {...doc,id:doc.sampleId||row.id,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at};};

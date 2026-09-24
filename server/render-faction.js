@@ -1,6 +1,7 @@
 import {renderConnectedNotes} from './note-connections.js';
 import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 import { factionSections, factionTypes, factionStatuses } from '../public/factions/template.js';
+/** Compose faction HTML with cast-derived members and linked notes; no fetching or saving. */
 export function renderFaction(faction,cast){
  const initials=escape((faction.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(n=>n[0]).join('').toUpperCase());
  const field=createFieldRenderer(faction,{options:(key,type)=>type==='character'?cast.map(c=>[c.id,c.name||'Untitled character']):type==='select'?(key==='type'?factionTypes:factionStatuses).map(v=>[v,v]):null,links:{founderId:'/characters/',leaderId:'/characters/'}});

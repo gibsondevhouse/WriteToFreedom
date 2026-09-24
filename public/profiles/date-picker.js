@@ -10,6 +10,12 @@ export function datePickerPlacement(field,card,viewport,width,height){
  const desiredTop=beside?field.top-16:field.bottom+9+height<=bottomEdge?field.bottom+9:field.top-height-9;
  return {left,top:Math.max(topEdge,Math.min(desiredTop,bottomEdge-height))};
 }
+/**
+ * Mount the shared dialog once for this form's data-date-input controls.
+ * Commit dispatches input/change into the profile draft; the owning editor saves.
+ * Cancel preserves the source value. Owns focus, positioning, keyboard handling,
+ * and document-lifetime listeners; there is no independent API write or teardown.
+ */
 export function initDatePicker(form){
  const fields=[...form.querySelectorAll('[data-date-input]')];if(!fields.length)return;
  const today=new Date(),now={year:today.getFullYear(),month:today.getMonth()+1,day:today.getDate()};

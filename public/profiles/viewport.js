@@ -3,6 +3,12 @@ export function sectionAtHeader(tops,edge){
  let index=-1;for(let i=0;i<tops.length;i++)if(Number.isFinite(tops[i])&&tops[i]<=edge)index=i;return index;
 }
 
+/**
+ * Attach sticky-heading tracking to one rendered profile. Reads layout, updates
+ * --profile-header-height/profile-reading, and observes content reflow. Uses
+ * requestAnimationFrame and reduced-motion-aware transitions. No persistence;
+ * listeners and ResizeObserver have document lifetime with no teardown API.
+ */
 export function initProfileViewport(form){
  const bar=form.querySelector('.article-bar'),current=bar?.querySelector('.current-view'),content=form.querySelector('.profile-content'),identity=form.querySelector('.infobox');
  if(!bar||!current||!content||!identity)return;

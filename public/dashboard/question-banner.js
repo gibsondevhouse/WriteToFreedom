@@ -1,4 +1,10 @@
 // The outer banner never moves. Only the non-interactive slide contents roll up.
+/**
+ * Create interleaved profile-question slides using host-supplied DOM/art helpers.
+ * Owns rotation timers, animations, visibility/media listeners and an observer.
+ * @returns {{element: HTMLElement, destroy: Function}} Call destroy before replacing
+ * the banner so background work and document/media subscriptions are released.
+ */
 export function createQuestionBanner(records,{el,tone,initial}){
  const slides=[];
  const prompts=records.map(record=>(record.prompts||[record.question]).filter(Boolean));

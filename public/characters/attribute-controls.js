@@ -3,6 +3,7 @@ import {attributeGroups} from './attributes.js?v=section-attributes-1';
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 
 // Mutates the supplied ratings draft; an empty numeric input leaves an attribute unrated.
+/** Render controls that mutate the supplied ratings draft; caller owns saving and dirty state. */
 export function createAttributeControls(draft,markDirty,selectedGroups=attributeGroups){
   const groups=el('div','attribute-groups');
   for(const group of selectedGroups){

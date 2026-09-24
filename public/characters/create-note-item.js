@@ -1,3 +1,4 @@
+import {locationHref} from '../locations/data.js';
 import {locationTypes,typeLabels,parentChoices,parentTypes,requiresParent,areaTypes} from '../locations/data.js?v=worlds-1';
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 export function createNoteItemButton(initial,connections,addNote){
@@ -42,7 +43,7 @@ export function createNoteItemButton(initial,connections,addNote){
    if(isNote){target=addNote({id:requestId,title:label,text:text.value.trim(),type:kind==='lore'?'lore':'detail'});}
    else if(kind==='character'){const created=await api('/api/characters',{id:requestId,name:label});target={kind:'character',id:created.id,label:created.name,group:'Characters',href:'/characters/'+created.id+'/'};if(!initial.cast.some(c=>c.id===created.id))initial.cast.push({id:created.id,name:created.name});}
    else if(kind==='faction'){const created=await api('/api/factions',{id:requestId,name:label});target={kind:'faction',id:created.id,label:created.name,group:'Factions',href:'/factions/'+created.id+'/'};if(!initial.factions.some(f=>f.id===created.id))initial.factions.push(created);}
-   else {const created=await api('/api/locations',{id:requestId,name:label,type:kind,parentId:parent.disabled?null:parent.value||null,...(kind==='area'?{areaType:area.value}:{})});initial.locations||=[];if(!initial.locations.some(l=>l.id===created.id))initial.locations.push(created);target={kind:'location',id:created.id,label:created.name,group:'Places',detail:typeLabels[created.type],href:['country','city'].includes(created.type)?'/locations/'+(created.type==='country'?'countries':'cities')+'/'+created.id+'/':'/locations/#location-'+created.id};}
+   else {const created=await api('/api/locations',{id:requestId,name:label,type:kind,parentId:parent.disabled?null:parent.value||null,...(kind==='area'?{areaType:area.value}:{})});initial.locations||=[];if(!initial.locations.some(l=>l.id===created.id))initial.locations.push(created);target={kind:'location',id:created.id,label:created.name,group:'Places',detail:typeLabels[created.type],href:locationHref(created)};}
   }catch(e){error.textContent=e.message;error.hidden=false;}
   finally{saving=false;fields.disabled=false;back.disabled=false;save.disabled=false;save.textContent='Create and insert';}
   if(target){dialog.close();connections.insertCreated(target);}

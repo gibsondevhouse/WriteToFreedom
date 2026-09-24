@@ -1,6 +1,8 @@
 export const locationTypes=['universe','galaxy','solar-system','planet','moon','continent','country','city','area','landmark'];
 export const typeLabels={universe:'Universe',galaxy:'Galaxy','solar-system':'Solar system',planet:'Planet',moon:'Moon',continent:'Continent',country:'Country',city:'City',area:'Area',landmark:'Landmark'};
 export const typePlurals={universe:'Universes',galaxy:'Galaxies','solar-system':'Solar systems',planet:'Planets',moon:'Moons',continent:'Continents',country:'Countries',city:'Cities',area:'Areas',landmark:'Landmarks'};
+export const locationPaths=Object.fromEntries(locationTypes.map(type=>[type,'/locations/'+typePlurals[type].toLowerCase().replaceAll(' ','-')+'/']));
+export const locationHref=place=>locationPaths[place.type]+encodeURIComponent(place.id)+'/';
 export const parentTypes={universe:[],galaxy:['universe'],'solar-system':['galaxy'],planet:['solar-system'],moon:['planet'],continent:['planet','moon'],country:['continent','planet','moon'],city:['country'],area:['city','area'],landmark:['city','area']};
 export const requiresParent=type=>['city','area','landmark'].includes(type);
 export const seedLocations=[

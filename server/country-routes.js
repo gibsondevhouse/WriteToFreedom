@@ -6,6 +6,17 @@ import {countryHideableFields,countryFields,countryImageFields,validImageUrl} fr
 import {characterCast} from './sample-characters.js';
 import {renderCountry} from './render-country.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+/**
+ * Serve existing country profiles at /locations/countries/id/ (GET/HEAD HTML)
+ * and /api/countries/id (GET/PUT JSON). Both forms use path segment 3 as ID.
+ * Resolve a country location before method dispatch; overlay saved fields on
+ * defaults. PUT validates optional world parent, local capital/largest city,
+ * leader, images and visibility, then saves with an optimistic version and a
+ * guarded catalog rename/reparent. Create countries through /api/locations.
+ * @param {Request} request Identity required; PUT additionally needs same-origin JSON.
+ * @param {{DB: object}} env D1-compatible binding.
+ * @returns {Promise<Response>} Expected errors are JSON; processing failures are 503.
+ */
 export async function countryRoute(request,env){
  const url=new URL(request.url),id=url.pathname.split('/')[3],profile=url.pathname.startsWith('/locations/'),owner=request.headers.get('oai-authenticated-user-id');
  if(!owner)return json({error:'Sign in to access your countries.'},401);

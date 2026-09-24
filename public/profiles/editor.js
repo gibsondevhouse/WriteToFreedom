@@ -1,7 +1,17 @@
+import {locationHref} from '../locations/data.js';
 import {initProfileControls,resize} from './controls.js?v=profile-reading-1';
 
 // Entity adapters supply only their field names, endpoint, and image constraints.
-export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],validImageUrl=()=>false}){
+/**
+ * Page-lifetime save controller for faction and location profile adapters.
+ * Assumes one shared profile form and all configured fields/preview hooks exist.
+ * Holds dirty/saving/version state, commits choices, PUTs the allowlisted fields
+ * and hiddenFields, and retains drafts on failure. Installs Ctrl/Cmd+S and an
+ * unload warning; returns no teardown/controller. Character saving is separate.
+ * @param {object} config fieldNames, endpoint, type, optional imageFields/validImageUrl and onSaved(data).
+ * @returns {void}
+ */
+export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],validImageUrl=()=>false,onSaved=()=>{}}){
  const form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields'),save=document.querySelector('#save-character'),status=document.querySelector('#save-status'),error=document.querySelector('#editor-error');
  let version=Number(form.dataset.version),dirty=false,saving=false;
  function update(){
@@ -23,8 +33,9 @@ export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],valid
    if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Copy your changes before reloading to sign in again.');
    const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save. Please try again.');
    version=data.version;dirty=false;form.elements.namedItem('name').value=data.name;update();
-   const country=form.elements.namedItem('parentId');if(country)document.querySelectorAll('[data-country-link]').forEach(link=>{link.href='/locations/countries/'+data.parentId+'/';link.textContent=country.selectedOptions[0]?.textContent||'Country';});
+   const country=form.elements.namedItem('parentId');if(country)document.querySelectorAll('[data-country-link]').forEach(link=>{link.href=locationHref({type:'country',id:data.parentId});link.textContent=country.selectedOptions[0]?.textContent||'Country';});
    status.textContent='Saved';
+   onSaved(data);
   }catch(e){error.hidden=false;error.textContent=e.message;status.textContent='Not saved — your changes are still here';}
   finally{saving=false;fields.disabled=false;save.disabled=false;}
  });

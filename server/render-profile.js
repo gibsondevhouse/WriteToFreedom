@@ -6,6 +6,13 @@ import { characters as seeds } from '../public/characters/data.js';
 import { templateSections, nameFields, storyRoles, alignments, humanFieldGroups, humanFields, humanChoices } from '../public/characters/template.js';
 import {escape,renderChoice,renderDateControl,renderFieldWrapper,renderSection,renderInfoGroup,renderProfileName,renderProfilePage} from './profile-components.js';
 export {escape} from './profile-components.js';
+/**
+ * Compose the character article from shared profile primitives plus specialized
+ * relationships, attributes and authored notes. Inputs are owner-scoped by the
+ * route. Initial JSON supplies the character, choices and note targets/backlinks
+ * to profile-editor.js; external mentions exclude own notes to avoid duplication.
+ * Returns HTML only: persistence and outer workspace navigation belong elsewhere.
+ */
 export function renderProfile(character, cast, factions=[],locations=[],notes=[]) {
  const color=seeds.find(c=>c.id===character.id)?.color||'blue';
  const initials=escape(character.name.trim().split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?');

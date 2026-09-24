@@ -7,6 +7,17 @@ import { idPattern } from '../public/characters/template.js';
 import { characterCast } from './sample-characters.js';
 import { renderFaction } from './render-faction.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+/**
+ * Handle /api/factions[/id] and /factions/id/: owner-scoped collection/item GET,
+ * HTML GET/HEAD, idempotent blank or name-deduplicated POST, and versioned PUT.
+ * Loads the catalog before method dispatch. Writes require same-origin JSON,
+ * validate founder/leader IDs and unique names, then batch profile/catalog writes.
+ * Expected failures return JSON; a missing HTML profile returns text. Storage
+ * exceptions become 503. The outer Worker injects the shared HTML shell.
+ * @param {Request} request ID is segment 2 for HTML and segment 3 for JSON.
+ * @param {{DB: object}} env D1-compatible binding; identity comes from the header.
+ * @returns {Promise<Response>}
+ */
 export async function factionRoute(request,env){
  const url=new URL(request.url),profile=url.pathname.startsWith('/factions/'),id=url.pathname.split('/')[profile?2:3];
  const owner=request.headers.get('oai-authenticated-user-id');if(!owner)return json({error:'Sign in to access your factions.'},401);

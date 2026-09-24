@@ -20,7 +20,7 @@ test('timeline parses explicit date precision, leap years, approximations and BC
  for(const text of ['1900-02-29','1984-02-30','1984-00-12','1984-13-01','1984-01-00','0 BCE','-44 BCE','03/04/05','14 Harvest, 112','late 1700s','May 12','Jan 1','1880–1890','April 31, 1984','',null,'999999999'])assert.equal(parseStoryDate(text),null,String(text));
 });
 test('seed timeline stays empty, owner identity is required and endpoint is read-only',async()=>{
- const req=setup(),response=await req('/api/timeline');assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');const data=await response.json();assert.deepEqual(data.events,[]);assert.deepEqual(data.unplaced,[]);assert.equal(data.undated,10);
+ const req=setup(),response=await req('/api/timeline');assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');const data=await response.json();assert.deepEqual(data.events,[]);assert.deepEqual(data.unplaced,[]);assert.equal(data.undated,13);
  assert.equal((await req('/api/timeline','GET',undefined,null)).status,401);assert.equal((await req('/api/timeline','POST',{})).status,405);
  assert.equal((await req('/timeline/')).status,200);assert.equal((await req('/timeline')).status,308);
 });

@@ -3,6 +3,16 @@ import {initDatePicker} from './date-picker.js?v=profile-reading-1';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
+/**
+ * Initialize one profile form for the lifetime of its document: choices,
+ * disclosures, visibility, validation/hash reveal, dates and reading viewport.
+ * markDirty belongs to the owning editor; nationalityContinents is its mutable
+ * draft map. No requests are issued here. Global listeners have no teardown API.
+ * @param {HTMLFormElement} form Shared server-rendered profile form.
+ * @param {Function} markDirty Notify the editor of a draft mutation.
+ * @param {object} options Name focus field and custom nationality assignments.
+ * @returns {object} choiceValues Map, commitChoices(), hiddenFields(), revealAncestors().
+ */
 export function initProfileControls(form,markDirty,{nameField="name",nationalityContinents={}}={}){
 initDatePicker(form);
 const pendingChoiceEditors=[],choiceValues=new Map();

@@ -4,6 +4,12 @@ Write to Freedom is a novel-planning and worldbuilding application for maintaini
 
 This README is the developer entry point: it describes how to run the project, how requests and data move through it, which modules own each behavior, and the constraints to preserve when extending it.
 
+For detailed implementation contracts, use these companion references:
+
+- [Routing and request contracts](docs/routing.md): dispatch precedence, handler annotations, projections, validation/write boundaries, redirects, and method differences.
+- [Component boundaries and extension contracts](docs/components.md): shared renderers, DOM hooks, browser adapters, state and cleanup ownership, cards, notes, and workspace navigation.
+- [Character-card integration](public/components/character-card/README.md): component usage, data shape, styling, callbacks, and featured-item behavior.
+
 ## Contents
 
 - [Current scope](#current-scope)
@@ -26,15 +32,16 @@ This README is the developer entry point: it describes how to run the project, h
 
 The implemented application includes:
 
-- **Characters:** searchable and sortable directory, blank character creation, editable article profiles, structured identity fields, relationships, faction selection, and location references.
+- **Dashboard and workspace:** overview rails, rotating open questions, shared navigation, and catalog search across characters, factions, and locations.
+- **Characters:** searchable and sortable card directory, blank or named creation, editable profiles, structured identity, relationships, attributes and derived power, portrait artwork, faction/location references, authored notes, and featured card items.
 - **Factions:** directory, blank or named creation, editable profiles, character-linked founders and leaders, and membership derived from character faction selections.
-- **Locations:** combined country/city/area/landmark directory, search and type filters, nested ancestry, editable country and city profiles, and a directory editor for areas and landmarks.
+- **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types.
 - **Timeline:** read-only visualization of saved profile dates, with filtering, pan/zoom controls, clustering, and links back to the source fields.
 - **Shared profile controls:** explicit saving, version conflict handling, field visibility, collapsible sections, custom dropdown values where supported, and a precision-aware date picker.
 
-Dashboard, Story Arcs, Chapters, Scenes, Story Beats, Lore, home-page global search, and Explore your novel are disabled placeholders. Areas and landmarks do not yet have standalone article profiles. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
+Story Arcs, Chapters, Scenes, Story Beats, and the standalone Lore module remain upcoming. Lore entries can already be authored as linked character notes. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
 
-The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The home-page artwork includes an original African-inspired white SVG crest in `public/crest.svg`.
+The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding includes an original African-inspired white SVG crest in `public/crest.svg`.
 
 ## Local setup
 
@@ -54,6 +61,7 @@ npm run dev
 
 Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Useful entry points are:
 
+- [Dashboard](http://127.0.0.1:4173/dashboard/)
 - [Characters](http://127.0.0.1:4173/characters/)
 - [Factions](http://127.0.0.1:4173/factions/)
 - [Locations](http://127.0.0.1:4173/locations/)
@@ -116,9 +124,13 @@ Tests import server and shared source modules directly, so they do not require a
 ├── drizzle/                     # Ordered SQL migrations and generator metadata
 ├── drizzle.config.ts            # SQLite dialect, schema path, migration output
 ├── public/
-│   ├── index.html               # Home page and feature entry points
-│   ├── styles.css               # Home-page styling
-│   ├── crest.svg                # Home-page artwork
+│   ├── index.html               # Root dashboard entry document
+│   ├── styles.css               # Root entry styling
+│   ├── crest.svg                # Shared branding
+│   ├── workspace-shell.css      # Shared sidebar/topbar layout
+│   ├── workspace-state.js       # Early device-preference restoration
+│   ├── dashboard/               # Overview rails, questions, shell search/controller
+│   ├── components/character-card/ # Canonical card, dialogs, graph and styles
 │   ├── characters/              # Directory, templates, seeds, character editor
 │   ├── factions/                # Directory, template, profile adapter/styles
 │   ├── locations/               # Directory, hierarchy helpers, location editor
@@ -131,7 +143,11 @@ Tests import server and shared source modules directly, so they do not require a
 │   ├── dev.mjs                  # Node HTTP server and local migration runner
 │   └── sqlite-adapter.mjs       # D1-shaped adapter over Node SQLite
 ├── server/
-│   ├── app.js                   # Worker factory, routing, character API, assets
+│   ├── app.js                   # Outer shell wrapper, dispatcher, character API/assets
+│   ├── workspace-shell.js       # Shared HTML navigation wrapper
+│   ├── dashboard-routes.js      # Dashboard API and reusable data projection
+│   ├── character-card-data.js   # Card affiliations, connections and mentions
+│   ├── note-connections.js      # Note targets, backlinks and reference validation
 │   ├── db.js                    # Owner-scoped repository and versioned writes
 │   ├── *-routes.js              # Faction, location, country, city, timeline APIs
 │   ├── render-*.js              # Entity-specific server-rendered profiles
@@ -140,6 +156,7 @@ Tests import server and shared source modules directly, so they do not require a
 │   ├── factions.js              # Faction catalog and affiliation resolution
 │   ├── countries.js             # Location catalog and default country profiles
 │   └── cities.js                # Default city profiles
+├── docs/                        # Detailed routing and component contracts
 ├── tests/                       # Node tests for routes, persistence and models
 ├── package.json
 └── package-lock.json
@@ -159,7 +176,7 @@ Browser modules remain individual served assets. They are not separately transpi
 
 ### Request flow
 
-`server/app.js` exports `createWorker(assets)`, which returns an object with `fetch(request, env)`:
+`server/app.js` exports `createWorker(assets)`, whose `fetch(request, env, ctx)` wraps the internal `createAppWorker` dispatcher. The inner dispatcher performs these steps:
 
 1. Match dynamic profile routes, API routes, and compatibility redirects.
 2. Resolve the authenticated owner for private routes.
@@ -167,7 +184,9 @@ Browser modules remain individual served assets. They are not separately transpi
 4. Return server-rendered profile HTML or JSON.
 5. For other paths, serve an embedded asset or return a not-found response.
 
-Directory pages are static HTML shells with browser scripts that fetch their catalogs. Character, faction, country, and city profiles are rendered by the Worker with their current content and choices, then enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the editor.
+The outer Worker then decorates non-HEAD HTML responses with `workspaceShell`, preserving status and headers except the now-invalid content length. JSON and other responses pass through. The wrapper is idempotent for HTML already marked `data-app-shell`. See [dispatch order and edge cases](docs/routing.md#dispatch-order-is-part-of-the-contract) before adding routes; path strictness and HEAD handling are not uniform across handlers.
+
+Directory pages are static HTML shells with browser scripts that fetch their catalogs. Character, faction, and all ten location profiles are rendered by the Worker with their current content and choices, then enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the editor.
 
 Static assets use `Cache-Control: no-cache`; private JSON responses and successful dynamic profile responses use `Cache-Control: no-store`. Rendered text is escaped through the server rendering code. Preserve those boundaries when adding fields or new markup.
 
@@ -210,7 +229,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 | `locations` | Private place names, types, direct parents, creation times | Primary ID and owner scope. |
 | `country_profiles` | Editable country JSON documents | Unique owner/location pair and integer version. |
 | `city_profiles` | Editable city JSON documents, including country selection | Unique owner/location pair and integer version. |
-| `location_details` | Area/landmark overrides, including name, parent and area type | Unique owner/location pair and integer version. |
+| `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair and integer version. |
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
 
@@ -252,7 +271,8 @@ The local migration runner executes `.sql` files in filename order and records a
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Home page. |
+| `/` | Root dashboard entry. |
+| `/dashboard/` | Dashboard overview; shared navigation/search is injected into all HTML pages. |
 | `/characters/` | Character directory. |
 | `/characters/{id}/` | Editable character article. |
 | `/factions/` | Faction directory. |
@@ -269,23 +289,28 @@ Use canonical trailing-slash page URLs. The router redirects supported noncanoni
 | Method | Endpoint | Request / response contract |
 | --- | --- | --- |
 | `GET` | `/api/characters` | Returns `{ characters: [...] }`, merging samples and private records. |
-| `POST` | `/api/characters` | Accepts `{ id }`; creates and returns a blank character with `201`. Other character fields are saved through `PUT`. |
-| `GET` | `/api/characters/{id}` | Returns one character document. |
-| `PUT` | `/api/characters/{id}` | Accepts editable character fields, `relationships`, `hiddenFields`, and `version`; returns the saved document. |
+| `POST` | `/api/characters` | Accepts `{ id, name? }`; creates a blank or initially named character with `201`. Other character fields are saved through `PUT`. |
+| `GET` | `/api/characters?view=cards` | Returns rich shared-card records; enriched relationships are display data, not a writable document. |
+| `GET` | `/api/characters/{id}` | Returns one editable character document. |
+| `GET` | `/api/characters/{id}?view=connections` | Returns `{ character, defaultAffiliationCard, options }` for the featured-item picker. |
+| `PUT` | `/api/characters/{id}` | Accepts editable fields, required `relationships` and `version`, plus notes, ratings, custom nationality assignments, featured-item reference, and visibility; returns the saved document. |
 | `GET` | `/api/factions` | Returns `{ factions: [...] }`. |
 | `POST` | `/api/factions` | Accepts `{ id, blank: true }` or `{ id, name }`; returns the new or matching faction with `201`. |
 | `GET` | `/api/factions/{id}` | Returns one faction document. |
 | `PUT` | `/api/factions/{id}` | Accepts editable faction fields, visibility, and `version`; returns the saved document. |
-| `GET` | `/api/locations` | Returns `{ locations: [...] }` with direct parent IDs and merged overrides. |
+| `GET` | `/api/locations` | Returns `{ locations: [...] }` with direct parents, merged overrides, and explicit linked-note backlinks. |
 | `POST` | `/api/locations` | Accepts `{ id, name, type, parentId }`, plus `areaType` for areas; returns the created record with `201`. |
-| `PUT` | `/api/locations` | Updates an area or landmark using its `id`, `name`, unchanged `type`, `parentId`, and `version`; areas also require `areaType`. |
+| `PUT` | `/api/locations` | Legacy basic updates for types other than country/city; uses `id`, `name`, unchanged `type`, `parentId`, and `version` (plus `areaType` for areas), preserving richer profile content. |
+| `GET` | `/api/locations/{id}` | Returns a full profile for the eight types other than country/city, with derived `{ id, name, href }` ancestry entries. |
+| `PUT` | `/api/locations/{id}` | Saves template fields, visibility, and `version`; returns the saved profile and refreshed ancestry. |
 | `GET` | `/api/countries/{id}` | Returns the country profile for an existing country location. |
 | `PUT` | `/api/countries/{id}` | Saves editable country fields, visibility, and `version`. |
 | `GET` | `/api/cities/{id}` | Returns the city profile for an existing city location. |
 | `PUT` | `/api/cities/{id}` | Saves editable city fields, required country `parentId`, visibility, and `version`. |
+| `GET` | `/api/dashboard` | Returns `{ questions, characters, factions, locations, timeline }`; also supplies shell search. |
 | `GET` | `/api/timeline` | Returns `{ events, unplaced, undated, counts }`; derives data on each request. |
 
-Country and city creation goes through `/api/locations`; their profile endpoints handle reads and updates. There are no separate country/city collection creation routes. Use the entity templates for exact field lists rather than maintaining a second schema in client code.
+All location creation goes through `/api/locations`; profile endpoints handle reads and updates. There are no separate country/city collection creation routes. Use the entity templates for exact field lists rather than maintaining a second schema in client code.
 
 ### Local API examples
 
@@ -325,9 +350,9 @@ API errors generally return JSON in the form `{ "error": "Human-readable message
 | `413` | Request text exceeds the route's size limit. |
 | `503` | Storage or route processing failed; inspect server logs for the underlying error. |
 
-Current request-body limits are 180,000 characters for characters, 250,000 for factions, 550,000 for country/city profiles, and 4,096 for location directory mutations. These checks use JavaScript string length after reading the body; they are not byte-accurate transport limits.
+Current request-body limits are 180,000 characters for characters, 250,000 for factions, 550,000 for location profiles, and 4,096 for location directory mutations. These checks use JavaScript string length after reading the body; they are not byte-accurate transport limits.
 
-Most profile text fields allow up to 10,000 characters, name fields up to 160, and country/city image URLs up to 2,048. Character relationships are capped at 100 entries. Validation is entity-specific; the route handlers remain the authority for precise rules.
+Most profile text fields allow up to 10,000 characters, name fields up to 160, and location image URLs up to 2,048. Character relationships are capped at 100 entries. Validation is entity-specific; the route handlers remain the authority for precise rules.
 
 ## Domain rules
 
@@ -343,11 +368,23 @@ A character's `factionId` is the structured faction link. Displayed affiliation 
 
 Faction founders and leaders link to characters. Membership is derived from character faction selections rather than maintained as an independent membership list. Named faction creation trims and normalizes whitespace and compares names using Unicode NFKC normalization and locale-aware lowercasing.
 
+### Character cards, attributes, and notes
+
+Dashboard and directory cards use the canonical component in `public/components/character-card/`. The server supplies artwork, incoming/outgoing connections, mentions, and a featured item through shared projections. Card dialogs fetch a fresh ordinary character document before editing so enriched display fields never replace the saved relationship schema. Attribute ratings determine power at read/render time; power is not stored independently.
+
+Characters can own structured notes with source markers, linked world items, and note/lore types. Notes save in the character document, while character/faction/location creation from a note composer persists the new entity immediately. `cardConnection` is a presentation choice independent of faction membership and citizenship. See the [component guide](docs/components.md) for state ownership, note anchors, and save boundaries.
+
 ### Location hierarchy
 
 | Type | Allowed direct parent | Additional constraints |
 | --- | --- | --- |
-| Country | None | `parentId` is null/empty. |
+| Universe | None | Parent is empty. |
+| Galaxy | Universe | Parent is optional. |
+| Solar system | Galaxy | Parent is optional. |
+| Planet | Solar system | Parent is optional. |
+| Moon | Planet | Parent is optional. |
+| Continent | Planet or moon | Parent is optional. |
+| Country | Continent, planet, or moon | Parent is optional. |
 | City | Country | A country is always required. |
 | Area | City or area | Requires `areaType`; cannot point to itself or its descendants. |
 | Landmark | City or area | Inherits city/country through its ancestors. |
@@ -358,11 +395,11 @@ Moving an area changes the ancestry of everything beneath it without changing ea
 
 Countries may designate a capital and largest city only from their own cities. A city currently designated as either cannot move to another country until those references are changed on the original country profile. Country and city leaders must refer to available characters.
 
-Country and city profiles accept optional HTTPS image URLs for their supported image fields. The browser loads those remote images; the application does not upload image files or persist them in R2. Invalid URLs are rejected, and failed previews retain the editable field with feedback.
+All location profiles accept optional HTTPS image URLs for their supported image fields. The browser loads those remote images; the application does not upload image files or persist them in R2. Invalid URLs are rejected, and failed previews retain the editable field with feedback.
 
 ## Shared profile system
 
-The character profile is the design baseline for characters, factions, countries, and cities. Extend the shared components before copying markup or implementing another set of controls.
+The character profile is the design baseline for characters, factions, and all location types. Extend the shared components before copying markup or implementing another set of controls.
 
 | Module | Responsibility |
 | --- | --- |
@@ -371,7 +408,7 @@ The character profile is the design baseline for characters, factions, countries
 | `public/profiles/editor.css` | Shared editable fields, save controls, and editor presentation. |
 | `public/profiles/controls.js` | Disclosures, field visibility, custom choices, focus, validation reveal, textarea sizing, hash navigation. |
 | `public/profiles/viewport.js` | Active-heading tracking for the sticky article bar. |
-| `public/profiles/editor.js` | Shared faction/country/city saving and image previews. |
+| `public/profiles/editor.js` | Shared faction/location saving and image previews, with an optional `onSaved` callback. |
 | `public/profiles/choices.js` | Reusable dropdown suggestions. |
 | `public/profiles/schema.js` | Field visibility allowlists and validation helpers. |
 | `public/profiles/dates.js` | Story-date parsing, formatting, precision, and calendar arithmetic. |
@@ -379,17 +416,17 @@ The character profile is the design baseline for characters, factions, countries
 | Entity `template.js` files | Entity field lists, defaults, options, and visibility definitions. |
 | Entity renderers and profile scripts | Domain-specific composition and editor configuration. |
 
-The character editor in `public/characters/profile-editor.js` uses the shared controls while retaining specialized relationship and inline faction-creation behavior. Faction, country, and city profile scripts configure `initProfileEditor`. The old character profile CSS paths are compatibility imports of the shared styles.
+The character editor in `public/characters/profile-editor.js` uses the shared controls while retaining specialized relationship and inline faction-creation behavior. Faction, country, city, and the shared location profile script configure `initProfileEditor`. The old character profile CSS paths are compatibility imports of the shared styles.
 
 ### Interaction and layout contract
 
-All four profile types share breadcrumb-only navigation, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus.
+Inside the shared workspace shell, all twelve profile types share profile breadcrumbs, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus.
 
 Field visibility is persisted as `hiddenFields` independently of the content values. Hidden fields and collapsed controls remain mounted, and their values survive saving and reopening. Collapsing a section is temporary page state; it must not delete fields or silently alter their visibility preference. Hash navigation and validation should reveal the relevant controls when necessary.
 
 On wide screens, the attributes card pins below the save bar and scrolls independently. The bar displays the last article heading to cross its lower edge, with a brief upward transition that respects reduced-motion preferences. Narrow layouts use a single page scroll. Footer links stay in the article column, and the sticky boundary extends through the footer.
 
-Saving is explicit through Save changes or Ctrl/Cmd+S. Editors disable relevant controls while a save is in flight, retain unsaved text on errors, and register a navigation warning when dirty. Browser storage is not the source of truth, and the warning is not a durable draft backup.
+Saving is explicit through Save changes or Ctrl/Cmd+S. Editors disable relevant controls while a save is in flight, retain unsaved text on errors, and register a navigation warning when dirty. Browser storage is not the source of truth for novel content, and the warning is not a durable draft backup. The desktop sidebar collapse preference does use localStorage; mobile navigation state is temporary.
 
 ## Story dates and timeline
 
@@ -418,6 +455,14 @@ The date picker supports Day, Month, Quarter, Half-year, and Year selection, dir
 
 The fixed-size glass card opens beside its source infobox when space permits, dims surrounding content while keeping the source card readable, and stays within the viewport on smaller screens. Preserve keyboard behavior, focus restoration, and coarse-date precision when changing it.
 
+### Shared location templates
+
+`public/locations/template.js` defines the eight profiles other than country/city: universes, galaxies, solar systems, planets, moons, continents, areas, and landmarks. Each definition supplies tailored infobox facts, article sections, image fields, visibility allowlists, and explicit timeline date mappings. All share overview, etymology, history, present circumstances, story significance, open questions, images, ancestry, immediate-child lists, and linked notes.
+
+`server/render-location.js`, `server/location-profile-routes.js`, and `public/locations/profile.js` provide one renderer, handler, and editor adapter. Pages use `/locations/{plural-type}/{id}/` (`solar-systems` for solar systems); country/city paths remain unchanged. `locationPaths` and `locationHref` in `public/locations/data.js` are the common URL source for all ten types. The directory opens a profile after creation and links every row to its profile; legacy directory anchors still work.
+
+These profiles reuse `location_details`; no new table or migration is required. Existing basic records receive blank template defaults on read. Full-profile and legacy directory writes share one version counter, and legacy updates preserve article text and visibility. The profile endpoint keeps IDs/types immutable, validates existing parent rules and cycles, and returns refreshed ancestry after saving. The editor updates ancestry links without reloading or clearing the saved form. `GET /api/locations` includes saved detail content in its owner-scoped catalog; `GET /api/locations/{id}` supplies a complete defaulted profile.
+
 ### Derived events
 
 `GET /api/timeline` reads the owner's catalogs and calls `collectTimeline` in `public/timeline/model.js`.
@@ -428,6 +473,12 @@ The fixed-size glass card opens beside its source infobox when space permits, di
 | Faction | `founded` |
 | Country | `founded`, `populationDate` when `population` is present |
 | City | `settled`, `incorporated`, `populationDate` when `population` is present |
+| Universe | `formed` |
+| Galaxy / solar system | `formed`, `discovered` |
+| Planet / moon | `formed`, `discovered`, `populationDate` when `population` is present |
+| Continent | `populationDate` when `population` is present |
+| Area | `founded`, `populationDate` when `population` is present |
+| Landmark | `founded`, `abandoned`, `restored` |
 
 There is no timeline table, synchronization job, or timeline write endpoint. An edit or cleared date is reflected on the next read. Event IDs derive from entity type, entity ID, and source field, and links target that field's profile anchor. `undated` counts records without qualifying nonempty source dates; `unplaced` retains qualifying dates the parser cannot position.
 
@@ -441,11 +492,19 @@ The suite uses the built-in Node test runner and strict assertions. Database-bac
 
 | Test file | Main coverage |
 | --- | --- |
+| `tests/workspace-shell.test.mjs` | Shared shell injection, sidebar preferences, mobile/desktop navigation behavior. |
+| `tests/dashboard.test.mjs` | Owner-scoped overview projection, cards, questions, and derived events. |
+| `tests/dashboard-search.test.mjs` | Catalog search semantics. |
+| `tests/character-cards.test.mjs` | Shared cards, projections, actions, artwork, ratings, featured items. |
+| `tests/connections-map.test.mjs` | Connection graph derivation and layout. |
+| `tests/cursor-notes.test.mjs` | Authored notes, source anchors, links, and composer behavior. |
+| `tests/world-locations.test.mjs` | Extended world hierarchy, optional parents, country ancestry and custom nationality continents. |
 | `tests/characters.test.mjs` | Creation/retry behavior, ownership, relationships, normalization, sample overrides, validation, rendering, visibility. |
 | `tests/factions.test.mjs` | Profile persistence, ownership, founder/leader links, renames, membership, escaping. |
 | `tests/locations.test.mjs` | Location creation, hierarchy, parent validation, ownership, filters. |
 | `tests/areas.test.mjs` | Nested ancestry, area moves, sample overrides, cycle prevention. |
 | `tests/countries.test.mjs` | Country profiles, private edits, city references, conflicts, image validation. |
+| `tests/location-profiles.test.mjs` | All eight shared location templates, ownership, save/reopen, versions, legacy preservation, hierarchy, images, notes, search, and timeline integration. |
 | `tests/cities.test.mjs` | City profiles, required countries, moves, capital restrictions, images, conflicts. |
 | `tests/profile-standard.test.mjs` | Shared markup and visibility/save/reopen behavior across profile types. |
 | `tests/profile-viewport.test.mjs` | Sticky-heading selection and date picker viewport placement. |
@@ -478,7 +537,7 @@ Wire the route in `createWorker`, add request-level tests using the existing fix
 
 ### Change shared profile behavior
 
-Start with `server/profile-components.js` and `public/profiles/`. Check the change against all four profile types, including the specialized character editor. Keep domain-specific behavior in adapters: faction membership remains derived, countries constrain city selections, cities require countries, and area/landmark ancestry remains intact.
+Start with `server/profile-components.js` and `public/profiles/`. Check the change against all twelve profile types, including the specialized character editor. Keep domain-specific behavior in adapters: faction membership remains derived, countries constrain city selections, cities require countries, and area/landmark ancestry remains intact.
 
 ### Extend timeline behavior
 
@@ -516,5 +575,5 @@ The local SQLite adapter does not verify hosted authentication, D1 provisioning,
 | Existing local database lacks a schema change | Generate a new migration if needed and restart the server; changing an old migration does not replay it. |
 | Timeline is empty | Samples have no invented dates. Save a supported story date in a mapped profile field. |
 | A saved date is absent from the placed timeline | Check Unplaced dates and the supported parser forms; population dates also require a population value. |
-| A country/city image does not display | Check the HTTPS URL and remote resource; a valid URL can still fail to load. |
+| A location image does not display | Check the HTTPS URL and remote resource; a valid URL can still fail to load. |
 | A newly added binary file is corrupted or has the wrong MIME type | Extend the text-only asset pipeline before serving binary assets. |

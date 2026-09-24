@@ -36,9 +36,9 @@ test('dashboard follows saved names, questions, factions and dates while keeping
  const current=await(await request('/api/characters/claude')).json();await request('/api/characters/claude','PUT',{...current,hiddenFields:['questions']});
  const hidden=await(await request('/api/dashboard')).json();assert.equal(hidden.questions.find(r=>r.id==='claude').question,'Who kept the letter?');assert.equal(hidden.questions.find(r=>r.id==='claude').href,'/characters/claude/');
 });
-test('nested location cards use full ancestry and link to existing editors without fabricated profile content',()=>{
+test('nested location cards use full ancestry and link to full profiles without fabricated profile content',()=>{
  const locations=[{id:'us',name:'United States',type:'country',parentId:null},{id:'nyc',name:'New York City',type:'city',parentId:'us'},{id:'manhattan',name:'Manhattan',type:'area',parentId:'nyc',areaType:'Borough'},{id:'harlem',name:'Harlem',type:'area',parentId:'manhattan',areaType:'Neighborhood'},{id:'rucker',name:'Rucker Park',type:'landmark',parentId:'harlem'}];
  const data=dashboardData({characters:[],factions:[],locations,countries:[],cities:[]}),park=data.locations.at(-1);
- assert.equal(park.parent,'United States / New York City / Manhattan / Harlem');assert.equal(park.href,'/locations/#location-rucker');assert.equal(park.summary,undefined);
+ assert.equal(park.parent,'United States / New York City / Manhattan / Harlem');assert.equal(park.href,'/locations/landmarks/rucker/');assert.equal(park.summary,'');
  assert.ok(data.questions.every(r=>r.kind==='character'));assert.ok(!data.locations.some(r=>r.image));
 });

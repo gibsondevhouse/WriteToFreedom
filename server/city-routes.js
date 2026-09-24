@@ -6,6 +6,17 @@ import {cityHideableFields,cityFields,cityImageFields,validImageUrl} from '../pu
 import {characterCast} from './sample-characters.js';
 import {renderCity} from './render-city.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+/**
+ * Serve /locations/cities/id/ HTML (GET/HEAD) or /api/cities/id JSON (GET/PUT).
+ * Resolve an owned/catalog city first; choose its saved profile or default.
+ * PUT rejects stale/negative versions, requires a valid country, validates
+ * leader/images/visibility, and prevents moving a designated capital/largest
+ * city until the original country's references are cleared. Repository save
+ * batches the profile write with its catalog name/parent update.
+ * @param {Request} request Both route forms place the ID at path segment 3.
+ * @param {{DB: object}} env D1-compatible binding.
+ * @returns {Promise<Response>} JSON or HTML; creation is handled by locationRoute.
+ */
 export async function cityRoute(request,env){
  const url=new URL(request.url),id=url.pathname.split('/')[3],profile=url.pathname.startsWith('/locations/'),owner=request.headers.get('oai-authenticated-user-id');
  if(!owner)return json({error:'Sign in to access your cities.'},401);
