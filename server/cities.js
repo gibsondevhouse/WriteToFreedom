@@ -7,4 +7,4 @@ export function defaultCity(location){const record={...blankCity(),...(location.
  architecture:'The present city stands above abandoned chambers and the ruins of earlier settlements.',
  economy:'The river workshops are a center of invention. The Lantern Guild hopes to reconnect the kingdom’s isolated cities.',
  questions:'How did the older city fall?\nWho holds authority over the districts?'
- }:{}),id:location.id,name:location.name,parentId:location.parentId,version:0};return {...record,profileRatings:{...(record.profileRatings||{})}};}
+ }:{}),id:location.id,name:location.name,parentId:location.parentId,version:0,schemaVersion:1};return {...record,profileRatings:{...(record.profileRatings||{})}};}

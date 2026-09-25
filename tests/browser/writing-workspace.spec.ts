@@ -10,6 +10,10 @@ interface Scene{id:string;chapterId:string;title:string;summary:string;status:st
 const documentFrom=(...paragraphs:string[]):RichNode=>({type:'doc',content:paragraphs.map(text=>({type:'paragraph',...(text?{content:[{type:'text',text}]}:{})}))});
 const textFrom=(node:RichNode):string=>node.text??(node.content||[]).map(textFrom).join(node.type==='doc'?'\n':'');
 const editor=(page:Page)=>page.getByRole('textbox',{name:'Scene text',exact:true});
+const focusedWritingRoutes=[
+ {path:'/chapters/',heading:'Chapters',primaryAction:'New chapter'},
+ {path:'/scenes/',heading:'Scenes',primaryAction:'New scene'},
+] as const;
 async function createChapter(request:APIRequestContext,title='Browser chapter '+randomUUID()):Promise<Chapter>{
  const response=await request.post('/api/chapters',{headers:{origin},data:{id:randomUUID(),title,summary:'A browser verification chapter.'}});
  expect(response.status(),await response.text()).toBe(201);
@@ -42,9 +46,37 @@ async function saveScene(page:Page,id:string,shortcut=false):Promise<Scene>{
 }
 async function selectedText(control:Locator){return control.evaluate(element=>element.ownerDocument.getSelection()?.toString()||'');}
 
+test('chapters and scenes open focused writing routes with their own primary actions',async({page})=>{
+ for(const route of focusedWritingRoutes){
+  expect((await page.goto(route.path))?.status()).toBe(200);
+  await expect(page.getByRole('heading',{name:route.heading,exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:route.primaryAction,exact:true}).first()).toBeVisible();
+ }
+});
+
+test('the local development host accepts a localhost same-origin chapter creation',async({page})=>{
+ const localhostOrigin=origin.replace('127.0.0.1','localhost');
+ await page.goto(localhostOrigin+'/chapters/');
+ const chapter={id:randomUUID(),title:'Same-origin chapter '+randomUUID(),summary:'Created through the browser on the local development host.'};
+ const mutation=page.waitForRequest(candidate=>candidate.url()===localhostOrigin+'/api/chapters'&&candidate.method()==='POST');
+ const result=await page.evaluate(async body=>{
+  const response=await fetch('/api/chapters',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return {status:response.status,body:await response.json()};
+ },chapter);
+ const browserRequest=await mutation;
+ expect(await browserRequest.headerValue('origin')).toBe(localhostOrigin);
+ expect(result.status).toBe(201);
+ expect(result.body).toMatchObject(chapter);
+ const catalog=await page.evaluate(async()=>{
+  const response=await fetch('/api/chapters',{credentials:'same-origin'});
+  return response.json();
+ });
+ expect(catalog.chapters).toContainEqual(expect.objectContaining({id:chapter.id,title:chapter.title}));
+});
+
 test('creates a chapter and a rich-text scene through the writing workspace',async({page,request})=>{
  await page.goto('/chapters/');
- await expect(page.getByRole('heading',{name:'Writing workspace',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Chapters',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'New chapter',exact:true}).first().click();
  const chapterDialog=page.getByRole('dialog',{name:'New chapter',exact:true});
  const title='New chapter '+randomUUID();
@@ -55,16 +87,29 @@ test('creates a chapter and a rich-text scene through the writing workspace',asy
  expect((await chapterCreated).status()).toBe(201);
  const chapter:Chapter=await (await chapterCreated).json();
  await expect(chapterDialog).toHaveCount(0);
- await page.getByRole('button',{name:'New scene',exact:true}).first().click();
+ const chapterCard=page.locator('article.story-character-card.story-card.story-profile-card.writing-chapter-story-card').filter({has:page.getByRole('heading',{name:title,exact:true})});
+ await expect(chapterCard).toBeVisible();
+ await expect(chapterCard.locator('.character-role')).toHaveText(/^Chapter \d+$/);
+ await expect(chapterCard).toContainText('0 scenes');
+ await expect(chapterCard).toContainText('A discovery in the winter archive.');
+ await expect(chapterCard.getByRole('group',{name:'Actions for '+title})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'is ready. Add its first scene'})).toBeVisible();
+ await chapterCard.getByRole('button',{name:'Edit chapter: '+title}).click();
+ const editChapterDialog=page.getByRole('dialog',{name:'Edit chapter',exact:true});
+ await expect(editChapterDialog.getByLabel('Chapter title',{exact:true})).toHaveValue(title);
+ await editChapterDialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ await chapterCard.getByRole('button',{name:'Add scene to '+title}).click();
  const sceneDialog=page.getByRole('dialog',{name:'New scene',exact:true});
  const sceneTitle='An open door '+randomUUID();
  await sceneDialog.getByLabel('Scene title',{exact:true}).fill(sceneTitle);
  await sceneDialog.getByLabel('Scene summary',{exact:true}).fill('A visitor finds the hidden archive.');
- await sceneDialog.getByLabel('Chapter',{exact:true}).selectOption(chapter.id);
+ await expect(sceneDialog.getByLabel('Chapter',{exact:true})).toHaveValue(chapter.id);
+ const sceneSubmitted=page.waitForRequest(candidate=>candidate.url()===origin+'/api/scenes'&&candidate.method()==='POST');
  const sceneCreated=page.waitForResponse(response=>response.url()===origin+'/api/scenes'&&response.request().method()==='POST');
  await sceneDialog.getByRole('button',{name:'Create scene',exact:true}).click();
- expect((await sceneCreated).status()).toBe(201);
- const scene:Scene=await (await sceneCreated).json();
+ const [submittedScene, createdScene]=await Promise.all([sceneSubmitted,sceneCreated]);
+ expect(createdScene.status()).toBe(201);
+ const scene=await readScene(request,(submittedScene.postDataJSON() as {id:string}).id);
  await expect(sceneDialog).toHaveCount(0);
  await expect(editor(page)).toBeVisible();
  await editor(page).fill('The door opened without a sound.');

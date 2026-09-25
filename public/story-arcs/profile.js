@@ -45,7 +45,7 @@ function addKeyScene(scene={title:'',chapter:'',beat:'',summary:''},focus=false)
  const row=element('div','key-scene-row'),title=element('input'),chapter=element('input'),beat=element('select'),summary=element('textarea'),remove=element('button','quiet-button','Remove scene');
  title.value=scene.title;title.maxLength=160;title.required=true;title.placeholder='Scene title';chapter.value=scene.chapter;chapter.maxLength=160;chapter.placeholder='Chapter or section';
  beat.append(new Option('Choose a narrative beat',''));for(const item of arcBeats)beat.append(new Option(item.title,item.id));beat.value=scene.beat;summary.value=scene.summary;summary.maxLength=10000;summary.rows=2;summary.placeholder='What changes in this scene?';remove.type='button';
- const source={row,title,chapter,beat,summary};sceneRows.push(source);for(const control of [title,chapter,beat,summary])control.addEventListener('input',dirty);
+ const source={id:scene.id||crypto.randomUUID(),row,title,chapter,beat,summary};sceneRows.push(source);for(const control of [title,chapter,beat,summary])control.addEventListener('input',dirty);
  remove.addEventListener('click',()=>{sceneRows.splice(sceneRows.indexOf(source),1);row.remove();dirty();document.querySelector('#add-key-scene').focus();});
  row.append(field('Scene',title),field('Chapter',chapter),field('Beat',beat),field('Purpose & change',summary),remove);document.querySelector('#key-scene-list').append(row);if(focus){title.focus();dirty();}
 }
@@ -56,7 +56,7 @@ form.elements.namedItem('arcType').addEventListener('change',event=>{document.qu
 initProfileEditor({fieldNames:storyArcFields,endpoint:'/api/story-arcs',type:'story arc',readExtra(){
  const connectedArcIds=connectedRows.map(({select})=>select.value);if(connectedArcIds.some(id=>!id))throw new Error('Choose an arc for every connected subplot.');if(new Set(connectedArcIds).size!==connectedArcIds.length)throw new Error('Choose every connected subplot once.');
  const keyEntities=Array.from(keyEntityIds,key=>{const target=targetMap.get(key);return {kind:target.kind,id:target.id};});
- const keyScenes=sceneRows.map(({title,chapter,beat,summary})=>({title:title.value,chapter:chapter.value,beat:beat.value,summary:summary.value}));
+ const keyScenes=sceneRows.map(({id,title,chapter,beat,summary})=>({id,title:title.value,chapter:chapter.value,beat:beat.value,summary:summary.value}));
  const pacing=Object.fromEntries(arcBeats.map(beat=>[beat.id,Object.fromEntries(pacingMetrics.map(([metric])=>[metric,Number(form.querySelector(`[data-pacing-beat="${beat.id}"][data-pacing-metric="${metric}"]`).value)]))]));
  return {keyEntities,connectedArcIds,keyScenes,pacing};
 }});

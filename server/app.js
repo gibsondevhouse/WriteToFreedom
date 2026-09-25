@@ -1,3 +1,4 @@
+import {validateSchemaVersion} from './document-storage.js';
 import {dashboardPages} from './dashboard-pages.js';
 import {renderDashboardPage} from './dashboard-shell.js';
 import {directoryPages} from './directory-pages.js';
@@ -95,7 +96,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  }
  if(path==='/chapters/'||path==='/scenes/'){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
-  return new Response(request.method==='HEAD'?null:renderWritingWorkspace(),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+  return new Response(request.method==='HEAD'?null:renderWritingWorkspace(path==='/chapters/'?'chapters':'scenes'),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
  }
  if(/^\/api\/(chapters|scenes)(?:\/|$)/.test(path))return writingRoute(request,env);
  // Dashboard definitions all share one complete main-area shell.
@@ -188,6 +189,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
    const body=await request.text();if(body.length>180000)return json({error:'Character is too large to save.'},413);
    let input;try{input=JSON.parse(body);}catch{return json({error:'Invalid character data.'},400);}
    if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid character data.'},400);
+   try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
    if(request.method==='POST'&&!id) {
     if(!idPattern.test(input.id))return json({error:'Invalid character ID.'},400);
     if(Object.hasOwn(input,'name')&&(typeof input.name!=='string'||!input.name.trim()||input.name.length>160))return json({error:'Enter a character name of 1–160 characters.'},400);
@@ -195,6 +197,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const character=await db.create(owner,input.id,document);return character?json(character,201):json({error:'Could not create this character. Try again.'},409);
    }
    if(request.method==='PUT'&&id) {
+    if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A character’s ID cannot change.'},400);
     const current=await db.get(owner,id)||sampleCharacter(id);
     if(!current)return json({error:'Character not found.'},404);
     let document;try{document=validate(input,current);}catch(error){return json({error:error.message},400);}
@@ -212,7 +215,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     const proposedCast=cast.map(c=>c.id===id?{...document,id}:c);
     try{
      const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations,await db.listLore(owner));
-     validateNoteConnections(document.notes,targets,current.notes||[]);
+     validateNoteConnections(document.notes,targets,current.notes||[],id);
      if(document.cardConnection){
       const key=referenceKey(document.cardConnection);
       if(document.cardConnection.kind==='character'&&document.cardConnection.id===id)throw new Error('Choose another item to feature on this card.');
@@ -220,7 +223,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
      }
     }catch(error){return json({error:error.message},400);}
     if(document.relationships.some(r=>r.targetId===id||!allowed.has(r.targetId)))return json({error:'Choose another existing character for each relationship.'},400);
-    if(!Number.isInteger(input.version))return json({error:'Reload this character before saving.'},400);
+    if(!Number.isSafeInteger(input.version)||input.version<0||input.version===Number.MAX_SAFE_INTEGER)return json({error:'Reload this character before saving.'},400);
     // Repository performs the conditional write; a stale version cannot overwrite content.
     const updated=await db.save(owner,id,input.version,document);
     return updated?json(updated):json({error:'This character changed in another tab. Copy your unsaved text, then reload before saving.'},409);

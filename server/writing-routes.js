@@ -1,4 +1,5 @@
 import {writingRepository} from './writing-repository.js';
+import {supportedSchemaVersion} from './document-storage.js';
 import {validateWritingContent,writingContentSchemaVersion,writingRequestMaxBytes} from '../public/writing/document.js';
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -35,13 +36,16 @@ export async function writingRoute(request,env){
   if(new TextEncoder().encode(raw).byteLength>writingRequestMaxBytes)return json({error:'Keep a writing request within 1 MiB of content plus 32 KiB of metadata.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid writing data.'},400);}
   if(!object(input))return json({error:'Invalid writing data.'},400);
+  if(Object.hasOwn(input,'schemaVersion')&&input.schemaVersion!==supportedSchemaVersion)return json({error:'This writing format version is not supported. Reload before saving.'},400);
   if(!id){
    if(typeof input.id!=='string'||!uuid.test(input.id))return json({error:'Choose a valid writing entry ID.'},400);
    const existing=await (scene?db.getScene(owner,input.id):db.getChapter(owner,input.id));
    if(existing)return json(existing,201);
   }else{
-   if(!Number.isInteger(input.version)||input.version<1)return json({error:`Reload this ${singular} before saving.`},400);
+   if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A writing entry ID cannot be changed.'},400);
+   if(!Number.isSafeInteger(input.version)||input.version<1)return json({error:`Reload this ${singular} before saving.`},400);
    if(input.version!==current.version)return json({error:`This ${singular} changed in another tab. Your draft is still here. Copy your changes, then reload before saving.`},409);
+   if(current.version===Number.MAX_SAFE_INTEGER)return json({error:`This ${singular} has reached its revision limit and cannot be saved.`},409);
   }
   let document;
   try{

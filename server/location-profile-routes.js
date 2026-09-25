@@ -1,3 +1,4 @@
+import {validateSchemaVersion} from './document-storage.js';
 import {repository} from './db.js';
 import {locationCatalog} from './countries.js';
 import {characterCast} from './sample-characters.js';
@@ -30,7 +31,9 @@ export async function locationProfileRoute(request,env){
   if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'Location profile is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid location data.'},400);}
-  if(!input||Array.isArray(input)||!Number.isInteger(input.version)||input.version<0)return json({error:'Reload this location before saving.'},400);
+  if(!input||typeof input!=='object'||Array.isArray(input)||!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<0)return json({error:'Reload this location before saving.'},400);
+  try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
+  if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A location’s ID cannot change.'},400);
   if(input.version!==current.version)return conflict();
   if(Object.hasOwn(input,'type')&&input.type!==location.type)return json({error:'A location’s type cannot change.'},400);
   const document={};
@@ -53,5 +56,5 @@ export async function locationProfileRoute(request,env){
   if(template.imageFields.some(key=>!validImageUrl(document[key])))return json({error:'Use an HTTPS image URL for images and maps.'},400);
   const saved=await db.saveLocationDetails(owner,id,input.version,document);
   return saved?json(responseRecord(defaultLocation({...saved,type:location.type}),locations)):conflict();
- }catch(error){console.error('Location profile request failed',error.message);return json({error:'Your location could not be saved or loaded. Please try again.'},503);}
+ }catch(error){if(/(?:^|:\s*)locations: (?:invalid parent|hierarchy cycle)(?:: SQLITE_CONSTRAINT(?:_TRIGGER)?)?$/.test(error.message))return conflict();console.error('Location profile request failed',error.message);return json({error:'Your location could not be saved or loaded. Please try again.'},503);}
 }

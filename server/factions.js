@@ -9,6 +9,6 @@ const details={
 export async function factionCatalog(db,owner){
  const [custom,profiles]=await Promise.all([db.listFactions(owner),db.listFactionProfiles(owner)]);
  const overrides=new Map(profiles.map(p=>[p.id,p]));
- return [...seedFactions,...custom].map(f=>({...blankFaction(),...details[f.id],...f,version:0,...overrides.get(f.id)}));
+ return [...seedFactions,...custom].map(f=>({...blankFaction(),...details[f.id],...f,version:0,schemaVersion:1,...overrides.get(f.id)}));
 }
 export function attachFactionNames(cast,factions){return cast.map(c=>({...c,affiliation:factions.find(f=>f.id===c.factionId)?.name??c.affiliation}));}

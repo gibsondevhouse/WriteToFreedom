@@ -1,3 +1,4 @@
+import {validateSchemaVersion} from './document-storage.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
 import { repository } from './db.js';
@@ -36,17 +37,19 @@ export async function factionRoute(request,env){
   const raw=await request.text();if(raw.length>250000)return json({error:'Faction is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid faction data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid faction data.'},400);
+  try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
   if(request.method==='POST'&&!id){
    if(!idPattern.test(input.id))return json({error:'Invalid faction ID.'},400);
-   if(input.blank===true){const existing=factions.find(f=>f.id===input.id);if(existing)return json(existing,201);const created=await db.createBlankFaction(owner,input.id);return created?json({...blankFaction(),...created,version:0},201):json({error:'Could not create this faction. Try again.'},409);}
+   if(input.blank===true){const existing=factions.find(f=>f.id===input.id);if(existing)return json(existing,201);const created=await db.createBlankFaction(owner,input.id);return created?json({...blankFaction(),...created,version:0,schemaVersion:1},201):json({error:'Could not create this faction. Try again.'},409);}
    if(typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>160)return json({error:'Enter a faction name of 1–160 characters.'},400);
    const name=input.name.trim().replace(/\s+/g,' '),key=name.normalize('NFKC').toLocaleLowerCase();
    const existing=factions.find(f=>f.name.normalize('NFKC').toLocaleLowerCase()===key);if(existing)return json(existing,201);
-   const created=await db.createFaction(owner,input.id,name);return created?json({...blankFaction(),...created,version:0},201):json({error:'Could not create this faction. Try again.'},409);
+   const created=await db.createFaction(owner,input.id,name);return created?json({...blankFaction(),...created,version:0,schemaVersion:1},201):json({error:'Could not create this faction. Try again.'},409);
   }
   if(request.method==='PUT'&&id){
    if(!current)return json({error:'Faction not found.'},404);
-   if(!Number.isInteger(input.version))return json({error:'Reload this faction before saving.'},400);
+   if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A faction’s ID cannot change.'},400);
+   if(!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<0)return json({error:'Reload this faction before saving.'},400);
    const document=blankFaction();for(const key of factionFields){const value=Object.hasOwn(input,key)?input[key]:current[key];if(typeof value!=='string'||value.length>(key==='name'?160:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
   document.hiddenFields=readHiddenFields(input,current,factionHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
    try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),factionRatingGroups);}catch(error){return json({error:error.message},400);}

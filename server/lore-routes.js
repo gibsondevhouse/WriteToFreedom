@@ -1,3 +1,4 @@
+import {validateSchemaVersion} from './document-storage.js';
 import {repository} from './db.js';
 import {characterCast} from './sample-characters.js';
 import {factionCatalog} from './factions.js';
@@ -53,10 +54,12 @@ export async function loreRoute(request,env){
   const raw=await request.text();if(raw.length>550000)return json({error:'This lore entry is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid lore data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid lore data.'},400);
+  try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
   if(!id){
    if(!idPattern.test(input.id)||!Object.hasOwn(loreTypes,input.type))return json({error:'Choose an entry type and valid ID.'},400);
-   const existing=records.find(r=>r.id===input.id);if(existing)return json(existing,201);
-  }else if(!Number.isInteger(input.version)||input.version<1)return json({error:'Reload this entry before saving.'},400);
+   const existing=records.find(r=>r.id===input.id);if(existing)return existing.type===input.type?json(existing,201):json({error:'That ID already belongs to a different entry type.'},409);
+  }else if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A lore entry’s ID cannot change.'},400);
+  else if(!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<1)return json({error:'Reload this entry before saving.'},400);
   else if(input.version!==current.version)return json({error:'This entry changed in another tab. Copy your unsaved text, then reload before saving.'},409);
   let document;try{document=validate(input,current||{...blankLore(input.type),id:input.id},targets);}catch(error){return json({error:error.message},400);}
   const saved=id?await db.saveLore(owner,id,input.version,document):await db.createLore(owner,input.id,document);

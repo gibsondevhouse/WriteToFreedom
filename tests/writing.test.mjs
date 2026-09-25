@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {writingRoute} from '../server/writing-routes.js';
+import {writingRepository} from '../server/writing-repository.js';
 import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
 import {getSchema} from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -26,13 +27,13 @@ function setup(t){
 
 test('chapters and scenes round-trip structured writing with deterministic content-free catalogs',async t=>{
  const {request,get,chapter,scene,sqlite}=setup(t),first=await chapter({title:'  The   beginning  ',summary:'Opening chapter'}),second=await chapter({title:'Afterward'});
- assert.equal(first.title,'The beginning');assert.equal(first.version,1);assert.ok(first.createdAt);assert.equal(first.updatedAt,first.createdAt);
+ assert.equal(first.title,'The beginning');assert.equal(first.schemaVersion,1);assert.equal(first.version,1);assert.ok(first.createdAt);assert.equal(first.updatedAt,first.createdAt);
  const rich={type:'doc',content:[{type:'heading',attrs:{level:3},content:[text('A scene')]},{type:'paragraph',content:[{type:'text',text:'Exact <script> text & spaces  ',marks:[{type:'bold'},{type:'italic'},{type:'underline'},{type:'strike'}]},{type:'hardBreak'},text('Second line'),{type:'text',text:'const dawn = true',marks:[{type:'code'}]}]},{type:'orderedList',attrs:{start:3,type:'A'},content:[{type:'listItem',content:[paragraph('First'),{type:'bulletList',content:[{type:'listItem',content:[paragraph('Nested')]}]}]}]},{type:'blockquote',content:[paragraph('Remember this.')]},{type:'horizontalRule'}]};
  const one=await scene(first.id,{content:rich,summary:'Outline text'}),two=await scene(first.id,{title:'Second scene'}),other=await scene(second.id);
  assert.deepEqual(one.content,rich);assert.deepEqual((await get('/api/scenes/'+one.id)).content,rich);assert.equal(one.chapterId,first.id);
  sqlite.prepare('UPDATE chapters SET created_at = ?').run('2026-01-01T00:00:00.000Z');sqlite.prepare('UPDATE scenes SET created_at = ?').run('2026-01-01T00:00:00.000Z');
  assert.deepEqual((await get('/api/chapters')).chapters.map(c=>c.id),[first.id,second.id].sort());
- const all=(await get('/api/scenes')).scenes;assert.deepEqual(all.map(s=>s.id),[one.id,two.id,other.id].sort());assert.ok(all.every(s=>!Object.hasOwn(s,'content')&&!Object.hasOwn(s,'ownerId')));
+ const all=(await get('/api/scenes')).scenes;assert.deepEqual(all.map(s=>s.id),[one.id,two.id,other.id].sort());assert.ok(all.every(s=>s.schemaVersion===1&&!Object.hasOwn(s,'content')&&!Object.hasOwn(s,'ownerId')));
  assert.deepEqual((await get('/api/scenes?chapterId='+first.id)).scenes.map(s=>s.id),[one.id,two.id].sort());
  let response=await request('/api/scenes/'+one.id,'PUT',{version:1,chapterId:second.id,title:'New title',status:'revising'});assert.equal(response.status,200);const updated=await response.json();
  assert.equal(updated.version,2);assert.equal(updated.status,'revising');assert.deepEqual(updated.content,rich);assert.equal(updated.summary,'Outline text');assert.equal(updated.chapterId,second.id);
@@ -76,6 +77,62 @@ test('writing request gates reject cross-origin, non-JSON, invalid methods, malf
  assert.equal((await request(url,'PUT','界'.repeat(Math.ceil(writingRequestMaxBytes/3)+1))).status,413);
  assert.equal((await request('/api/scenes/not-an-id')).status,404);assert.equal((await request('/api/scenes?chapterId=bad')).status,404);
  assert.equal((await get(url)).version,1);
+});
+
+test('writing rejects identity changes, imprecise revisions, and newer envelope schemas without losing stored data',async t=>{
+ const {request,get,chapter,scene}=setup(t),parent=await chapter(),entry=await scene(parent.id,{content:document('Keep this revision')});
+ for(const [collection,record] of [['chapters',parent],['scenes',entry]]){
+  for(const bad of [{id:crypto.randomUUID()},{id:null},{version:Number.MAX_SAFE_INTEGER+1},{schemaVersion:2},{schemaVersion:'1'}]){
+   const response=await request(`/api/${collection}/${record.id}`,'PUT',{version:record.version,...bad});
+   assert.equal(response.status,400,JSON.stringify(bad));
+   assert.deepEqual(await get(`/api/${collection}/${record.id}`),record);
+  }
+ }
+ assert.equal((await request('/api/chapters','POST',{id:crypto.randomUUID(),title:'Future chapter',schemaVersion:2})).status,400);
+});
+
+test('creation acknowledges its exact revision even when another writer saves before the insert returns',async t=>{
+ const {sqlite}=setup(t),binding=d1Adapter(sqlite),id=crypto.randomUUID(),initial={title:'Original title',summary:'Original summary'};
+ const interleaved={prepare(sql){
+  const statement=binding.prepare(sql);
+  return {bind(...args){
+   const bound=statement.bind(...args);
+   return {...bound,async run(){
+    const result=await bound.run();
+    if(sql.startsWith('INSERT INTO chapters')&&result.meta.changes)sqlite.prepare('UPDATE chapters SET document = ?, version = version + 1 WHERE id = ?').run(JSON.stringify({title:'Another writer',summary:'Keep this newer revision'}),id);
+    return result;
+   }};
+  }};
+ }};
+ const created=await writingRepository(interleaved).createChapter('author',id,initial);
+ assert.equal(created.version,1);assert.equal(created.title,initial.title);assert.equal(created.schemaVersion,1);
+ const current=await writingRepository(binding).getChapter('author',id);
+ assert.equal(current.version,2);assert.equal(current.title,'Another writer');
+ assert.equal(await writingRepository(binding).saveChapter('author',created,{title:'Stale overwrite',summary:''}),null);
+});
+
+test('newer stored writing schemas fail closed in reads, catalogs, and saves',async t=>{
+ const {request,chapter,scene,sqlite}=setup(t),parent=await chapter(),entry=await scene(parent.id,{content:document('Newer format must remain intact')});
+ t.mock.method(console,'error',()=>{});
+ sqlite.prepare('UPDATE scenes SET schema_version = 2, version = version + 1 WHERE id = ?').run(entry.id);
+ const before=sqlite.prepare('SELECT * FROM scenes WHERE id = ?').get(entry.id);
+ assert.equal((await request('/api/scenes/'+entry.id)).status,503);
+ assert.equal((await request('/api/scenes')).status,503);
+ assert.equal((await request('/api/scenes/'+entry.id,'PUT',{version:2,title:'An old client overwrite'})).status,503);
+ // Even a stale in-memory caller that bypasses the decoder cannot downgrade
+ // a stored format after reading a revision written by a newer deployment.
+ assert.equal(await writingRepository(d1Adapter(sqlite)).saveScene('author',{...entry,version:2},{...entry,title:'Another old client overwrite'}),null);
+ assert.deepEqual(sqlite.prepare('SELECT * FROM scenes WHERE id = ?').get(entry.id),before);
+ sqlite.prepare('UPDATE chapters SET schema_version = 2, version = version + 1 WHERE id = ?').run(parent.id);
+ assert.equal((await request('/api/chapters')).status,503);
+ assert.equal((await request('/api/chapters/'+parent.id,'PUT',{version:2,title:'An old client overwrite'})).status,503);
+});
+
+test('an exhausted revision is never rounded into an unsafe version',async t=>{
+ const {request,sqlite}=setup(t),id=crypto.randomUUID(),now='2026-09-24T12:00:00.000Z';
+ sqlite.prepare('INSERT INTO chapters (id,owner_id,document,version,created_at,updated_at) VALUES (?,?,?,?,?,?)').run(id,'author',JSON.stringify({title:'Last exact revision',summary:''}),Number.MAX_SAFE_INTEGER,now,now);
+ assert.equal((await request('/api/chapters/'+id,'PUT',{version:Number.MAX_SAFE_INTEGER,title:'Cannot increment exactly'})).status,409);
+ assert.equal(sqlite.prepare('SELECT version FROM chapters WHERE id = ?').get(id).version,Number.MAX_SAFE_INTEGER);
 });
 
 test('writing metadata and content versions validate without mutating stored drafts',async t=>{

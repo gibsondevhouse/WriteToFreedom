@@ -1,9 +1,12 @@
+// Cross-row and JSON invariants also live in the custom 0011 migration;
+// Drizzle does not model SQLite triggers. Preserve them in future table rebuilds.
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const chapters = sqliteTable('chapters', {
  id: text('id').primaryKey(),
  ownerId: text('owner_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  createdAt: text('created_at').notNull(),
  updatedAt: text('updated_at').notNull(),
@@ -14,6 +17,7 @@ export const scenes = sqliteTable('scenes', {
  ownerId: text('owner_id').notNull(),
  chapterId: text('chapter_id').notNull().references(()=>chapters.id),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  createdAt: text('created_at').notNull(),
  updatedAt: text('updated_at').notNull(),
@@ -23,6 +27,7 @@ export const loreEntries = sqliteTable('lore_entries', {
  id: text('id').primaryKey(),
  ownerId: text('owner_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  createdAt: text('created_at').notNull(),
  updatedAt: text('updated_at').notNull(),
@@ -32,6 +37,7 @@ export const storyArcs = sqliteTable('story_arcs', {
  id: text('id').primaryKey(),
  ownerId: text('owner_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  createdAt: text('created_at').notNull(),
  updatedAt: text('updated_at').notNull(),
@@ -41,6 +47,7 @@ export const characterDrafts = sqliteTable('character_drafts', {
   id: text('id').primaryKey(),
   ownerId: text('owner_id').notNull(),
   document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
   version: integer('version').notNull().default(1),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -58,6 +65,7 @@ export const factionProfiles = sqliteTable('faction_profiles', {
  ownerId: text('owner_id').notNull(),
  factionId: text('faction_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  updatedAt: text('updated_at').notNull(),
 }, table => [uniqueIndex('idx_faction_profiles_owner_faction').on(table.ownerId,table.factionId)]);
@@ -75,6 +83,7 @@ export const countryProfiles = sqliteTable('country_profiles', {
  ownerId: text('owner_id').notNull(),
  locationId: text('location_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  updatedAt: text('updated_at').notNull(),
 }, table => [uniqueIndex('idx_country_profiles_owner_location').on(table.ownerId,table.locationId)]);
@@ -83,6 +92,7 @@ export const cityProfiles = sqliteTable('city_profiles', {
  ownerId: text('owner_id').notNull(),
  locationId: text('location_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  updatedAt: text('updated_at').notNull(),
 }, table => [uniqueIndex('idx_city_profiles_owner_location').on(table.ownerId,table.locationId)]);
@@ -91,5 +101,6 @@ export const locationDetails = sqliteTable('location_details', {
  ownerId: text('owner_id').notNull(),
  locationId: text('location_id').notNull(),
  document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
 }, table => [uniqueIndex('idx_location_details_owner_location').on(table.ownerId,table.locationId)]);

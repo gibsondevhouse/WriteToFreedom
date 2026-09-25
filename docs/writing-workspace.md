@@ -1,10 +1,10 @@
 # Chapters and scenes
 
-`/chapters/` and `/scenes/` open the React writing workspace. Chapters organize independently saved scenes. Each scene contains a title, summary, drafting status, chapter assignment and rich-text document. Existing Lore notes and positional character-note anchors keep their current storage and editors.
+`/chapters/` and `/scenes/` share the React writing data layer, but serve different tasks. **Chapters** is a chapter-planning view: it lists visible chapter cards, shows their scene counts, and confirms a newly created chapter in the main page. **Scenes** is the rich-text writing view: it opens scene drafts, the outline, formatting controls, and references. Chapters organize independently saved scenes. Each scene contains a title, summary, drafting status, chapter assignment and rich-text document. Existing Lore notes and positional character-note anchors keep their current storage and editors.
 
 ## Ownership and editing
 
-`frontend/writing/Workspace.tsx` owns the outline, per-scene drafts, loading, chapter metadata, reference panel and explicit saves. The outer workspace navigation still belongs to the existing shell. Moving between application sections uses ordinary full-page navigation.
+`frontend/writing/Workspace.tsx` owns the route-specific chapter plan or scene workspace, per-scene drafts, loading, chapter metadata, reference panel and explicit saves. Creating a scene from the Chapters view opens that scene in the Scenes view. The outer workspace navigation still belongs to the existing shell. Moving between application sections uses ordinary full-page navigation.
 
 `frontend/writing/Editor.tsx` owns each scene's Tiptap instance, selection and undo history. Visited scene editors remain mounted while hidden, so switching between scenes preserves unsaved writing and history within the document. Parent updates and successful saves do not call `setContent` or recreate the editor. Tiptap transaction rendering is disabled for the outer React editor; toolbar and word-count subscriptions update separately. This follows [Tiptap's integration performance guidance](https://tiptap.dev/docs/guides/performance).
 

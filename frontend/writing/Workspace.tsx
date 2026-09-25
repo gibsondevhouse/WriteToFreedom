@@ -1,13 +1,19 @@
-import {memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
+import {memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import {WritingEditor} from './Editor';
 import {emptyWritingContent, readChapterRecord, readSceneRecord, readSceneSummary, serializeChapter, serializeScene, type ChapterRecord, type SceneRecord, type SceneStatus, type SceneSummary, type WritingContent} from './contracts';
 import {announceWorkspaceChange} from '../../public/profiles/workspace-events.js';
+import {createStoryCardAction, createStoryCardFrame} from '../../public/components/story-card/card.js';
 
 type SceneDraft = {record: SceneRecord; initialContent: WritingContent; dirty: boolean; saving: boolean; error: string; revision: number};
 type Drafts = Record<string, SceneDraft>;
 type SceneChange = Partial<Pick<SceneRecord, 'title' | 'summary' | 'status' | 'chapterId' | 'content'>>;
 type Composer = {kind: 'chapter'; chapter?: ChapterRecord} | {kind: 'scene'; chapterId: string};
+export type WritingView = 'chapters' | 'scenes';
 const statusLabels: Record<SceneStatus, string> = {draft: 'Draft', revising: 'Revising', complete: 'Complete'};
+type StoryCardActionOptions = {href?: string; onClick?: () => void; label: string; title?: string; className?: string; icon?: string | HTMLElement; text?: string; count?: number; dialog?: boolean};
+type StoryCardFrameOptions = {tone?: string; headingLevel?: number; eyebrow?: string; badge?: HTMLElement; profileLabel?: string; context?: HTMLElement[]; actions?: HTMLElement[]; cardClass?: string};
+const storyCardAction = createStoryCardAction as unknown as (options: StoryCardActionOptions) => HTMLElement;
+const storyCardFrame = createStoryCardFrame as unknown as (record: {id: string; name: string; href: string}, options: StoryCardFrameOptions) => HTMLElement;
 
 async function requestJSON(path: string, options: RequestInit = {}): Promise<unknown> {
   const response = await fetch(path, {credentials: 'same-origin', cache: 'no-store', ...options});
@@ -27,11 +33,13 @@ function Icon({name}: {name: 'outline' | 'reference' | 'plus' | 'edit'}) {
 }
 
 /** Scene drafts and explicit writes belong here; each mounted editor owns its history. */
-export function WritingWorkspace() {
+export function WritingWorkspace({view}: {view: WritingView}) {
+  const sceneView = view === 'scenes';
   const [chapters, setChapters] = useState<ChapterRecord[]>([]), [scenes, setScenes] = useState<SceneSummary[]>([]), [drafts, setDrafts] = useState<Drafts>({}), draftsRef = useRef<Drafts>({});
-  const [selectedId, setSelectedId] = useState(() => new URL(location.href).searchParams.get('scene') || ''), [catalogLoading, setCatalogLoading] = useState(true), [catalogError, setCatalogError] = useState(''), [catalogAttempt, setCatalogAttempt] = useState(0);
+  const [selectedId, setSelectedId] = useState(() => sceneView ? new URL(location.href).searchParams.get('scene') || '' : ''), [catalogLoading, setCatalogLoading] = useState(true), [catalogError, setCatalogError] = useState(''), [catalogAttempt, setCatalogAttempt] = useState(0);
   const [sceneLoading, setSceneLoading] = useState(''), [loadError, setLoadError] = useState(''), [loadAttempt, setLoadAttempt] = useState(0), [composer, setComposer] = useState<Composer | null>(null);
   const [outlineOpen, setOutlineOpen] = useState(() => matchMedia('(min-width: 950px)').matches), [referencesOpen, setReferencesOpen] = useState(false);
+  const [createdChapterId, setCreatedChapterId] = useState('');
   const mounted = useRef(true), saves = useRef(new Map<string, AbortController>());
   const storeDraft = useCallback((id: string, update: (previous: SceneDraft | undefined) => SceneDraft) => {
     const next = {...draftsRef.current, [id]: update(draftsRef.current[id])}; draftsRef.current = next; setDrafts(next);
@@ -42,21 +50,22 @@ export function WritingWorkspace() {
     storeDraft(id, previous => ({...previous!, record: {...previous!.record, ...change}, dirty: true, revision: previous!.revision + 1}));
   }, [storeDraft]);
   const chooseScene = useCallback((id: string) => {
+    if (!sceneView) {const url = new URL('/scenes/', location.href); url.searchParams.set('scene', id); location.assign(url.href); return;}
     setSelectedId(id); setLoadError('');
     const url = new URL(location.href); url.searchParams.set('scene', id); history.replaceState(history.state, '', url);
-  }, []);
+  }, [sceneView]);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false; saves.current.forEach(controller => controller.abort());};}, []);
   useEffect(() => {
     const controller = new AbortController(); setCatalogLoading(true); setCatalogError('');
     Promise.all([requestJSON('/api/chapters', {signal: controller.signal}), requestJSON('/api/scenes', {signal: controller.signal})]).then(([chapterData, sceneData]) => {
       if (controller.signal.aborted) return;
       const nextChapters = collection(chapterData, 'chapters').map(readChapterRecord), nextScenes = collection(sceneData, 'scenes').map(readSceneSummary);
-      setChapters(nextChapters); setScenes(nextScenes); setSelectedId(current => current || nextScenes[0]?.id || '');
+      setChapters(nextChapters); setScenes(nextScenes); setSelectedId(current => sceneView ? current || nextScenes[0]?.id || '' : '');
     }).catch(error => {if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'Your chapters and scenes could not be loaded.');}).finally(() => {if (!controller.signal.aborted) setCatalogLoading(false);});
     return () => controller.abort();
-  }, [catalogAttempt]);
+  }, [catalogAttempt, sceneView]);
   useEffect(() => {
-    if (!selectedId || draftsRef.current[selectedId]) {setSceneLoading(''); setLoadError(''); return;}
+    if (!sceneView || !selectedId || draftsRef.current[selectedId]) {setSceneLoading(''); setLoadError(''); return;}
     const controller = new AbortController(); setSceneLoading(selectedId); setLoadError('');
     requestJSON('/api/scenes/' + encodeURIComponent(selectedId), {signal: controller.signal}).then(value => {
       if (controller.signal.aborted) return;
@@ -64,7 +73,7 @@ export function WritingWorkspace() {
       storeDraft(selectedId, () => initialDraft(record));
     }).catch(error => {if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'This scene could not be opened.');}).finally(() => {if (!controller.signal.aborted) setSceneLoading('');});
     return () => controller.abort();
-  }, [selectedId, loadAttempt, storeDraft]);
+  }, [sceneView, selectedId, loadAttempt, storeDraft]);
   const saveScene = useCallback(async (id: string) => {
     const draft = draftsRef.current[id]; if (!draft || draft.saving || saves.current.has(id)) return;
     let payload; try {payload = serializeScene(draft.record);} catch (error) {storeDraft(id, previous => ({...previous!, error: error instanceof Error ? error.message : 'Check this scene before saving.'})); return;}
@@ -89,15 +98,21 @@ export function WritingWorkspace() {
   const outlineScenes = useMemo(() => scenes.map(scene => drafts[scene.id] ? summary(drafts[scene.id].record) : scene), [scenes, drafts]);
   const selected = drafts[selectedId], dirtyCount = Object.values(drafts).filter(draft => draft.dirty).length;
   const createComplete = (record: ChapterRecord | SceneRecord) => {
-    if ('content' in record) {storeDraft(record.id, () => initialDraft(record)); setScenes(previous => [...previous.filter(scene => scene.id !== record.id), summary(record)]); chooseScene(record.id);}
-    else setChapters(previous => previous.some(chapter => chapter.id === record.id) ? previous.map(chapter => chapter.id === record.id ? record : chapter) : [...previous, record]);
+    if ('content' in record) {
+      storeDraft(record.id, () => initialDraft(record)); setScenes(previous => [...previous.filter(scene => scene.id !== record.id), summary(record)]);
+      chooseScene(record.id);
+    } else {
+      const isNew = !chapters.some(chapter => chapter.id === record.id);
+      setChapters(previous => previous.some(chapter => chapter.id === record.id) ? previous.map(chapter => chapter.id === record.id ? record : chapter) : [...previous, record]);
+      setCreatedChapterId(isNew ? record.id : '');
+    }
     setComposer(null); announceWorkspaceChange();
   };
   return <main className="writing-workspace" id="writing-workspace">
-    <header className="writing-heading"><div><p className="writing-eyebrow">Your manuscript</p><h1>Writing workspace</h1><p className="writing-description">A place for the story to take shape.</p></div><div className="writing-create-actions"><button type="button" className="writing-button" disabled={catalogLoading} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button writing-primary" disabled={!chapters.length || catalogLoading} onClick={() => setComposer({kind: 'scene', chapterId: selected?.record.chapterId || chapters[0]?.id || ''})}><Icon name="plus"/>New scene</button></div></header>
-    <div className="writing-viewbar"><div className="writing-panel-actions"><button type="button" className="writing-panel-toggle" aria-expanded={outlineOpen} aria-controls="writing-outline" onMouseDown={event => event.preventDefault()} onClick={() => setOutlineOpen(open => !open)}><Icon name="outline"/>{outlineOpen ? 'Hide outline' : 'Show outline'}</button><button type="button" className="writing-panel-toggle" aria-expanded={referencesOpen} aria-controls="writing-references" onMouseDown={event => event.preventDefault()} onClick={() => setReferencesOpen(open => !open)}><Icon name="reference"/>{referencesOpen ? 'Hide references' : 'Show references'}</button></div><span className="writing-draft-note">{dirtyCount ? `${dirtyCount} scene${dirtyCount === 1 ? '' : 's'} with unsaved changes` : 'Save when you’re ready'}</span></div>
+    <header className="writing-heading"><div><p className="writing-eyebrow">{sceneView ? 'Your manuscript' : 'Manuscript structure'}</p><h1>{sceneView ? 'Scenes' : 'Chapters'}</h1><p className="writing-description">{sceneView ? 'Write the moments that bring your story to life.' : 'Shape the larger movements of your manuscript before you draft.'}</p></div><div className="writing-create-actions">{sceneView ? <><button type="button" className="writing-button" disabled={catalogLoading} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button writing-primary" disabled={!chapters.length || catalogLoading} onClick={() => setComposer({kind: 'scene', chapterId: selected?.record.chapterId || chapters[0]?.id || ''})}><Icon name="plus"/>New scene</button></> : <><button type="button" className="writing-button writing-primary" disabled={catalogLoading} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button" disabled={!chapters.length || catalogLoading} onClick={() => setComposer({kind: 'scene', chapterId: chapters[0]?.id || ''})}><Icon name="plus"/>New scene</button></>}</div></header>
+    {sceneView && <div className="writing-viewbar"><div className="writing-panel-actions"><button type="button" className="writing-panel-toggle" aria-expanded={outlineOpen} aria-controls="writing-outline" onMouseDown={event => event.preventDefault()} onClick={() => setOutlineOpen(open => !open)}><Icon name="outline"/>{outlineOpen ? 'Hide outline' : 'Show outline'}</button><button type="button" className="writing-panel-toggle" aria-expanded={referencesOpen} aria-controls="writing-references" onMouseDown={event => event.preventDefault()} onClick={() => setReferencesOpen(open => !open)}><Icon name="reference"/>{referencesOpen ? 'Hide references' : 'Show references'}</button></div><span className="writing-draft-note">{dirtyCount ? `${dirtyCount} scene${dirtyCount === 1 ? '' : 's'} with unsaved changes` : 'Save when you’re ready'}</span></div>}
     {catalogError && <div className="writing-banner" role="alert"><p>{catalogError}</p><button type="button" className="writing-button" onClick={() => setCatalogAttempt(attempt => attempt + 1)}>Retry loading workspace</button></div>}
-    <div className={'writing-layout' + (outlineOpen ? ' with-outline' : '') + (referencesOpen ? ' with-references' : '')}>
+    {sceneView ? <div className={'writing-layout' + (outlineOpen ? ' with-outline' : '') + (referencesOpen ? ' with-references' : '')}>
       <aside id="writing-outline" className="writing-outline" aria-label="Manuscript outline" hidden={!outlineOpen}><div className="writing-panel-heading"><h2>Outline</h2><span>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}</span></div>{catalogLoading ? <p role="status" className="writing-muted">Loading your manuscript…</p> : chapters.length ? chapters.map((chapter, index) => <ChapterOutline key={chapter.id} chapter={chapter} index={index} scenes={outlineScenes.filter(scene => scene.chapterId === chapter.id)} drafts={drafts} selectedId={selectedId} onSelect={chooseScene} onEdit={() => setComposer({kind: 'chapter', chapter})} onCreate={() => setComposer({kind: 'scene', chapterId: chapter.id})}/>) : <p className="writing-muted">Your chapters and scenes will appear here.</p>}</aside>
       <section className="writing-center" aria-label="Scene workspace" aria-busy={sceneLoading === selectedId && Boolean(selectedId)}>
         {!selectedId && <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">The next page is yours</p><h2>{chapters.length ? 'Give your chapter its first scene.' : 'Every story begins somewhere.'}</h2><p>{chapters.length ? 'Create a scene, then make room for the words. Your outline and world notes will stay close by.' : 'Start with a chapter. Add scenes as your story grows, and save each one at your own pace.'}</p><button type="button" className="writing-button writing-primary" disabled={catalogLoading} onClick={() => setComposer(chapters.length ? {kind: 'scene', chapterId: chapters[0].id} : {kind: 'chapter'})}>{chapters.length ? 'Create your first scene' : 'Create your first chapter'}</button></div>}
@@ -106,9 +121,72 @@ export function WritingWorkspace() {
         {Object.entries(drafts).map(([id, draft]) => <ScenePane key={id} draft={draft} chapters={chapters} active={id === selectedId} onChange={changeScene} onSave={saveScene}/>)}
       </section>
       <ReferencePanel open={referencesOpen}/>
-    </div>
+    </div> : <ChapterBoard chapters={chapters} scenes={scenes} loading={catalogLoading} createdChapterId={createdChapterId} onEdit={chapter => setComposer({kind: 'chapter', chapter})} onCreateScene={chapterId => setComposer({kind: 'scene', chapterId})} onCreateChapter={() => setComposer({kind: 'chapter'})}/>}
     {composer && <ComposeDialog composer={composer} chapters={chapters} onClose={() => setComposer(null)} onComplete={createComplete}/>}
   </main>;
+}
+
+function ChapterBoard({chapters, scenes, loading, createdChapterId, onEdit, onCreateScene, onCreateChapter}: {chapters: ChapterRecord[]; scenes: SceneSummary[]; loading: boolean; createdChapterId: string; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void; onCreateChapter: () => void}) {
+  const created = chapters.find(chapter => chapter.id === createdChapterId);
+  return <section className="writing-chapter-board" aria-label="Chapter plan" aria-busy={loading}>
+    {loading ? <p className="writing-loading" role="status">Loading your chapters…</p> : chapters.length ? <><div className="writing-chapter-board-heading"><p>{chapters.length} {chapters.length === 1 ? 'chapter' : 'chapters'}</p><p>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} organized</p></div>{created && <p className="writing-create-confirmation" role="status"><strong>{created.title}</strong> is ready. Add its first scene when you’re ready to write.</p>}<ol className="writing-chapter-cards">{chapters.map((chapter, index) => <ChapterStoryCard key={chapter.id} chapter={chapter} index={index} sceneCount={scenes.filter(scene => scene.chapterId === chapter.id).length} isCreated={chapter.id === createdChapterId} onEdit={onEdit} onCreateScene={onCreateScene}/>)}</ol></> : <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">Begin the structure</p><h2>Give your manuscript its first chapter.</h2><p>Chapters hold the scenes that carry your story forward. Start with a title, then add scenes when the shape is clear.</p><button type="button" className="writing-button writing-primary" onClick={onCreateChapter}>Create your first chapter</button></div>}
+  </section>;
+}
+
+/** Adapts the established Story Card shell while React retains chapter state ownership. */
+function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCreateScene}: {chapter: ChapterRecord; index: number; sceneCount: number; isCreated: boolean; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void}) {
+  const host = useRef<HTMLLIElement>(null);
+  const latest = useRef({chapter, onEdit, onCreateScene});
+  latest.current = {chapter, onEdit, onCreateScene};
+  useLayoutEffect(() => {
+    const ordinal = String(index + 1).padStart(2, '0');
+    const sceneLabel = `${sceneCount} ${sceneCount === 1 ? 'scene' : 'scenes'}`;
+    const destination = '/scenes/';
+    const record = {id: chapter.id, name: chapter.title, href: destination};
+    const badge = document.createElement('span');
+    badge.className = 'character-power';
+    const badgeText = document.createElement('strong');
+    badgeText.textContent = sceneLabel;
+    badge.append(badgeText);
+    const contextPicker = document.createElement('a');
+    contextPicker.className = 'affiliation-picker';
+    contextPicker.href = destination;
+    contextPicker.setAttribute('aria-label', `Open scenes for ${chapter.title}`);
+    const avatar = document.createElement('span');
+    avatar.className = 'affiliation-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.textContent = ordinal;
+    contextPicker.append(avatar);
+    const contextCopy = document.createElement('a');
+    contextCopy.className = 'affiliation-copy';
+    contextCopy.href = destination;
+    contextCopy.setAttribute('aria-label', `Open scenes for ${chapter.title}`);
+    const contextKind = document.createElement('span');
+    contextKind.className = 'affiliation-kind';
+    contextKind.textContent = sceneLabel;
+    const contextSummary = document.createElement('strong');
+    contextSummary.textContent = chapter.summary || 'No chapter summary yet.';
+    contextCopy.append(contextKind, contextSummary);
+    const card = storyCardFrame(record, {
+      tone: 'blue',
+      headingLevel: 2,
+      eyebrow: `Chapter ${ordinal}`,
+      badge,
+      profileLabel: `Open scenes for ${chapter.title}`,
+      context: [contextPicker, contextCopy],
+      actions: [
+        storyCardAction({onClick: () => latest.current.onEdit(latest.current.chapter), label: `Edit chapter: ${chapter.title}`, title: 'Edit chapter', icon: 'overview', dialog: true}),
+        storyCardAction({onClick: () => latest.current.onCreateScene(latest.current.chapter.id), label: `Add scene to ${chapter.title}`, title: 'Add scene', icon: 'story', dialog: true}),
+        storyCardAction({href: destination, label: `Open scenes for ${chapter.title}`, title: 'Open scenes', icon: 'notes'}),
+      ],
+      cardClass: 'story-profile-card writing-chapter-story-card',
+    });
+    card.dataset.chapterId = chapter.id;
+    if (isCreated) card.classList.add('is-created');
+    host.current?.replaceChildren(card);
+    return () => card.remove();
+  }, [chapter.id, chapter.title, chapter.summary, chapter.version, index, sceneCount, isCreated]);
+  return <li className={'writing-chapter-card-host' + (isCreated ? ' is-created' : '')} ref={host}/>;
 }
 
 function ChapterOutline({chapter, index, scenes, drafts, selectedId, onSelect, onEdit, onCreate}: {chapter: ChapterRecord; index: number; scenes: SceneSummary[]; drafts: Drafts; selectedId: string; onSelect: (id: string) => void; onEdit: () => void; onCreate: () => void}) {

@@ -1,3 +1,4 @@
+import {validateSchemaVersion} from './document-storage.js';
 import {parentChoices} from '../public/locations/data.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
 import {repository} from './db.js';
@@ -31,7 +32,10 @@ export async function countryRoute(request,env){
   if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'Country profile is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid country data.'},400);}
-  if(!input||!Number.isInteger(input.version))return json({error:'Reload this country before saving.'},400);
+  if(!input||typeof input!=='object'||Array.isArray(input)||!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<0)return json({error:'Reload this country before saving.'},400);
+  try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
+  if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A country’s ID cannot change.'},400);
+  if(Object.hasOwn(input,'type')&&input.type!=='country')return json({error:'A country’s type cannot change.'},400);
   const document={};for(const key of countryFields){const value=Object.hasOwn(input,key)?input[key]:current[key]||'';if(typeof value!=='string'||value.length>(key==='name'?160:countryImageFields.includes(key)?2048:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
   document.hiddenFields=readHiddenFields(input,current,countryHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
   try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),ratingGroupsFor('location','country'));}catch(error){return json({error:error.message},400);}

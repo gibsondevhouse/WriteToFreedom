@@ -6,6 +6,7 @@ This README is the developer entry point: it describes how to run the project, h
 
 For detailed implementation contracts, use these companion references:
 
+- [Data model and integrity](docs/data-model.md): canonical identities, revision/format versions, database guards, migrations, and decisions before AI integration.
 - [Routing and request contracts](docs/routing.md): dispatch precedence, handler annotations, projections, validation/write boundaries, redirects, and method differences.
 - [Reusable dashboard shell](docs/dashboard-shell.md): complete page definitions, slots, actions, loading/retry, sections, and lifecycle for Home, Lore, and future dashboards.
 - [Component boundaries and extension contracts](docs/components.md): shared renderers, DOM hooks, browser adapters, state and cleanup ownership, cards, notes, and workspace navigation.
@@ -41,7 +42,7 @@ The implemented application includes:
 - **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types, and type-aware place ratings such as cost of living, climate, quality of life, habitability, or cultural value.
 - **Lore:** a dashboard built from the home dashboard’s shared cards, scrolling rails, and question banner; Notes, Artifacts, Relics, Books, Jewels, and Species collections; quick notes, editable standalone profiles, pinned/featured entries, connections, backlinks, and tailored ratings for value, attribute impact, knowledge, or biology. Existing character notes remain discoverable without moving their content.
 - **Story Arcs:** searchable directory and full editable profiles using the shared three-column shell, with arc logistics, story-date scope, linked characters/factions/locations, structural beats, stakes, connected subplots, key scenes, and a live tension/pace/action graph.
-- **Chapters and Scenes:** React writing workspace with chapter organization, scene metadata, Tiptap rich text, reusable reference access, explicit versioned saves and per-scene drafts/undo history.
+- **Chapters and Scenes:** separate React chapter-planning and scene-writing views with chapter organization, scene metadata, Tiptap rich text, reusable reference access, explicit versioned saves and per-scene drafts/undo history.
 - **Timeline:** read-only visualization of saved profile dates, including story arc scope, with filtering and pan/zoom controls.
 - **Shared profile controls:** explicit saving, version conflict handling, field visibility, collapsible sections, custom dropdown values where supported, and a precision-aware date picker.
 
@@ -65,7 +66,7 @@ npm run build
 npm run dev
 ```
 
-Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Useful entry points are:
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173) or [http://localhost:4173](http://localhost:4173). Useful entry points are:
 
 - [Dashboard](http://127.0.0.1:4173/dashboard/)
 - [Characters](http://127.0.0.1:4173/characters/)
@@ -227,6 +228,7 @@ The adapter supplies the D1 methods used by this repository: prepared statements
 | `oai-authenticated-user-id` | Request header used as the owner identity by private routes. |
 | Local author | `local-development-author`, injected by `scripts/dev.mjs`. |
 | Local bind address | `127.0.0.1`, hard-coded in `scripts/dev.mjs`. |
+| Local browser hosts | `127.0.0.1:<port>` and `localhost:<port>` retain their own matching request origins. |
 | Local port | `4173`, hard-coded in `scripts/dev.mjs`. |
 | Local SQLite file | `.sites-runtime/development.sqlite`. |
 | Hosted binding metadata | `.openai/hosting.json` declares D1 binding `DB`; R2 is unset. |
@@ -259,7 +261,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
 
-Parent type, ownership, valid references, and ancestry rules are enforced in application code. Preserve route validation when changing repository methods; direct SQL writes do not reproduce all of the application's domain checks.
+Every document table also has `schema_version` (currently 1), independent of the edit `version`. Migration `0011` adds SQL triggers for JSON object envelopes, safe revisions, immutable identities, owner-consistent scene/profile targets, and valid acyclic location parents. These supplement route validation; embedded JSON relationships and complete template semantics still require the application boundary. See [the data-model contract](docs/data-model.md) for precise guarantees and remaining limits.
 
 ### Samples and private overrides
 
@@ -289,7 +291,7 @@ Faction renames, country renames, city renames/reparenting, and location detail 
 6. Restart the local server to apply pending migrations to the development database.
 7. Commit the schema change, generated SQL, and generated metadata together.
 
-The local migration runner executes `.sql` files in filename order and records applied filenames in a local-only `local_migrations` table. Editing an already-applied migration does not make it run again. Add a new migration for an existing database change rather than rewriting migration history. Tests build fresh databases from all migrations, so also consider an existing local database when reviewing upgrades.
+The local migration runner executes `.sql` files in filename order and commits each file together with its entry in the local-only `local_migrations` table. A failure rolls both back. Editing an already-applied migration does not make it run again. Add a new migration for an existing database change rather than rewriting migration history. Preserve the custom integrity triggers when rebuilding tables: Drizzle snapshots do not model triggers. Tests cover both fresh databases and existing-data upgrades.
 
 ## HTTP routes and API contracts
 

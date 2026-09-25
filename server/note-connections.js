@@ -23,10 +23,10 @@ export function renderConnectedNotes(cast,target,record,lore=[]){
  return renderSection({id:'connected-notes',title:'Linked notes',fields:[]},`<ol class="profile-references">${notes.map(n=>`<li><a href="${escape(n.href)}">${escape(n.title||n.source)}</a>${n.title?' · '+escape(n.source):''}. ${escape(n.text)}</li>`).join('')}</ol>`,record);
 }
 /** Reject new unavailable/self-note links, while retaining existing unresolved references for compatibility. */
-export function validateNoteConnections(notes,targets,currentNotes=[]){
+export function validateNoteConnections(notes,targets,currentNotes=[],characterId){
  const keys=new Set(targets.map(referenceKey));
  for(const note of notes){
-  if((note.links||[]).some(l=>l.kind==='note'&&l.id===note.id))throw new Error('Choose a different note to link.');
+  if((note.links||[]).some(l=>l.kind==='note'&&l.id===note.id&&(!characterId||l.characterId===characterId)))throw new Error('Choose a different note to link.');
   const old=new Set((currentNotes.find(n=>n.id===note.id)?.links||[]).map(referenceKey));
   for(const link of note.links||[])if(!keys.has(referenceKey(link))&&!old.has(referenceKey(link)))throw new Error('Choose linked items from your world. A linked item may have been removed.');
  }
