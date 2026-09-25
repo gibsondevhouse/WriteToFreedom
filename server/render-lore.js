@@ -1,9 +1,19 @@
 import {loreTypes,loreTemplates,loreCollections,allowedCollections,primaryCollection,validImageUrl} from '../public/lore/template.js';
 import {referenceKey} from '../public/characters/notes.js';
-import {escape,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage,renderRatingsHost} from './profile-components.js';
+import {escape,jsonData,profileRevision,createFieldRenderer,renderSection,renderInfoGroup,renderProfileName,renderProfilePage,renderRatingsHost} from './profile-components.js';
 import {ratingGroupsFor} from '../public/profiles/ratings.js';
+import {frontendAssets} from './frontend-assets.js';
+
+/** The standalone note owns a single React region; no legacy profile controller runs here. */
+function renderNotePilot(record,targets,incoming){
+ const name=escape(record.name?.trim()||'Untitled lore');
+ const styles=['/profiles/profile.css','/profiles/editor.css','/profiles/date-picker.css','/characters/attribute-controls.css','/profiles/ratings.css','/locations/countries/profile.css','/lore/profile.css'];
+ const initial={record,targets:targets.filter(t=>!(t.kind==='lore'&&t.id===record.id)),incoming};
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${name} — Write to Freedom</title><link rel="icon" href="/crest.svg">${styles.map(path=>`<link rel="stylesheet" href="${path}?v=${profileRevision}">`).join('')}${frontendAssets('frontend/lore-profile.tsx')}</head><body class="entity-profile lore-profile"><div class="page-layout" id="lore-profile-root"><main><h1>${name}</h1><p role="status">Loading note…</p><noscript>Enable JavaScript to edit and save this note.</noscript></main></div><script id="profile-data" type="application/json">${jsonData(initial)}</script></body></html>`;
+}
 
 export function renderLore(record,targets,incoming){
+ if(record.type==='note')return renderNotePilot(record,targets,incoming);
  const template=loreTemplates[record.type],ratingGroups=ratingGroupsFor('lore',record.type),field=createFieldRenderer(record,{required:['name']}),visible=record.imageUrl&&validImageUrl(record.imageUrl);
  const image=`<figure class="country-media country-map"><img data-image="imageUrl" alt="${escape(record.name)}" referrerpolicy="no-referrer"${visible?` src="${escape(record.imageUrl)}"`:' hidden'}><figcaption><details${visible?'':' open'}><summary>Image</summary>${field(['imageUrl','Image URL','url'])}</details><small class="image-error" data-image-error="imageUrl" hidden>Image unavailable. Check its URL.</small></figcaption></figure>`;
  const collections=allowedCollections(record.type).map(c=>`<label class="lore-check"><input type="checkbox" data-collection="${c}"${record.collections.includes(c)?' checked':''}${c===primaryCollection[record.type]?' disabled':''}> ${loreCollections[c]}</label>`).join('');

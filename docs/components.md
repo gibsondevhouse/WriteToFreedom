@@ -32,6 +32,10 @@ renderDirectoryPage / renderDashboardPage / legacy static pages + workspaceShell
 
 Shared data modules such as templates, dates, notes validation, attribute validation, and graph/timeline models can be imported by both Worker and browser code because their model functions do not need the DOM. Browser controllers may access `document` during module evaluation and must not be imported into server execution paths. Placement under `public/` alone does not make a file browser-only or server-safe; inspect its imports and top-level effects.
 
+Standalone Lore notes are the first React/TypeScript pilot. `frontend/lore-profile.tsx` mounts into a dedicated region selected by `server/render-lore.js`, with one React owner for the complete profile and save lifecycle. The workspace shell remains outside it. The legacy profile controller contracts below still apply to other profiles; do not initialize them inside the React region. See [frontend migration](frontend-migration.md) for build, typing, verification and retirement boundaries.
+
+Chapters/Scenes use the second typed entry, `frontend/writing-workspace.tsx`. `Workspace.tsx` owns per-scene drafts, explicit saves, metadata and panels; `Editor.tsx` owns each mounted Tiptap instance, selection and undo history. Visited scenes remain mounted while hidden, and successful saves do not reset their editor content. The versioned rich-text schema and owner-scoped API contract are documented in [writing workspace](writing-workspace.md).
+
 ## Ownership map
 
 | Concern | Authoritative modules | Consumers |

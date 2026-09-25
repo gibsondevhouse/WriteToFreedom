@@ -3,6 +3,8 @@ import {renderDashboardPage} from './dashboard-shell.js';
 import {directoryPages} from './directory-pages.js';
 import {renderDirectoryPage} from './directory-shell.js';
 import {loreRoute} from './lore-routes.js';
+import {writingRoute} from './writing-routes.js';
+import {renderWritingWorkspace} from './render-writing.js';
 import {storyArcRoute} from './story-arc-routes.js';
 import {locationProfileRoute} from './location-profile-routes.js';
 import {locationTemplates,locationProfileGroups} from '../public/locations/template.js';
@@ -81,12 +83,21 @@ function validate(input,current) {
  * broad API prefixes must not consume a more specific endpoint placed later.
  * Authentication belongs to private handlers, not static pages or redirects.
  * See docs/routing.md for exact path, method, and query-string edge cases.
- * @param {Record<string, {content: string, type: string}>} assets Built text assets.
+ * @param {Record<string, {content: string, type: string, encoding?: string}>} assets Built text or base64 assets.
  * @returns {{fetch: function(Request, object): Promise<Response>}}
  */
 function createAppWorker(assets) { return {async fetch(request,env) {
  // Canonicalize/delegate specific location routes before broad APIs and assets.
  const url=new URL(request.url);const path=url.pathname;
+ if(path==='/chapters'||path==='/scenes'){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return Response.redirect(url.origin+path+'/'+url.search,308);
+ }
+ if(path==='/chapters/'||path==='/scenes/'){
+  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+  return new Response(request.method==='HEAD'?null:renderWritingWorkspace(),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+ }
+ if(/^\/api\/(chapters|scenes)(?:\/|$)/.test(path))return writingRoute(request,env);
  // Dashboard definitions all share one complete main-area shell.
  const dashboard=dashboardPages.get(path);
  if(dashboard){
@@ -223,7 +234,8 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  if(!assets[key]&&assets[path+'/index.html'])return Response.redirect(url.origin+path+'/'+url.search,308);
  const asset=assets[key];
  if(!asset)return new Response('Page not found',{status:404});
- return new Response(request.method==='HEAD'?null:asset.content,{headers:{'content-type':asset.type,'cache-control':'no-cache','x-content-type-options':'nosniff'}});
+ const body=request.method==='HEAD'?null:asset.encoding==='base64'?Uint8Array.from(atob(asset.content),character=>character.charCodeAt(0)):asset.content;
+ return new Response(body,{headers:{'content-type':asset.type,'cache-control':'no-cache','x-content-type-options':'nosniff'}});
 }};}
 
 
@@ -233,7 +245,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  * only for non-HEAD HTML. JSON, redirects without HTML, and other content pass
  * through. Buffer HTML, preserve status/headers, and remove stale content-length.
  * workspaceShell is idempotent; entity renderers must not duplicate its markup.
- * @param {Record<string, {content: string, type: string}>} assets Built text assets.
+ * @param {Record<string, {content: string, type: string, encoding?: string}>} assets Built text or base64 assets.
  * @returns {{fetch: function(Request, object, object): Promise<Response>}}
  */
 export function createWorker(assets) {

@@ -24,16 +24,29 @@ for(const type of Object.keys(loreTypes))test(`${type}: standalone lore template
  assert.deepEqual(record.collections,[primaryCollection[type]]);assert.equal(record.version,1);
  assert.deepEqual(record.profileRatings,{});
  for(const key of template.fields)assert.equal(typeof record[key],'string');
- let html=await (await request(page)).text();for(const key of template.fields)assert.equal(html.split(`name="${key}"`).length-1,1,key);
- assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,new Set(ratingGroupsFor('lore',type).map(group=>group.sectionId)).size);
- assert.ok(html.includes('data-app-shell'));assert.ok(html.includes('/lore/'));assert.ok(html.includes('What is true'));assert.ok(html.includes('What people believe'));
+ let html=await (await request(page)).text();
+ if(type==='note'){
+  assert.equal(html.split('id="lore-profile-root"').length-1,1);assert.ok(!html.includes('src="/lore/profile.js'));
+  const initial=JSON.parse(html.match(/<script id="profile-data" type="application\/json">(.*?)<\/script>/s)[1]);
+  assert.deepEqual(initial.record,record);assert.ok(Array.isArray(initial.targets));assert.deepEqual(initial.incoming,[]);
+  assert.ok(!initial.targets.some(target=>target.kind==='lore'&&target.id===record.id));
+ }else{
+  for(const key of template.fields)assert.equal(html.split(`name="${key}"`).length-1,1,key);
+  assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,new Set(ratingGroupsFor('lore',type).map(group=>group.sectionId)).size);
+  assert.ok(html.includes('What is true'));assert.ok(html.includes('What people believe'));
+ }
+ assert.ok(html.includes('data-app-shell'));assert.ok(html.includes('/lore/'));
  const ratingKey=ratingGroupsFor('lore',type)[0].fields[0][0];
  const changed={...record,truth:'The stone transfers illness.',beliefs:'Everyone calls it a healing stone.',knowledge:'Only Claude knows.',history:'Before </textarea><script>escape</script>',questions:'Who made it?\nWhat was the cost?',hiddenFields:['truth'],profileRatings:{[ratingKey]:61},originDate:'1200 BCE',pinned:true,featured:true,imageUrl:'https://example.com/entry.png'};
  for(const key of template.fields)if(key!=='name'&&!changed[key])changed[key]='Details for '+key;
  let r=await request(url,'PUT',changed);assert.equal(r.status,200);let saved=await r.json();assert.equal(saved.version,2);
  const reopened=await get(url);assert.deepEqual(reopened,saved);assert.notEqual(saved.truth,saved.beliefs);
  assert.deepEqual(reopened.profileRatings,{[ratingKey]:61});
- html=await (await request(page)).text();assert.ok(html.includes('data-profile-field="truth" hidden'));assert.ok(html.includes('&lt;/textarea&gt;&lt;script&gt;escape&lt;/script&gt;'));
+ html=await (await request(page)).text();
+ if(type==='note'){
+  const initial=JSON.parse(html.match(/<script id="profile-data" type="application\/json">(.*?)<\/script>/s)[1]);
+  assert.deepEqual(initial.record.hiddenFields,['truth']);assert.equal(initial.record.history,changed.history);assert.ok(html.includes('\\u003c/script\\u003e'));assert.ok(!html.includes('<script>escape</script>'));
+ }else{assert.ok(html.includes('data-profile-field="truth" hidden'));assert.ok(html.includes('&lt;/textarea&gt;&lt;script&gt;escape&lt;/script&gt;'));}
  assert.equal((await request(url,'PUT',changed)).status,409);assert.equal((await request(url,'GET',undefined,'other')).status,404);assert.equal((await request(page,'GET',undefined,'other')).status,404);
  const partial=await request(url,'PUT',{version:saved.version,summary:'Updated summary'});assert.equal(partial.status,200);saved=await partial.json();assert.equal(saved.truth,changed.truth);assert.deepEqual(saved.hiddenFields,['truth']);assert.equal(saved.pinned,true);assert.deepEqual(saved.profileRatings,{[ratingKey]:61});
  const dashboard=await get('/api/dashboard');assert.ok(searchCatalog(dashboard,'Updated summary').some(r=>r.id===record.id));assert.ok(dashboard.characters.find(c=>c.id==='claude').mentions.some(m=>m.href===page+'#field-knowledge'));

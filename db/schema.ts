@@ -1,5 +1,24 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+export const chapters = sqliteTable('chapters', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ document: text('document').notNull(),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [index('idx_chapters_owner_created').on(table.ownerId,table.createdAt,table.id)]);
+
+export const scenes = sqliteTable('scenes', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ chapterId: text('chapter_id').notNull().references(()=>chapters.id),
+ document: text('document').notNull(),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [index('idx_scenes_owner_chapter_created').on(table.ownerId,table.chapterId,table.createdAt,table.id)]);
+
 export const loreEntries = sqliteTable('lore_entries', {
  id: text('id').primaryKey(),
  ownerId: text('owner_id').notNull(),

@@ -19,7 +19,7 @@ function revisioned(specifier,revision){
 
 export function stampAssets(assets,revision=revisionForAssets(assets)){
  return Object.fromEntries(Object.entries(assets).map(([path,asset])=>{
-  if(typeof asset.content!=='string')return [path,asset];
+  if(typeof asset.content!=='string'||asset.encoding==='base64')return [path,asset];
   let content=asset.content.replaceAll(ASSET_REVISION_PLACEHOLDER,revision);
   if(path.endsWith('.js'))content=content.replace(/((?:\bfrom\s*|\bimport\s*)['"])([^'"]+)(['"])/g,(_,open,specifier,close)=>open+revisioned(specifier,revision)+close);
   if(path.endsWith('.css'))content=content.replace(/(@import\s+url\(["']?)([^"')]+)(["']?\))/g,(_,open,specifier,close)=>open+revisioned(specifier,revision)+close);

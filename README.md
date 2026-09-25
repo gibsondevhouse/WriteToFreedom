@@ -1,6 +1,6 @@
 # Write to Freedom
 
-Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, lore, story arcs, and a timeline derived from their story dates. It uses plain HTML, CSS, and browser JavaScript, with server-rendered entity profiles and a Cloudflare-compatible Worker backed by D1.
+Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, lore, story arcs, chapters, scenes, and a timeline derived from story dates. It uses semantic HTML and shared CSS, with React/TypeScript for standalone Lore notes and the Tiptap writing workspace alongside the existing browser JavaScript and server-rendered profiles. A Cloudflare-compatible Worker backed by D1 serves the application and its assets.
 
 This README is the developer entry point: it describes how to run the project, how requests and data move through it, which modules own each behavior, and the constraints to preserve when extending it.
 
@@ -9,6 +9,8 @@ For detailed implementation contracts, use these companion references:
 - [Routing and request contracts](docs/routing.md): dispatch precedence, handler annotations, projections, validation/write boundaries, redirects, and method differences.
 - [Reusable dashboard shell](docs/dashboard-shell.md): complete page definitions, slots, actions, loading/retry, sections, and lifecycle for Home, Lore, and future dashboards.
 - [Component boundaries and extension contracts](docs/components.md): shared renderers, DOM hooks, browser adapters, state and cleanup ownership, cards, notes, and workspace navigation.
+- [Frontend migration](docs/frontend-migration.md): Vite integration, type-check boundaries, the React Lore note pilot, browser verification, and the next workspace gates.
+- [Writing workspace](docs/writing-workspace.md): Chapters/Scenes, Tiptap document schema, versioned APIs, draft/history ownership and verification.
 - [Character-card integration](public/components/character-card/README.md): component usage, data shape, styling, callbacks, and featured-item behavior.
 
 ## Contents
@@ -39,10 +41,11 @@ The implemented application includes:
 - **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types, and type-aware place ratings such as cost of living, climate, quality of life, habitability, or cultural value.
 - **Lore:** a dashboard built from the home dashboard’s shared cards, scrolling rails, and question banner; Notes, Artifacts, Relics, Books, Jewels, and Species collections; quick notes, editable standalone profiles, pinned/featured entries, connections, backlinks, and tailored ratings for value, attribute impact, knowledge, or biology. Existing character notes remain discoverable without moving their content.
 - **Story Arcs:** searchable directory and full editable profiles using the shared three-column shell, with arc logistics, story-date scope, linked characters/factions/locations, structural beats, stakes, connected subplots, key scenes, and a live tension/pace/action graph.
+- **Chapters and Scenes:** React writing workspace with chapter organization, scene metadata, Tiptap rich text, reusable reference access, explicit versioned saves and per-scene drafts/undo history.
 - **Timeline:** read-only visualization of saved profile dates, including story arc scope, with filtering and pan/zoom controls.
 - **Shared profile controls:** explicit saving, version conflict handling, field visibility, collapsible sections, custom dropdown values where supported, and a precision-aware date picker.
 
-Chapters, Scenes, and Story Beats remain upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
+Story Beats remains upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
 
 The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding includes an original African-inspired white SVG crest in `public/crest.svg`.
 
@@ -50,7 +53,7 @@ The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fict
 
 ### Prerequisites
 
-Use **Node.js 22**, with npm; the documented build and test commands have been verified with Node 22.22.3 and npm 10.9.8. The development server and database-backed tests import `DatabaseSync` from `node:sqlite`, so your runtime must support that module without additional flags. Node may print an experimental SQLite warning even when everything is working.
+Use **Node.js 22.13 or newer**, with npm; the documented build and test commands have been verified with Node 22.22.3 and npm 10.9.8. The development server and database-backed tests import `DatabaseSync` from `node:sqlite`, which is [available without an enabling flag from Node 22.13](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html). Node may print an experimental SQLite warning even when everything is working.
 
 Run all commands from the repository root. The build, migration loader, and test fixtures resolve paths relative to the current working directory.
 
@@ -71,6 +74,8 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Useful entry points are:
 - [Lore](http://127.0.0.1:4173/lore/)
 - [Timeline](http://127.0.0.1:4173/timeline/)
 - [Story Arcs](http://127.0.0.1:4173/story-arcs/)
+- [Chapters](http://127.0.0.1:4173/chapters/)
+- [Scenes](http://127.0.0.1:4173/scenes/)
 
 `npm ci` installs the versions recorded in `package-lock.json`. Use `npm install` when intentionally changing dependencies, and commit the resulting lockfile changes with `package.json`.
 
@@ -87,12 +92,15 @@ To start with a fresh local database while keeping a backup, stop the server and
 | Command | Purpose | Notes |
 | --- | --- | --- |
 | `npm ci` | Install locked dependencies | Recommended for a fresh checkout. |
-| `npm run build` | Embed frontend assets and bundle the Worker | Writes `.sites-runtime/entry.mjs` and `dist/server/index.js`. |
-| `npm run dev` | Start the local HTTP server and SQLite adapter | Requires a build; listens on `127.0.0.1:4173`. |
+| `npm run build` | Type-check, build the Vite frontend, embed assets and bundle the Worker | Writes `dist/client/`, `.sites-runtime/entry.mjs`, and `dist/server/index.js`. |
+| `npm run build:frontend` | Build only the Vite frontend | Does not type-check or rebuild the Worker; normally use the full build. |
+| `npm run typecheck` | Check TypeScript and selected legacy JavaScript | Strict frontend checking; a separate `checkJs` boundary covers the shared visibility schema. |
+| `npm run dev` | Build and start the local HTTP server and SQLite adapter | Defaults to `127.0.0.1:4173`; optional `PORT` and `WTF_DATABASE_PATH` overrides. |
 | `npm test` | Run all Node test files | Database fixtures use isolated in-memory SQLite. |
+| `npm run test:browser` | Run Playwright against a freshly built Worker | Install Chromium once with `npx playwright install chromium`; uses a temporary database and port 4175 (override with `WTF_BROWSER_TEST_PORT`). |
 | `npm run db:generate` | Generate SQL migrations with Drizzle Kit | Reads `db/schema.ts`; writes SQL and metadata under `drizzle/`. |
 
-There is currently no watch mode, hot reload, lint script, type-check script, or npm deployment script.
+There is currently no watch mode, hot reload, lint script, or npm deployment script. Local development serves compiled assets from the same origin as the APIs; it does not use a Vite development proxy.
 
 ### Editing application code
 
@@ -128,6 +136,10 @@ Tests import server and shared source modules directly, so they do not require a
 ├── db/schema.ts                 # Drizzle definitions for persisted tables
 ├── drizzle/                     # Ordered SQL migrations and generator metadata
 ├── drizzle.config.ts            # SQLite dialect, schema path, migration output
+├── frontend/                    # Typed React entries and complete profile regions
+├── vite.config.ts               # Frontend entry, manifest and asset prefix
+├── tsconfig*.json               # Strict frontend and selected legacy JS checks
+├── playwright.config.ts         # Compiled-Worker browser tests with isolated SQLite
 ├── public/
 │   ├── styles.css               # Shared dashboard theme
 │   ├── crest.svg                # Shared branding
@@ -145,12 +157,14 @@ Tests import server and shared source modules directly, so they do not require a
 │   ├── profiles/                # Shared controls, styling, dates, editor behavior
 │   └── timeline/                # Timeline page, model, rendering and interaction
 ├── scripts/
-│   ├── build.mjs                # Asset collection and esbuild bundling
+│   ├── build.mjs                # Vite frontend and embedded esbuild Worker
+│   ├── collect-assets.mjs       # Text/binary asset collection
 │   ├── dev.mjs                  # Node HTTP server and local migration runner
 │   └── sqlite-adapter.mjs       # D1-shaped adapter over Node SQLite
 ├── server/
 │   ├── app.js                   # Outer shell wrapper, dispatcher, character API/assets
 │   ├── workspace-shell.js       # Shared HTML navigation wrapper
+│   ├── frontend-assets.js       # Manifest entry scripts, CSS and module preloads
 │   ├── dashboard-shell.js       # Complete reusable dashboard HTML frame
 │   ├── dashboard-pages.js       # Home/Lore definitions and route aliases
 │   ├── dashboard-routes.js      # Dashboard API and reusable data projection
@@ -165,7 +179,8 @@ Tests import server and shared source modules directly, so they do not require a
 │   ├── countries.js             # Location catalog and default country profiles
 │   └── cities.js                # Default city profiles
 ├── docs/                        # Detailed routing and component contracts
-├── tests/                       # Node tests for routes, persistence and models
+├── tests/                       # Node tests for routes, persistence, models and assets
+│   └── browser/                 # Playwright note pilot and legacy-route coverage
 ├── package.json
 └── package-lock.json
 ```
@@ -176,11 +191,11 @@ Tests import server and shared source modules directly, so they do not require a
 
 ### Build and asset delivery
 
-`scripts/build.mjs` recursively reads `public/` and constructs an asset map keyed by URL path. Each entry contains UTF-8 text and a content type. It writes an entry module that calls `createWorker(assets)`, then bundles that module with esbuild into an ES module at `dist/server/index.js`, targeting ES2022 and browser-compatible APIs.
+`scripts/build.mjs` runs Vite for the Lore note and writing workspace entries, reads its manifest, then collects legacy `public/` assets and generated `dist/client/` assets. Generated files are served under the reserved `/frontend/` prefix. The script writes an entry module that calls `createWorker(assets)`, then bundles that module and the frontend manifest with esbuild into `dist/server/index.js`, targeting ES2022 and browser-compatible APIs.
 
-The current asset collector explicitly recognizes HTML, CSS, JavaScript, and SVG. Other extensions fall back to `text/plain`, and every file is read as UTF-8. Binary assets such as PNGs, fonts, and PDFs therefore require changes to the asset pipeline before adding them to `public/`; simply copying them into that directory is insufficient.
+`scripts/collect-assets.mjs` stores known text formats as UTF-8 and binary formats as base64 with their content types. The Worker decodes binary bytes on delivery. Unknown formats use `application/octet-stream`; dotfiles and Vite's internal manifest are not publicly served. Images and fonts can be embedded, but they increase Worker size.
 
-Browser modules remain individual served assets. They are not separately transpiled or bundled into a frontend application. Keep their syntax and dependencies compatible with the browsers the project is intended to support.
+Legacy browser modules remain individual served assets and retain their shared revision stamping. Vite owns the generated frontend's hashes and imports; generated chunks are not rewritten by the legacy stamper. `server/frontend-assets.js` renders entry scripts, CSS and transitive module preloads from the manifest. `npm run build` runs TypeScript checking separately from Vite transpilation.
 
 ### Request flow
 
@@ -194,7 +209,7 @@ Browser modules remain individual served assets. They are not separately transpi
 
 The outer Worker then decorates non-HEAD HTML responses with `workspaceShell`, preserving status and headers except the now-invalid content length. JSON and other responses pass through. The wrapper is idempotent for HTML already marked `data-app-shell`. See [dispatch order and edge cases](docs/routing.md#dispatch-order-is-part-of-the-contract) before adding routes; path strictness and HEAD handling are not uniform across handlers.
 
-Directories retain static HTML with browser scripts that fetch their catalogs. Home and Lore use `renderDashboardPage` and page definitions, with `initDashboardShell` owning loading, errors, refresh and section cleanup. Their shared stylesheet dependency is automatic; see the [dashboard shell contract](docs/dashboard-shell.md). Character, faction, Lore, and all ten location profiles are rendered by the Worker with their current content and choices, then enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the editor.
+Directories retain static HTML with browser scripts that fetch their catalogs. Home and Lore use `renderDashboardPage` and page definitions, with `initDashboardShell` owning loading, errors, refresh and section cleanup. Their shared stylesheet dependency is automatic; see the [dashboard shell contract](docs/dashboard-shell.md). Standalone Lore notes mount a React profile into a dedicated region using escaped initial JSON. Other profiles remain server-rendered and enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the owning editor.
 
 Static assets use `Cache-Control: no-cache`; private JSON responses and successful dynamic profile responses use `Cache-Control: no-store`. Rendered text is escaped through the server rendering code. Preserve those boundaries when adding fields or new markup.
 
@@ -239,6 +254,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 | `city_profiles` | Editable city JSON documents, including country selection | Unique owner/location pair and integer version. |
 | `lore_entries` | Standalone Lore JSON documents with primary type, collections, fields and connections | Primary UUID, owner scope, integer version and timestamps; added in migration `0007`. |
 | `story_arcs` | Story arc JSON documents with beats, pacing, linked entities, subplots, and key scenes | Primary UUID, owner scope, integer version and timestamps; added in migration `0008`. |
+| `chapters`, `scenes` | Chapter metadata and schema-versioned rich-text scene documents | Owner scope, optimistic versions and timestamps; scene-to-chapter relationship; added in migration `0009`. |
 | `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair and integer version. |
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
@@ -551,7 +567,7 @@ The suite uses the built-in Node test runner and strict assertions. Database-bac
 
 For application changes, run the relevant focused suites during development, then run `npm test` and `npm run build` before handing off. Add tests for changed behavior, especially ownership, stale writes, hierarchy constraints, and preservation of existing content.
 
-These tests do not launch a real browser or run against hosted D1. For layout or interaction changes, also inspect the affected pages at wide and narrow viewport sizes. Verify keyboard navigation, save/reopen behavior, hidden content preservation, the sticky footer boundary, and relevant picker or timeline interactions. A model or markup assertion does not prove that a visual interaction works in the browser.
+The Node suites do not launch a browser or run against hosted D1. `npm run test:browser` adds real Chromium coverage against the compiled Worker and an isolated SQLite database, including the React note pilot, failures, version conflicts, keyboard controls and narrow-screen behavior. For layout changes, also inspect the affected pages at wide and narrow viewport sizes. A model or markup assertion does not prove that a visual interaction works in the browser.
 
 ## Common development changes
 
