@@ -1,4 +1,4 @@
-import {searchCatalog} from './search.js';
+import {searchCatalog} from './search.js?v=__WTF_ASSET_REVISION__';
 
 const input = document.querySelector('#novel-search');
 const results = document.querySelector('#search-results');

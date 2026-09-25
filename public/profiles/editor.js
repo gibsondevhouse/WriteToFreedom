@@ -1,5 +1,6 @@
 import {locationHref} from '../locations/data.js';
 import {initProfileControls,resize} from './controls.js?v=profile-reading-1';
+import {announceWorkspaceChange} from './workspace-events.js?v=__WTF_ASSET_REVISION__';
 
 // Entity adapters supply only their field names, endpoint, and image constraints.
 /**
@@ -36,7 +37,7 @@ export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],valid
    version=data.version;dirty=false;form.elements.namedItem('name').value=data.name;update();
    const country=form.elements.namedItem('parentId');if(country)document.querySelectorAll('[data-country-link]').forEach(link=>{link.href=locationHref({type:'country',id:data.parentId});link.textContent=country.selectedOptions[0]?.textContent||'Country';});
    status.textContent='Saved';
-   window.dispatchEvent(new Event('workspace:changed'));
+   announceWorkspaceChange();
    onSaved(data);
   }catch(e){error.hidden=false;error.textContent=e.message;status.textContent='Not saved — your changes are still here';}
   finally{saving=false;fields.disabled=false;save.disabled=false;}

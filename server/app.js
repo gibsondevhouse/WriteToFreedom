@@ -3,6 +3,7 @@ import {renderDashboardPage} from './dashboard-shell.js';
 import {directoryPages} from './directory-pages.js';
 import {renderDirectoryPage} from './directory-shell.js';
 import {loreRoute} from './lore-routes.js';
+import {storyArcRoute} from './story-arc-routes.js';
 import {locationProfileRoute} from './location-profile-routes.js';
 import {locationTemplates,locationProfileGroups} from '../public/locations/template.js';
 import {locationPaths} from '../public/locations/data.js';
@@ -114,6 +115,8 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  if(locationPage||/^\/api\/locations\/[^/]+\/?$/.test(path))return locationProfileRoute(request,env);
  if(/^\/lore\/[0-9a-f-]{36}$/i.test(path))return Response.redirect(url.origin+path+'/'+url.search,308);
  if(/^\/lore\/[^/]+\/$/.test(path)||path==='/api/lore'||/^\/api\/lore\/[^/]+\/?$/.test(path))return loreRoute(request,env);
+ if(/^\/story-arcs\/[0-9a-f-]{36}$/i.test(path))return Response.redirect(url.origin+path+'/'+url.search,308);
+ if(/^\/story-arcs\/[^/]+\/$/.test(path)||path==='/api/story-arcs'||/^\/api\/story-arcs\/[^/]+\/?$/.test(path))return storyArcRoute(request,env);
  if(path==='/api/timeline')return timelineRoute(request,env);
  if(path==='/api/dashboard')return dashboardRoute(request,env);
  if(path==='/api/locations')return locationRoute(request,env);

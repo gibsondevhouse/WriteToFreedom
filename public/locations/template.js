@@ -65,7 +65,7 @@ export const locationTemplates=Object.fromEntries(Object.entries(definitions).ma
 
 export function defaultLocation(location){
  const template=locationTemplates[location.type];
- return {...Object.fromEntries(template.fields.map(key=>[key,''])),hiddenFields:[],version:0,...location,parentId:location.parentId||''};
+ return {...Object.fromEntries(template.fields.map(key=>[key,''])),hiddenFields:[],version:0,...location,profileRatings:{...(location.profileRatings||{})},parentId:location.parentId||''};
 }
 export function locationProfileGroups(locations){
  return Object.fromEntries(Object.keys(locationTemplates).map(type=>[type,locations.filter(l=>l.type===type).map(defaultLocation)]));

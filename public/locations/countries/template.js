@@ -1,4 +1,4 @@
-import {hiddenFieldNames} from '../../profiles/schema.js';
+import {hiddenFieldNames} from '../../profiles/schema.js?v=__WTF_ASSET_REVISION__';
 export const countrySections=[
  {id:'identity',title:'Country information',fields:[['name','Name','input'],['officialName','Official name','input'],['parentId','Continent / world','world'],['motto','Motto','input'],['anthem','Anthem','input'],['capitalId','Capital','city'],['largestCityId','Largest city','city'],['officialLanguages','Official languages','choice'],['demonym','Demonym','input'],['governmentType','Government','choice'],['leaderId','Head of state','character'],['legislature','Legislature','input'],['founded','Established','date'],['area','Area','input'],['population','Population','input'],['populationDate','Population as of','date'],['currency','Currency','input'],['timeZone','Time zone / calendar','input']]},
  {id:'symbols',title:'National symbols & map',fields:[['flagUrl','Flag image URL','url'],['coatOfArmsUrl','Coat of arms image URL','url'],['mapUrl','Map image URL','url']]},
@@ -15,6 +15,6 @@ export const countrySections=[
 ];
 export const countryFields=countrySections.flatMap(s=>s.fields.map(f=>f[0]));
 export const countryImageFields=['flagUrl','coatOfArmsUrl','mapUrl'];
-export const blankCountry=()=>({...Object.fromEntries(countryFields.map(k=>[k,''])),hiddenFields:[]});
+export const blankCountry=()=>({...Object.fromEntries(countryFields.map(k=>[k,''])),hiddenFields:[],profileRatings:{}});
 export const countryHideableFields=hiddenFieldNames(countrySections);
 export function validImageUrl(value){if(!value)return true;try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}}

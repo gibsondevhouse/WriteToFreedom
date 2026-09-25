@@ -1,6 +1,7 @@
-import {el,loreEntryCard} from '../dashboard/components.js?v=species-cards-1';
-import {initDashboardShell} from '../dashboard/shell.js?v=shell-2';
-import {loreTypes,loreCollections,primaryCollection,loreHref} from './template.js';
+import {el,loreEntryCard} from '../dashboard/components.js?v=__WTF_ASSET_REVISION__';
+import {initDashboardShell} from '../dashboard/shell.js?v=__WTF_ASSET_REVISION__';
+import {loreTypes,loreCollections,primaryCollection,loreHref} from './template.js?v=__WTF_ASSET_REVISION__';
+import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 
 const $=selector=>document.querySelector(selector);
 const search=$('#lore-search'),dialog=$('#new-lore-dialog'),form=$('#new-lore-form');
@@ -110,7 +111,7 @@ $('#quick-note').addEventListener('submit',async event=>{
  saving=true;updateSaving();$('#capture-error').hidden=true;$('#capture-status').hidden=true;noteId??=crypto.randomUUID();
  try{
   const record=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:noteId,type:'note',name:text.split('\n')[0].slice(0,100),body:text,summary:text.slice(0,180)})});
-  quick.value='';noteId=null;window.dispatchEvent(new Event('workspace:changed'));
+  quick.value='';noteId=null;announceWorkspaceChange();
   const status=$('#capture-status'),link=el('a','','Open note →');link.href=loreHref(record);
   status.replaceChildren(document.createTextNode('Note saved.'),link);status.hidden=false;
   setCapture(false,false);await dashboard.refresh();

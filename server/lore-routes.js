@@ -9,6 +9,7 @@ import {readHiddenFields} from '../public/profiles/schema.js';
 import {blankLore,loreTypes,loreTemplates,allowedCollections,primaryCollection,validImageUrl} from '../public/lore/template.js';
 import {loreDashboardData} from './lore.js';
 import {renderLore} from './render-lore.js';
+import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 function validate(input,current,targets){
@@ -18,6 +19,7 @@ function validate(input,current,targets){
  document.name=document.name.trim().replace(/\s+/g,' ');if(!document.name)throw new Error('Enter a name for this entry.');
  if(!validImageUrl(document.imageUrl))throw new Error('Use an HTTPS image URL.');
  document.hiddenFields=readHiddenFields(input,current,template.hideableFields);if(!document.hiddenFields)throw new Error('Choose visible fields from this entry’s template.');
+ document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),ratingGroupsFor('lore',current.type));
  const collections=Object.hasOwn(input,'collections')?input.collections:current.collections;
  if(!Array.isArray(collections)||collections.length>4||!collections.includes(primaryCollection[current.type])||collections.some(c=>!allowedCollections(current.type).includes(c)))throw new Error('Choose collections appropriate for this entry and keep its primary collection.');
  document.collections=[...new Set(collections)];
@@ -41,7 +43,7 @@ export async function loreRoute(request,env){
  if(!owner)return json({error:'Sign in to access your lore.'},401);
  if(!['GET','HEAD','POST','PUT'].includes(request.method)||html&&!['GET','HEAD'].includes(request.method)||!html&&request.method==='HEAD'||id&&request.method==='POST'||!id&&request.method==='PUT')return json({error:'Method not allowed.'},405);
  try{
-  const db=repository(env.DB),records=await db.listLore(owner),current=id?records.find(r=>r.id===id):null;
+  const db=repository(env.DB),records=(await db.listLore(owner)).map(record=>({...blankLore(record.type),...record,profileRatings:{...(record.profileRatings||{})}})),current=id?records.find(r=>r.id===id):null;
   if(id&&!current)return json({error:'Lore entry not found.'},404);
   if(request.method==='HEAD')return new Response(null,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
   if(!html&&request.method==='GET')return json(id?current:loreDashboardData(records,characterCast(await db.list(owner))));

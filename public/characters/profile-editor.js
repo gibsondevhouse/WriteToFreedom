@@ -3,6 +3,7 @@ import {attributeGroups} from './attributes.js?v=section-attributes-1';
 import {createAttributeControls} from './attribute-controls.js?v=section-attributes-1';
 import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';
 import { fieldNames, nameFields, fullName } from './template.js?v=character-cards-1';
+import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
 const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');
@@ -74,7 +75,7 @@ form.addEventListener('submit',async event=>{
  const payload=Object.fromEntries(fieldNames.map(key=>[key,choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.notes=noteEditor.notes;payload.nationalityContinents={...nationalityContinents};payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
- try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();}
+ try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();announceWorkspaceChange();}
  catch(e){showError(e.message);status.textContent='Not saved — your changes are still here';}
  finally{saving=false;save.disabled=false;fields.disabled=false;}
 });

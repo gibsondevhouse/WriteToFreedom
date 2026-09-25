@@ -5,6 +5,7 @@ import { factionCatalog, attachFactionNames } from './factions.js';
 import { factionHideableFields, factionFields, blankFaction, factionTypes, factionStatuses } from '../public/factions/template.js';
 import { idPattern } from '../public/characters/template.js';
 import { characterCast } from './sample-characters.js';
+import {factionRatingGroups,validateProfileRatings} from '../public/profiles/ratings.js';
 import { renderFaction } from './render-faction.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
@@ -48,6 +49,7 @@ export async function factionRoute(request,env){
    if(!Number.isInteger(input.version))return json({error:'Reload this faction before saving.'},400);
    const document=blankFaction();for(const key of factionFields){const value=Object.hasOwn(input,key)?input[key]:current[key];if(typeof value!=='string'||value.length>(key==='name'?160:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
   document.hiddenFields=readHiddenFields(input,current,factionHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
+   try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),factionRatingGroups);}catch(error){return json({error:error.message},400);}
    if(!validImageUrl(document.imageUrl)||document.imageUrl.length>2048)return json({error:'Use an HTTPS faction image URL of at most 2048 characters.'},400);
    document.name=document.name.trim().replace(/\s+/g,' ');
    for(const [key,choices] of [['type',factionTypes],['status',factionStatuses]])if(document[key]&&!choices.includes(document[key]))return json({error:'Choose a '+key+' from the list.'},400);

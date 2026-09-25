@@ -1,6 +1,6 @@
 # Write to Freedom
 
-Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, lore, and a timeline derived from their story dates. It uses plain HTML, CSS, and browser JavaScript, with server-rendered entity profiles and a Cloudflare-compatible Worker backed by D1.
+Write to Freedom is a novel-planning and worldbuilding application for maintaining a private cast of characters, factions, places, lore, story arcs, and a timeline derived from their story dates. It uses plain HTML, CSS, and browser JavaScript, with server-rendered entity profiles and a Cloudflare-compatible Worker backed by D1.
 
 This README is the developer entry point: it describes how to run the project, how requests and data move through it, which modules own each behavior, and the constraints to preserve when extending it.
 
@@ -33,15 +33,16 @@ For detailed implementation contracts, use these companion references:
 
 The implemented application includes:
 
-- **Dashboard and workspace:** overview rails, rotating open questions, shared navigation, and catalog search across characters, factions, locations, and standalone lore.
+- **Dashboard and workspace:** overview rails, rotating open questions, shared navigation, and catalog search across characters, factions, locations, standalone lore, and story arcs.
 - **Characters:** searchable and sortable card directory, blank or named creation, editable profiles, structured identity, relationships, attributes and derived power, portrait artwork, faction/location references, authored notes, and featured card items.
-- **Factions:** directory, blank or named creation, editable profiles, character-linked founders and leaders, and membership derived from character faction selections.
-- **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types.
-- **Lore:** a dashboard built from the home dashboard’s shared cards, scrolling rails, and question banner; Notes, Artifacts, Relics, Books, Jewels, and Species collections; quick notes, editable standalone profiles, pinned/featured entries, connections, and backlinks. Existing character notes remain discoverable without moving their content.
-- **Timeline:** read-only visualization of saved profile dates, with filtering, pan/zoom controls, clustering, and links back to the source fields.
+- **Factions:** directory, blank or named creation, editable profiles, character-linked founders and leaders, membership derived from character faction selections, and ratings for power, organization, and standing.
+- **Locations:** a hierarchy from universes through galaxies, solar systems, planets, moons, continents, countries, cities, areas, and landmarks; search/type filters, full editable profiles for all ten types, and type-aware place ratings such as cost of living, climate, quality of life, habitability, or cultural value.
+- **Lore:** a dashboard built from the home dashboard’s shared cards, scrolling rails, and question banner; Notes, Artifacts, Relics, Books, Jewels, and Species collections; quick notes, editable standalone profiles, pinned/featured entries, connections, backlinks, and tailored ratings for value, attribute impact, knowledge, or biology. Existing character notes remain discoverable without moving their content.
+- **Story Arcs:** searchable directory and full editable profiles using the shared three-column shell, with arc logistics, story-date scope, linked characters/factions/locations, structural beats, stakes, connected subplots, key scenes, and a live tension/pace/action graph.
+- **Timeline:** read-only visualization of saved profile dates, including story arc scope, with filtering and pan/zoom controls.
 - **Shared profile controls:** explicit saving, version conflict handling, field visibility, collapsible sections, custom dropdown values where supported, and a precision-aware date picker.
 
-Story Arcs, Chapters, Scenes, and Story Beats remain upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
+Chapters, Scenes, and Story Beats remain upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
 
 The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding includes an original African-inspired white SVG crest in `public/crest.svg`.
 
@@ -69,6 +70,7 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Useful entry points are:
 - [Locations](http://127.0.0.1:4173/locations/)
 - [Lore](http://127.0.0.1:4173/lore/)
 - [Timeline](http://127.0.0.1:4173/timeline/)
+- [Story Arcs](http://127.0.0.1:4173/story-arcs/)
 
 `npm ci` installs the versions recorded in `package-lock.json`. Use `npm install` when intentionally changing dependencies, and commit the resulting lockfile changes with `package.json`.
 
@@ -139,6 +141,7 @@ Tests import server and shared source modules directly, so they do not require a
 │   │   ├── countries/           # Country template, profile adapter/styles
 │   │   └── cities/              # City template, profile adapter/styles
 │   ├── lore/                    # Lore dashboard, templates and profile adapter
+│   ├── story-arcs/              # Arc directory, template, pacing graph and editor
 │   ├── profiles/                # Shared controls, styling, dates, editor behavior
 │   └── timeline/                # Timeline page, model, rendering and interaction
 ├── scripts/
@@ -235,6 +238,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 | `country_profiles` | Editable country JSON documents | Unique owner/location pair and integer version. |
 | `city_profiles` | Editable city JSON documents, including country selection | Unique owner/location pair and integer version. |
 | `lore_entries` | Standalone Lore JSON documents with primary type, collections, fields and connections | Primary UUID, owner scope, integer version and timestamps; added in migration `0007`. |
+| `story_arcs` | Story arc JSON documents with beats, pacing, linked entities, subplots, and key scenes | Primary UUID, owner scope, integer version and timestamps; added in migration `0008`. |
 | `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair and integer version. |
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
@@ -289,6 +293,8 @@ The local migration runner executes `.sql` files in filename order and records a
 | `/locations/countries/{id}/` | Editable country article. |
 | `/locations/cities/{id}/` | Editable city article. |
 | `/timeline/` | Derived story timeline. |
+| `/story-arcs/` | Story arc directory. |
+| `/story-arcs/{id}/` | Editable story arc profile and pacing graph. |
 
 Use canonical trailing-slash page URLs. The router redirects supported noncanonical paths and retains compatibility with `/characters/edit/?id={id}` and `/characters/edit/index.html?id={id}`.
 
@@ -319,7 +325,11 @@ Use canonical trailing-slash page URLs. The router redirects supported noncanoni
 | `POST` | `/api/lore` | Creates an entry with UUID `id`, primary `type`, required `name`, and optional template fields; owner/ID retries are idempotent. |
 | `GET` | `/api/lore/{id}` | Returns a full standalone Lore document. |
 | `PUT` | `/api/lore/{id}` | Saves validated fields, collections, connections, visibility, pin/feature choices and `version`; omitted fields are preserved. |
-| `GET` | `/api/dashboard` | Returns `{ questions, characters, factions, locations, lore, timeline }`; also supplies shell search. |
+| `GET` | `/api/story-arcs` | Returns `{ storyArcs: [...] }`. |
+| `POST` | `/api/story-arcs` | Creates a blank owner-scoped story arc from a UUID `id`. |
+| `GET` | `/api/story-arcs/{id}` | Returns one complete editable story arc document. |
+| `PUT` | `/api/story-arcs/{id}` | Saves arc fields, pacing values, key entities, connected arcs, key scenes, visibility, and `version`. |
+| `GET` | `/api/dashboard` | Returns `{ questions, characters, factions, locations, lore, storyArcs, timeline }`; also supplies shell search. |
 | `GET` | `/api/timeline` | Returns `{ events, unplaced, undated, counts }`; derives data on each request. |
 
 All location creation goes through `/api/locations`; profile endpoints handle reads and updates. There are no separate country/city collection creation routes. Use the entity templates for exact field lists rather than maintaining a second schema in client code.
@@ -433,6 +443,8 @@ The character profile is the design baseline for characters, factions, all locat
 | `public/profiles/editor.js` | Shared faction/location/Lore saving and image previews, with optional `readExtra` and `onSaved` hooks. |
 | `public/profiles/choices.js` | Reusable dropdown suggestions. |
 | `public/profiles/schema.js` | Field visibility allowlists and validation helpers. |
+| `public/profiles/ratings.js` | Type-aware rating registries and server-side 0–99 validation for locations, factions, and Lore. |
+| `public/profiles/ratings-controls.js` / `ratings.css` | Shared editable rating dials used by every non-character profile; characters reuse the same dial presentation for attributes. |
 | `public/profiles/dates.js` | Story-date parsing, formatting, precision, and calendar arithmetic. |
 | `public/profiles/date-picker.js` / `date-picker.css` | Shared date picker and positioning behavior. |
 | Entity `template.js` files | Entity field lists, defaults, options, and visibility definitions. |
@@ -442,7 +454,7 @@ The character editor in `public/characters/profile-editor.js` uses the shared co
 
 ### Interaction and layout contract
 
-Inside the shared workspace shell, characters, factions, all ten location types, and the six Lore types share profile breadcrumbs, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus.
+Inside the shared workspace shell, characters, factions, all ten location types, the six Lore types, and story arcs share profile breadcrumbs, a sticky save bar, editable infobox names, collapsible article headings, dimmed collapsed titles, collapsible infobox groups, and icon-only visibility menus. Profiles that use 0–99 ratings place them inside the article sections they describe. Story arcs instead use the same value range for an editable tension, pace, and action graph across six narrative beats.
 
 Field visibility is persisted as `hiddenFields` independently of the content values. Hidden fields and collapsed controls remain mounted, and their values survive saving and reopening. Collapsing a section is temporary page state; it must not delete fields or silently alter their visibility preference. Hash navigation and validation should reveal the relevant controls when necessary.
 
@@ -473,7 +485,7 @@ Ambiguous dates, yearless birthdays, ranges, unsupported fictional-calendar text
 
 ### Shared picker
 
-The date picker supports Day, Month, Quarter, Half-year, and Year selection, direct year/era navigation, keyboard calendar navigation, approximation, custom text, and clearing. A selection changes the profile draft; the normal save action persists it. Cancel leaves the original field value unchanged.
+The reusable date control supports Day, Month, Quarter, Half-year, and Year selection, direct year/era navigation, keyboard calendar navigation, approximation, custom text, and clearing. Every editable date field, including the character-card birthday editor, uses this picker. A selection changes the owning draft; the normal save action persists it. Cancel leaves the original field value unchanged.
 
 The fixed-size glass card opens beside its source infobox when space permits, dims surrounding content while keeping the source card readable, and stays within the viewport on smaller screens. Preserve keyboard behavior, focus restoration, and coarse-date precision when changing it.
 
@@ -505,7 +517,7 @@ These profiles reuse `location_details`; no new table or migration is required. 
 
 There is no timeline table, synchronization job, or timeline write endpoint. An edit or cleared date is reflected on the next read. Event IDs derive from entity type, entity ID, and source field, and links target that field's profile anchor. `undated` counts records without qualifying nonempty source dates; `unplaced` retains qualifying dates the parser cannot position.
 
-The browser refreshes on focus, on becoming visible, and every 30 seconds while visible. The view virtualizes content and clusters nearby milestones without discarding events; offscreen markers are excluded from keyboard focus.
+The browser refreshes immediately when saved workspace data changes, when a restored timeline page is shown, on focus or visibility changes, and every 30 seconds while visible as a fallback. Cross-tab saves use a timestamp-only same-origin storage signal; profile content is never written to browser storage. The view virtualizes rows and positions each entity heading at its saved date; profiles with more than one date retain a span between their earliest and latest milestones.
 
 Supported navigation includes drag-to-pan, trackpad or Shift-wheel horizontal travel, pinch or Ctrl-scroll pointer-anchored zoom, unmodified arrow-key panning, +/− zoom, and Home to fit filtered events. A bottom-center button opens a centered filter dialog with entity/event types, search, zoom, fit, go-to-year controls, and unplaced dates.
 
@@ -519,6 +531,7 @@ The suite uses the built-in Node test runner and strict assertions. Database-bac
 | `tests/dashboard-shell.test.mjs` | Reusable frame/routes, automatic styles, queued refresh, failure retention, retry, cancellation and cleanup. |
 | `tests/dashboard.test.mjs` | Owner-scoped overview projection, cards, questions, and derived events. |
 | `tests/lore.test.mjs` | All six types, render/save/reopen, privacy, concurrent saves, overlapping collections, character notes, backlinks, search, mentions and timeline. |
+| `tests/story-arcs.test.mjs` | Story arc directory/profile rendering, narrative persistence, pacing, linked entities, subplots, scenes, dates, privacy, conflicts, and validation. |
 | `tests/dashboard-search.test.mjs` | Catalog search semantics. |
 | `tests/character-cards.test.mjs` | Shared cards, projections, actions, artwork, ratings, featured items. |
 | `tests/connections-map.test.mjs` | Connection graph derivation and layout. |

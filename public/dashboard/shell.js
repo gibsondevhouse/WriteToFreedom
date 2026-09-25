@@ -1,5 +1,5 @@
-import {el,tone,initial,createRails} from './components.js?v=shell-2';
-import {createQuestionBanner} from './question-banner.js?v=shell-2';
+import {el,tone,initial,createRails} from './components.js?v=__WTF_ASSET_REVISION__';
+import {createQuestionBanner} from './question-banner.js?v=__WTF_ASSET_REVISION__';
 
 /** Read a private dashboard without coupling the shell to its data shape. */
 export async function fetchDashboard(endpoint,{signal,errorMessage='Your dashboard could not be loaded.'}={}){

@@ -18,5 +18,5 @@ export const citySections=[
 ];
 export const cityFields=citySections.flatMap(s=>s.fields.map(f=>f[0]));
 export const cityImageFields=['skylineUrl','flagUrl','sealUrl','mapUrl'];
-export const blankCity=()=>({...Object.fromEntries(cityFields.map(k=>[k,''])),hiddenFields:[]});
+export const blankCity=()=>({...Object.fromEntries(cityFields.map(k=>[k,''])),hiddenFields:[],profileRatings:{}});
 export const cityHideableFields=hiddenFieldNames(citySections);

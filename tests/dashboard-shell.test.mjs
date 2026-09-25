@@ -22,7 +22,7 @@ test('home aliases and Lore receive one complete dashboard shell without asset c
  assert.equal(pages[0],pages[1]);assert.equal(pages[0],pages[2]);assert.equal(pages[0],pages[3]);assert.equal(pages[4],pages[5]);
  for(const path of ['/dashboard','/lore'])assert.equal((await worker.fetch(new Request(origin+path+'?collection=books'),{})).headers.get('location'),origin+path+'/?collection=books');
  const css=readFileSync('public/dashboard/shell.css','utf8');
- for(const dependency of ['./dashboard.css','../styles.css?v=shared-1','../components/character-card/card.css?v=2','../components/character-card/details.css?v=1'])assert.ok(css.includes(dependency));
+ for(const dependency of ['./dashboard.css?v=__WTF_ASSET_REVISION__','../styles.css?v=__WTF_ASSET_REVISION__','../components/character-card/card.css?v=__WTF_ASSET_REVISION__','../components/character-card/details.css?v=__WTF_ASSET_REVISION__'])assert.ok(css.includes(dependency));
 });
 
 test('dashboard frame escapes metadata, supports action/slot variations and rejects unsafe links',()=>{

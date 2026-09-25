@@ -5,6 +5,7 @@ import {defaultCity} from './cities.js';
 import {cityHideableFields,cityFields,cityImageFields,validImageUrl} from '../public/locations/cities/template.js';
 import {characterCast} from './sample-characters.js';
 import {renderCity} from './render-city.js';
+import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
  * Serve /locations/cities/id/ HTML (GET/HEAD) or /api/cities/id JSON (GET/PUT).
@@ -23,7 +24,7 @@ export async function cityRoute(request,env){
  try{
   const db=repository(env.DB),locations=await locationCatalog(db,owner),location=locations.find(l=>l.id===id&&l.type==='city');
   if(!location)return json({error:'City not found.'},404);
-  const current=(await db.listCityProfiles(owner)).find(p=>p.id===id)||defaultCity(location),cast=characterCast(await db.list(owner));
+  const stored=(await db.listCityProfiles(owner)).find(p=>p.id===id),current={...defaultCity(location),...stored,profileRatings:{...(stored?.profileRatings||{})}},cast=characterCast(await db.list(owner));
   if(profile){if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);return new Response(request.method==='HEAD'?null:renderCity(current,locations,cast,await db.listLore(owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});}
   if(request.method==='GET')return json(current);
   if(request.method!=='PUT')return json({error:'Method not allowed.'},405);
@@ -34,6 +35,7 @@ export async function cityRoute(request,env){
   if(input.version!==current.version)return json({error:'This city changed in another tab. Copy your unsaved text, then reload before saving.'},409);
   const document={};for(const key of cityFields){const value=Object.hasOwn(input,key)?input[key]:current[key]||'';if(typeof value!=='string'||value.length>(key==='name'?160:cityImageFields.includes(key)?2048:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
   document.hiddenFields=readHiddenFields(input,current,cityHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
+  try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),ratingGroupsFor('location','city'));}catch(error){return json({error:error.message},400);}
   document.name=document.name.trim().replace(/\s+/g,' ');if(!document.name)return json({error:'Enter a city name.'},400);
   if(!locations.some(l=>l.id===document.parentId&&l.type==='country'))return json({error:'Every city must belong to a country. Choose an existing country.'},400);
   for(const key of cityImageFields)if(!validImageUrl(document[key]))return json({error:'Use an HTTPS image URL for city images and maps.'},400);

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {createWorker} from '../server/app.js';
 import {renderDirectoryPage} from '../server/directory-shell.js';
 
-for(const kind of ['characters','factions','locations'])test(kind+' aliases use one complete directory shell and preserve route boundaries',async()=>{
+for(const kind of ['characters','factions','locations','story-arcs'])test(kind+' aliases use one complete directory shell and preserve route boundaries',async()=>{
  const worker=createWorker({}),origin='https://novel.example',pages=[];
  for(const path of ['/'+kind+'/','/'+kind+'/index.html']){
   const response=await worker.fetch(new Request(origin+path),{});assert.equal(response.status,200);
@@ -18,11 +18,16 @@ for(const kind of ['characters','factions','locations'])test(kind+' aliases use 
    assert.ok(html.includes('aria-describedby="character-archive-description"'));assert.ok(html.includes('Character archive is not available yet.'));
    assert.ok(html.includes('/components/character-card/card.css'));
   }else{
+   assert.ok(html.includes('<option value="cards">Cards</option>'));
    assert.ok(html.includes('<option value="list">List</option>'));
+   assert.ok(html.includes('/components/story-card/card.css'));
    assert.ok(html.includes('/'+kind+'/'+kind+'.css'));
   }
   if(kind==='locations'){
    assert.ok(html.includes('aria-label="Filter location types"'));
+   assert.ok(html.includes('id="location-filter-toggle"'));assert.ok(html.includes('aria-controls="location-filter-menu"'));
+   assert.ok(html.indexOf('data-directory-direction')<html.indexOf('id="location-filter-toggle"'));
+   assert.ok(!html.includes('data-directory-slot="filters"><div class="type-filters"'));
    assert.equal((html.match(/id="new-location-dialog"/g)||[]).length,1);
    assert.ok(html.indexOf('<dialog')>html.indexOf('</main>'));
   }
@@ -36,10 +41,11 @@ for(const kind of ['characters','factions','locations'])test(kind+' aliases use 
 });
 
 test('directory configuration escapes metadata and supports reusable actions, controls and slots',()=>{
- const config={id:'research',title:'Research <entry>',singular:'entry',plural:'entries',eyebrow:'A & B',description:'"Details"',script:'/research.js',styles:['/research.css'],leadingAction:{label:'Open notes',href:'/lore/?collection=notes'},primaryAction:{id:'new-research',label:'New <entry>',icon:'+'},views:[{value:'list',label:'List'}],sorts:[],slots:{filters:'<div id="filter-draft"></div>',dialogs:'<dialog id="create-research"></dialog>'}};
+ const config={id:'research',title:'Research <entry>',singular:'entry',plural:'entries',eyebrow:'A & B',description:'"Details"',script:'/research.js',styles:['/research.css'],leadingAction:{label:'Open notes',href:'/lore/?collection=notes'},primaryAction:{id:'new-research',label:'New <entry>',icon:'+'},views:[{value:'list',label:'List'}],sorts:[],slots:{filters:'<div id="filter-draft"></div>',toolbarActions:'<button id="toolbar-filter">Filter</button>',dialogs:'<dialog id="create-research"></dialog>'}};
  const html=renderDirectoryPage(config);
  assert.ok(html.includes('Research &lt;entry&gt;'));assert.ok(html.includes('A &amp; B'));assert.ok(html.includes('New &lt;entry&gt;'));assert.ok(html.includes('href="/lore/?collection=notes"'));
  assert.ok(html.includes('data-directory-view'));assert.ok(!html.includes('data-directory-direction'));assert.ok(!html.includes('data-directory-sort>'));
+ assert.ok(html.indexOf('data-directory-view')<html.indexOf('id="toolbar-filter"'));
  assert.ok(html.indexOf('/directory/shell.css')<html.indexOf('/research.css'));assert.ok(html.indexOf('<dialog')>html.indexOf('</main>'));
  for(const script of ['https://evil.example/x.js','//evil.example/x.js','/\\evil.example/x.js'])assert.throws(()=>renderDirectoryPage({...config,script}));
  assert.throws(()=>renderDirectoryPage({...config,id:'bad"id'}));
@@ -153,6 +159,7 @@ test('faction adapter retains retries, guards double creation, and sorts without
  const records=[{id:'house',name:'The House',type:'House',motto:'Quiet promises',summary:'Keep the peace'},{id:'guild',name:'The Guild',type:'Guild',location:'Harbor'}];
  const context=vm.createContext({document:{querySelector:()=>button,createElement:()=>node()},window,location:{assign:path=>navigations.push(path)},crypto:{randomUUID:()=>String(++uuid)},
   fetchDirectory:async()=>({factions:records}),initDirectoryShell:options=>{config=options;return directory;},
+  createProfileStoryCard:(record,options)=>({record,options}),
   fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return request.promise;}
  });
  vm.runInContext(readFileSync('public/factions/factions.js','utf8').replace(/^import .*\n/gm,''),context);
@@ -160,7 +167,7 @@ test('faction adapter retains retries, guards double creation, and sorts without
  assert.deepEqual(Array.from(config.select(records,{query:'promises',sort:'order'}),r=>r.id),['house']);
  assert.deepEqual(Array.from(config.select(records,{query:'',sort:'type'}),r=>r.id),['guild','house']);assert.equal(records[0].id,'house');
  assert.deepEqual(Array.from(config.select(records,{query:'',sort:'name',reversed:true}),r=>r.id),['house','guild']);
- const card=config.renderItem(records[0],{},0);assert.equal(card.children[0].href,'/factions/house/');assert.equal(card.children[0].children[1].textContent,'Keep the peace');
+ const card=config.renderItem(records[0],{},0);assert.equal(card.record.href,'/factions/house/');assert.equal(card.options.contextText,'Quiet promises');assert.equal(card.options.label,'House');assert.equal(card.options.cardClass,'faction-card');assert.equal(card.options.sections.length,4);assert.equal(card.options.sections[3].hash,'ratings');
  const first=button.dispatch('click')[0];button.dispatch('click');assert.equal(calls.length,1);assert.equal(calls[0].blank,true);
  request.resolve(new Response('{"error":"Try again"}',{status:503,headers:{'content-type':'application/json'}}));await first;assert.equal(button.disabled,false);assert.deepEqual(errors,['Try again']);
  request=defer();const retry=button.dispatch('click')[0];assert.equal(calls[1].id,calls[0].id);

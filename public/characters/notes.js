@@ -1,4 +1,4 @@
-import {templateSections} from './template.js';
+import {templateSections} from './template.js?v=__WTF_ASSET_REVISION__';
 export const noteFields=templateSections.flatMap(s=>s.fields.filter(f=>f[2]==='textarea').map(f=>f[0]));
 export const referenceKey=ref=>[ref.kind,ref.characterId||'',ref.id].join(':');
 export const noteTypes=['detail','update','lore'];

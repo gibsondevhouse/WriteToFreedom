@@ -10,6 +10,7 @@ function setup(){const sqlite=new DatabaseSync(':memory:');for(const file of rea
 test('country pages expose the editable template and derived city/landmark hierarchy',async()=>{
  const req=setup(),page=await req('/locations/countries/sample-kingdom/');assert.equal(page.status,200);assert.equal(page.headers.get('cache-control'),'no-store');const html=await page.text();
  for(const key of countryFields)assert.equal(html.split('name="'+key+'"').length-1,1,key);
+ assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,4);
  for(const value of ['The Capital','Royal Archive','Geography','Government &amp; politics','Economy','Culture'])assert.ok(html.includes(value),value);
  assert.ok(html.includes('/locations/cities/sample-capital/'));assert.ok(html.includes('value="sample-capital" selected'));
  assert.equal((await req('/locations/countries/sample-capital/')).status,404);
@@ -17,13 +18,14 @@ test('country pages expose the editable template and derived city/landmark hiera
  assert.equal((await req('/locations/countries/sample-kingdom')).status,308);
 });
 test('country changes persist privately, rename the directory, and prevent stale saves',async()=>{
- const req=setup(),original=await (await req('/api/countries/sample-kingdom')).json();const payload={...original,name:'The United Houses',officialName:'Union of the Houses',history:'First era\nSecond era',population:'12 million',flagUrl:'https://example.com/flag.png'};
+ const req=setup(),original=await (await req('/api/countries/sample-kingdom')).json();assert.deepEqual(original.profileRatings,{});const payload={...original,name:'The United Houses',officialName:'Union of the Houses',history:'First era\nSecond era',population:'12 million',profileRatings:{costOfLiving:45,qualityOfLife:82,climate:67},flagUrl:'https://example.com/flag.png'};
  let response=await req('/api/countries/sample-kingdom','PUT',payload);assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.version,1);
- const reopened=await (await req('/api/countries/sample-kingdom')).json();assert.equal(reopened.history,payload.history);assert.equal(reopened.flagUrl,payload.flagUrl);
+ const reopened=await (await req('/api/countries/sample-kingdom')).json();assert.equal(reopened.history,payload.history);assert.equal(reopened.flagUrl,payload.flagUrl);assert.deepEqual(reopened.profileRatings,payload.profileRatings);
+ const legacy={...reopened,summary:'Older client update'};delete legacy.profileRatings;response=await req('/api/countries/sample-kingdom','PUT',legacy);assert.equal(response.status,200);const legacySaved=await response.json();assert.deepEqual(legacySaved.profileRatings,payload.profileRatings);
  const list=(await (await req('/api/locations')).json()).locations;assert.equal(list.find(l=>l.id==='sample-kingdom').name,payload.name);assert.equal(list.find(l=>l.id==='sample-capital').parentId,'sample-kingdom');
  assert.equal((await (await req('/api/countries/sample-kingdom','GET',undefined,'author-b')).json()).name,original.name);
  assert.equal((await req('/api/countries/sample-kingdom','PUT',payload)).status,409);
- assert.equal((await req('/api/countries/sample-kingdom','PUT',{...saved,currency:'Crowns'})).status,200);
+ assert.equal((await req('/api/countries/sample-kingdom','PUT',{...legacySaved,currency:'Crowns'})).status,200);
 });
 test('custom countries retain location IDs and capitals must be cities in the same country',async()=>{
  const req=setup(),id=crypto.randomUUID(),cityId=crypto.randomUUID();await req('/api/locations','POST',{id,name:'The Coast',type:'country',parentId:null});

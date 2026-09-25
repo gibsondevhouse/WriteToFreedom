@@ -7,6 +7,7 @@ import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
 import {locationTemplates} from '../public/locations/template.js';
 import {locationHref,locationPaths,ancestors} from '../public/locations/data.js';
 import {searchCatalog} from '../public/dashboard/search.js';
+import {ratingGroupsFor} from '../public/profiles/ratings.js';
 
 const origin='https://novel.example';
 function setup(t){
@@ -26,15 +27,18 @@ for(const [type,template] of Object.entries(locationTemplates)){
  test(`${type}: full profile fields persist, share controls, and retain private versions`,async t=>{
   const {request,create,get}=setup(t),place=await create(type),url='/api/locations/'+place.id,page=locationHref(place);
   let record=await get(url);
+  assert.deepEqual(record.profileRatings,{});
   for(const key of template.fields)assert.equal(typeof record[key],'string',key);
   let response=await request(page),html=await response.text();assert.equal(response.status,200);
+  assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,new Set(ratingGroupsFor('location',type).map(group=>group.sectionId)).size);
   assert.equal((html.match(/<h1 /g)||[]).length,1);
   for(const key of template.fields)assert.equal(html.split(`name="${key}"`).length-1,1,key);
   assert.ok(html.includes('data-collapse-target="identity-information"'));
   assert.ok(html.includes('Choose visible fields for Overview'));
   for(const [key] of template.dates)assert.match(html,new RegExp(`name="${key}"[^>]*data-date-input`));
   if(type==='universe')assert.ok(!html.includes('name="parentId"'));
-  const changes={...record,name:'Renamed '+type,history:'Claude found </textarea><script>danger</script> & clues.',summary:'A silver sanctuary',questions:'Who built it?\nWhere is the key?',hiddenFields:['history'],imageUrl:'https://example.com/image.png',mapUrl:'https://example.com/map.png'};
+  const ratingKey=ratingGroupsFor('location',type)[0].fields[0][0];
+  const changes={...record,name:'Renamed '+type,history:'Claude found </textarea><script>danger</script> & clues.',summary:'A silver sanctuary',questions:'Who built it?\nWhere is the key?',hiddenFields:['history'],profileRatings:{[ratingKey]:73},imageUrl:'https://example.com/image.png',mapUrl:'https://example.com/map.png'};
   for(const [key] of template.dates)changes[key]='c. 1200 BCE';
   if(template.fields.includes('population'))changes.population='42,000';
   for(const section of template.sections.filter(s=>!['identity','symbols'].includes(s.id)))for(const [key] of section.fields)if(!Object.hasOwn(changes,key)||!changes[key])changes[key]='Notes for '+key;
@@ -43,13 +47,16 @@ for(const [type,template] of Object.entries(locationTemplates)){
   assert.ok(html.includes('data-profile-field="history" hidden'));assert.ok(html.includes('&lt;/textarea&gt;&lt;script&gt;danger&lt;/script&gt;'));
   assert.ok(html.includes('src="https://example.com/image.png"'));
   assert.equal((await get(url)).history,changes.history);
+  assert.deepEqual((await get(url)).profileRatings,{[ratingKey]:73});
   assert.equal((await request(url,'PUT',changes)).status,409);
   assert.equal((await request(url,'GET',undefined,'other')).status,404);
   assert.equal((await request(page,'GET',undefined,'other')).status,404);
-  const oldClient={...record,summary:'Updated summary'};delete oldClient.hiddenFields;
+  const oldClient={...record,summary:'Updated summary'};delete oldClient.hiddenFields;delete oldClient.profileRatings;
   response=await request(url,'PUT',oldClient);assert.equal(response.status,200);record=await response.json();assert.deepEqual(record.hiddenFields,['history']);
+  assert.deepEqual(record.profileRatings,{[ratingKey]:73});
   response=await request(url,'PUT',{...record,hiddenFields:[]});assert.equal(response.status,200);record=await response.json();assert.equal(record.history,changes.history);
   for(const bad of [{imageUrl:'javascript:alert(1)'},{mapUrl:'http://example.com/a.png'},{name:''},{summary:'x'.repeat(10001)},{hiddenFields:['name']},{type:'city'},{version:-1}])assert.equal((await request(url,'PUT',{...record,...bad})).status,400,JSON.stringify(bad).slice(0,100));
+  for(const profileRatings of [{[ratingKey]:100},{[ratingKey]:1.5},{unknown:20},[],null])assert.equal((await request(url,'PUT',{...record,profileRatings})).status,400);
   const catalog=(await get('/api/locations')).locations;assert.equal(catalog.find(l=>l.id===place.id).name,record.name);
   const dashboard=await get('/api/dashboard');assert.equal(dashboard.locations.find(l=>l.id===place.id).href,page);assert.equal(dashboard.locations.find(l=>l.id===place.id).image,record.imageUrl);
   assert.ok(searchCatalog(dashboard,'Updated summary').some(l=>l.id===place.id));

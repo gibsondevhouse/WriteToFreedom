@@ -60,3 +60,9 @@ test('sidebar collapse survives navigation and mobile menu does not overwrite de
   next.click();
   assert.equal(saved.get('wtf-sidebar-collapsed'),'false');
 });
+
+test('the workspace gives every page asset one coherent revision',()=>{
+ const html=workspaceShell('<!doctype html><html><head><link rel="stylesheet" href="/profiles/profile.css?v=old"><script type="module" src="/profiles/editor.js?v=old"></script></head><body></body></html>','/characters/example/');
+ const urls=[...html.matchAll(/(?:href|src)="(\/(?:[^" ]+)\.(?:css|js)\?v=([^"]+))"/g)];
+ assert.ok(urls.length>=5);assert.equal(new Set(urls.map(match=>match[2])).size,1);assert.equal(urls[0][2],'dev');
+});

@@ -1,5 +1,4 @@
-import {createStoryCardFrame} from '../character-card/frame.js';
-import {characterTone} from '../character-card/model.js';
+import {createStoryCardAction,createStoryCardFrame,storyCardTone} from '../story-card/card.js?v=__WTF_ASSET_REVISION__';
 
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 const paths={
@@ -18,12 +17,13 @@ export function createLoreCard(record){
  const avatar=el('span','affiliation-avatar');avatar.append(icon(symbol));mark.append(avatar);
  const summary=record.summary?.trim()||'Add a description',details=el('a','affiliation-copy');details.href=mark.href;details.title=summary;
  details.append(el('span','affiliation-kind','About this '+label.toLowerCase()),el('strong','',summary));
- const action=(section,description,kind,text,cls='')=>{const link=el('a',cls);link.href=record.href+(section?'#'+section:'');link.setAttribute('aria-label',description+' for '+record.name);link.title=description;if(kind)link.append(icon(kind));if(text!==undefined)link.append(el('span','',text));return link;};
- const pin=action('identity-dashboard','Pin and feature settings','bookmark',undefined,record.pinned?'lore-pinned':'');
- const count=Number(record.connectionCount)||0,connections=action('connections',`${count} connection${count===1?'':'s'}`,'connections',String(count));
- const story=action('story','Story significance','story');
- const more=action('','More details',null,'More ›','character-more');
+ const href=section=>record.href+(section?'#'+section:'');
+ const count=Number(record.connectionCount)||0;
+ const pin=createStoryCardAction({href:href('identity-dashboard'),label:'Pin and feature settings for '+record.name,title:'Pin and feature settings',className:record.pinned?'lore-pinned':'',icon:icon('bookmark')});
+ const connections=createStoryCardAction({href:href('connections'),label:`${count} connection${count===1?'':'s'} for ${record.name}`,title:'Connections',icon:icon('connections'),count});
+ const story=createStoryCardAction({href:href('story'),label:'Story significance for '+record.name,title:'Story significance',icon:icon('story')});
+ const menuItems=[['Open profile',href('')],['Overview',href('overview')],['Ratings',href('ratings')],['Story significance',href('story')],['Connections',href('connections')],['Pin and feature settings',href('identity-dashboard')]].map(([label,link])=>({label,href:link}));
  const eyebrow=[label,record.pinned&&'Pinned',record.featured&&'Featured'].filter(Boolean).join(' · ');
- const card=createStoryCardFrame(record,{tone:characterTone(record),eyebrow,badge,context:[mark,details],actions:[pin,connections,story,more]});
+ const card=createStoryCardFrame(record,{tone:storyCardTone(record),eyebrow,badge,context:[mark,details],actions:[pin,connections,story],menuItems});
  card.classList.add('story-lore-card',species?'story-species-card':'story-jewel-card');card.dataset.loreId=record.id;return card;
 }

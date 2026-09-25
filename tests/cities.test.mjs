@@ -11,6 +11,7 @@ function setup(){const sqlite=new DatabaseSync(':memory:');for(const file of rea
 test('city profiles expose all editable fields, required country, and linked landmarks',async()=>{
  const req=setup(),response=await req('/locations/cities/sample-capital/');assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');const html=await response.text();
  for(const key of cityFields)assert.equal(html.split('name="'+key+'"').length-1,1,key);
+ assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,3);
  assert.match(html,/<select[^>]+name="parentId"[^>]+required>/);assert.match(html,/value="sample-kingdom" selected/);
  for(const text of ['City profile','Boroughs &amp; neighborhoods','Infrastructure','Royal Archive','/locations/countries/sample-kingdom/'])assert.ok(html.includes(text),text);
  assert.equal((await req('/locations/cities/sample-kingdom/')).status,404);
@@ -19,14 +20,15 @@ test('city profiles expose all editable fields, required country, and linked lan
  assert.equal((await req('/locations/cities/sample-capital/','HEAD')).status,200);
 });
 test('city edits save and reopen privately, rename directory and country listings, reject stale saves',async()=>{
- const req=setup(),original=await (await req('/api/cities/sample-capital')).json();const payload={...original,name:'Ember City',history:'First era\nSecond era',region:'Riverlands',leaderId:'claude',skylineUrl:'https://example.com/city.png'};
+ const req=setup(),original=await (await req('/api/cities/sample-capital')).json();assert.deepEqual(original.profileRatings,{});const payload={...original,name:'Ember City',history:'First era\nSecond era',region:'Riverlands',leaderId:'claude',profileRatings:{costOfLiving:71,qualityOfLife:79,climate:64},skylineUrl:'https://example.com/city.png'};
  let response=await req('/api/cities/sample-capital','PUT',payload);assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.version,1);
- const reopened=await (await req('/api/cities/sample-capital')).json();assert.equal(reopened.history,payload.history);assert.equal(reopened.skylineUrl,payload.skylineUrl);
+ const reopened=await (await req('/api/cities/sample-capital')).json();assert.equal(reopened.history,payload.history);assert.equal(reopened.skylineUrl,payload.skylineUrl);assert.deepEqual(reopened.profileRatings,payload.profileRatings);
+ const legacy={...reopened,summary:'Older client update'};delete legacy.profileRatings;response=await req('/api/cities/sample-capital','PUT',legacy);assert.equal(response.status,200);const legacySaved=await response.json();assert.deepEqual(legacySaved.profileRatings,payload.profileRatings);
  const list=(await (await req('/api/locations')).json()).locations;assert.equal(list.find(l=>l.id==='sample-capital').name,payload.name);
  const country=await (await req('/locations/countries/sample-kingdom/')).text();assert.ok(country.includes('Ember City'));assert.ok(country.includes('/locations/cities/sample-capital/'));
  assert.equal((await (await req('/api/cities/sample-capital','GET',undefined,'author-b')).json()).name,original.name);
  assert.equal((await req('/api/cities/sample-capital','PUT',payload)).status,409);
- assert.equal((await req('/api/cities/sample-capital','PUT',{...saved,population:'250,000'})).status,200);
+ assert.equal((await req('/api/cities/sample-capital','PUT',{...legacySaved,population:'250,000'})).status,200);
 });
 test('every city requires an owned country and landmarks follow a city when it moves',async()=>{
  const req=setup(),countryId=crypto.randomUUID(),cityId=crypto.randomUUID(),landmarkId=crypto.randomUUID();

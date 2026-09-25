@@ -2,18 +2,19 @@ import {locationTemplates} from '../locations/template.js';
 import {locationPaths,typePlurals} from '../locations/data.js';
 // Timeline coordinates use astronomical years (0 = 1 BCE). Original date text is
 // always retained; coarse dates are positioned at their midpoint, never invented days.
-export const types={character:'Characters',faction:'Factions',lore:'Lore',...typePlurals};
-export const kinds={origin:'Origins',birth:'Births',death:'Deaths',founded:'Foundings',settled:'Settlements',incorporated:'Charters',population:'Population records',formation:'Formations',discovery:'Discoveries',abandonment:'Abandonments',restoration:'Restorations'};
-import {months,leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
-export {leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=date-picker-1';
+export const types={character:'Characters',faction:'Factions',lore:'Lore',storyArc:'Story Arcs',...typePlurals};
+export const kinds={origin:'Origins',birth:'Births',death:'Deaths',founded:'Foundings',settled:'Settlements',incorporated:'Charters',population:'Population records',formation:'Formations',discovery:'Discoveries',abandonment:'Abandonments',restoration:'Restorations',arcStart:'Arc starts',arcEnd:'Arc endings'};
+import {months,leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=__WTF_ASSET_REVISION__';
+export {leapYear,daysInMonth,datePosition,yearLabel,parseStoryDate} from '../profiles/dates.js?v=__WTF_ASSET_REVISION__';
 const fields={
  lore:[['originDate','origin','Origin / first appearance']],
+ storyArc:[['startDate','arcStart','Arc begins'],['endDate','arcEnd','Arc ends']],
  ...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.dates])),
  character:[['birthDate','birth','Born'],['deathDate','death','Died']],
  faction:[['founded','founded','Founded']],country:[['founded','founded','Established'],['populationDate','population','Population recorded']],
  city:[['settled','settled','First settled'],['incorporated','incorporated','Chartered'],['populationDate','population','Population recorded']]
 };
-const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/'};
+const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/',storyArc:'/story-arcs/'};
 export function collectTimeline(catalogs){
  const events=[],unplaced=[],counts={};let undated=0;
  for(const [type,records] of Object.entries(catalogs)){
@@ -40,7 +41,7 @@ export function timelineRows(events){
 }
 export const minScale=.002,maxScale=60000;
 export function zoomAt(view,factor,pixel){const scale=Math.min(maxScale,Math.max(minScale,view.scale*factor));return {...view,scale,start:view.start+pixel/view.scale-pixel/scale};}
-export function fitView(events,width){if(!events.length)return {start:1,scale:120};const lo=events[0].date.position,hi=events.at(-1).date.position,span=Math.max(5,hi-lo+2);return {start:(lo+hi)/2-span/2,scale:Math.min(maxScale,Math.max(minScale,(width-100)/span))};}
+export function fitView(events,width){if(!events.length)return {start:1,scale:120};const lo=events[0].date.position,hi=events.at(-1).date.position,span=Math.max(5,hi-lo),padding=Math.min(50,Math.max(12,width*.1)),scale=Math.min(maxScale,Math.max(minScale,Math.max(1,width-padding*2)/span));return {start:(lo+hi)/2-width/(2*scale),scale};}
 export function rulerTicks(start,width,scale){
  const end=start+width/scale,result=[];
  if(scale>=50000){

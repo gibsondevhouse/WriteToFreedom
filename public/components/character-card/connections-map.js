@@ -1,4 +1,4 @@
-import {connectionGraph,layoutConnections} from './connections-model.js';
+import {connectionGraph,layoutConnections} from './connections-model.js?v=__WTF_ASSET_REVISION__';
 const ns='http://www.w3.org/2000/svg';
 function svgNode(tag,attrs={}){const node=document.createElementNS(ns,tag);for(const [key,value]of Object.entries(attrs))node.setAttribute(key,String(value));return node;}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}

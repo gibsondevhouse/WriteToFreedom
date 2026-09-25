@@ -1,7 +1,17 @@
-import {months,precisionNames,parseStoryDate,formatStoryDate,calendarCells,shiftMonth,daysInMonth,yearLabel} from './dates.js?v=date-picker-1';
+import {months,precisionNames,parseStoryDate,formatStoryDate,calendarCells,shiftMonth,daysInMonth,yearLabel} from './dates.js?v=__WTF_ASSET_REVISION__';
 const modes=Object.keys(precisionNames),minYear=-999999,maxYear=999999;
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
 function button(text,label,action,cls){const b=node('button',text,cls);b.type='button';if(label)b.setAttribute('aria-label',label);b.addEventListener('click',action);return b;}
+function calendarIcon(){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('width','16');svg.setAttribute('height','16');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('aria-hidden','true');
+ const frame=document.createElementNS('http://www.w3.org/2000/svg','rect');frame.setAttribute('x','4');frame.setAttribute('y','5');frame.setAttribute('width','16');frame.setAttribute('height','16');frame.setAttribute('rx','2');
+ const marks=document.createElementNS('http://www.w3.org/2000/svg','path');marks.setAttribute('d','M8 3v4m8-4v4M4 10h16');svg.append(frame,marks);return svg;
+}
+/** Build the standard editable story-date control for dynamically rendered UI. */
+export function createDateControl({id='',name='',label='Choose date',value='',placeholder='Select date…',inputClass=''}={}){
+ const control=node('div',undefined,'date-control'),input=node('input',undefined,inputClass);input.type='text';input.readOnly=true;input.autocomplete='off';input.maxLength=10000;input.value=String(value??'');input.placeholder=placeholder;input.dataset.dateInput='';
+ if(id)input.id=id;if(name)input.name=name;input.setAttribute('aria-label',label);input.setAttribute('aria-haspopup','dialog');input.setAttribute('aria-controls','profile-date-picker');control.append(input,calendarIcon());return {control,input};
+}
 // Keep the picker beside its source card when there is room, inside the viewport otherwise.
 export function datePickerPlacement(field,card,viewport,width,height){
  const leftEdge=viewport.left+12,topEdge=viewport.top+12,rightEdge=viewport.left+viewport.width-12,bottomEdge=viewport.top+viewport.height-12;
@@ -11,13 +21,13 @@ export function datePickerPlacement(field,card,viewport,width,height){
  return {left,top:Math.max(topEdge,Math.min(desiredTop,bottomEdge-height))};
 }
 /**
- * Mount the shared dialog once for this form's data-date-input controls.
+ * Mount the shared dialog once for a root's data-date-input controls.
  * Commit dispatches input/change into the profile draft; the owning editor saves.
  * Cancel preserves the source value. Owns focus, positioning, keyboard handling,
- * and document-lifetime listeners; there is no independent API write or teardown.
+ * and listeners. The returned controller tears down dynamic instances cleanly.
  */
-export function initDatePicker(form){
- const fields=[...form.querySelectorAll('[data-date-input]')];if(!fields.length)return;
+export function initDatePicker(root,{requestSave}={}){
+ const fields=[...root.querySelectorAll('[data-date-input]')];if(!fields.length)return null;
  const today=new Date(),now={year:today.getFullYear(),month:today.getMonth()+1,day:today.getDate()};
  let active=null,mode='day',view={...now},focused={...now},parsed=null,needsSelection=false,approximate=false,restoreFocus=true;
  const dialog=node('dialog',undefined,'date-dialog');dialog.id='profile-date-picker';dialog.setAttribute('aria-labelledby','date-picker-title');
@@ -97,7 +107,7 @@ export function initDatePicker(form){
   view={year:parsed?.year??now.year,month:parsed?.month||(parsed?.quarter?(parsed.quarter-1)*3+1:parsed?.half?(parsed.half-1)*6+1:parsed?1:now.month),day:parsed?.day||1};focused={...view,day:parsed?.day||(!parsed?now.day:1)};
   title.textContent=input.getAttribute('aria-label')||'Choose date';document.querySelectorAll('.field-menu[open]').forEach(menu=>menu.open=false);render();dialog.showModal();document.body.classList.add('date-picker-open');position();draft.focus();draft.select();
  }
- for(const input of fields){input.addEventListener('click',()=>open(input));input.addEventListener('keydown',event=>{if(['Enter',' ','ArrowDown'].includes(event.key)){event.preventDefault();open(input);}});}
+ const fieldListeners=[];for(const input of fields){const click=()=>open(input),keydown=event=>{if(['Enter',' ','ArrowDown'].includes(event.key)){event.preventDefault();open(input);}};input.addEventListener('click',click);input.addEventListener('keydown',keydown);fieldListeners.push([input,click,keydown]);}
  draft.addEventListener('input',()=>{parsed=parseStoryDate(draft.value);needsSelection=false;approximate=parsed?.approximate||false;if(parsed){mode=parsed.precision;view={year:parsed.year,month:parsed.month||(parsed.quarter?(parsed.quarter-1)*3+1:parsed.half?(parsed.half-1)*6+1:1),day:parsed.day||1};focused={...view};}render();});
  draft.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();applyDraft();}});
  month.addEventListener('change',()=>{if(readYear()){view.month=Number(month.value);focused={year:view.year,month:view.month,day:1};render();}});
@@ -108,6 +118,8 @@ export function initDatePicker(form){
  tabs.addEventListener('keydown',event=>{const current=modes.indexOf(mode);let index;if(event.key==='ArrowRight')index=(current+1)%modes.length;else if(event.key==='ArrowLeft')index=(current+modes.length-1)%modes.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=modes.length-1;else return;event.preventDefault();setMode(modes[index]);tabs.children[index].focus();});
  dialog.addEventListener('click',event=>{const rect=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom))dialog.close();});
  dialog.addEventListener('close',()=>{document.body.classList.remove('date-picker-open');if(restoreFocus)active?.focus({preventScroll:true});});
- document.addEventListener('keydown',event=>{if(dialog.open&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='s'){event.preventDefault();event.stopImmediatePropagation();restoreFocus=false;if(applyDraft())form.requestSubmit();else restoreFocus=true;}},true);
+ const saveShortcut=event=>{if(dialog.open&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='s'){event.preventDefault();event.stopImmediatePropagation();restoreFocus=false;if(applyDraft())(requestSave||(()=>root.requestSubmit?.()))();else restoreFocus=true;}};
+ document.addEventListener('keydown',saveShortcut,true);
  window.addEventListener('scroll',position,{passive:true,capture:true});window.addEventListener('resize',position);window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);
+ return {dialog,open,destroy(){restoreFocus=false;if(dialog.open)dialog.close();dialog.remove();fieldListeners.forEach(([input,click,keydown])=>{input.removeEventListener('click',click);input.removeEventListener('keydown',keydown);});document.removeEventListener('keydown',saveShortcut,true);window.removeEventListener('scroll',position,true);window.removeEventListener('resize',position);window.visualViewport?.removeEventListener('resize',position);window.visualViewport?.removeEventListener('scroll',position);}};
 }

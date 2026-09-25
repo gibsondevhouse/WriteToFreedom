@@ -4,7 +4,7 @@ export const humanFieldGroups=[
  {title:'Health & background',fields:[['bloodType','Blood type','select'],['health','Health / disabilities','choice'],['education','Education','choice'],['faith','Faith / beliefs','choice']]}
 ];
 export const humanChoices={lifeStatus:['Alive','Deceased','Missing','Unknown'],heightUnit:['cm','in'],weightUnit:['kg','lb'],handedness:['Right-handed','Left-handed','Ambidextrous','Mixed-handed'],bloodType:['A+','A−','B+','B−','AB+','AB−','O+','O−','Unknown']};
-export {profileChoices,multiChoiceFields} from '../profiles/choices.js';
+export {profileChoices,multiChoiceFields} from '../profiles/choices.js?v=__WTF_ASSET_REVISION__';
 export const humanFields=humanFieldGroups.flatMap(g=>g.fields);
 export const templateSections = [
   {id:'identity', title:'Identity', fields:[['firstName','First name','input'],['middleName','Middle name','input'],['lastName','Last name','input'],['title','Known as / epithet','input'],['portraitUrl','Portrait image URL','url'],['roles','Occupations','choice'],['factionId','Faction','faction'],['storyRole','Story role','select'],['alignment','Moral alignment','select'],...humanFields]},

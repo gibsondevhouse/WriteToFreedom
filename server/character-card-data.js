@@ -8,9 +8,10 @@ import {factionSections} from '../public/factions/template.js';
 import {countrySections} from '../public/locations/countries/template.js';
 import {citySections} from '../public/locations/cities/template.js';
 import {ancestors} from '../public/locations/data.js';
+import {storyArcSections} from '../public/story-arcs/template.js';
 
-const schemas={lore:loreMentionSections,...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.sections])),character:templateSections,faction:factionSections,country:countrySections,city:citySections};
-const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/'};
+const schemas={lore:loreMentionSections,storyArc:storyArcSections,...Object.fromEntries(Object.entries(locationTemplates).map(([type,template])=>[type,template.sections])),character:templateSections,faction:factionSections,country:countrySections,city:citySections};
+const paths={...locationPaths,lore:'/lore/',storyArc:'/story-arcs/',character:'/characters/',faction:'/factions/'};
 const href=(kind,id)=>paths[kind]+encodeURIComponent(id)+'/';
 function mentionsName(text,name) {
   if (!name?.trim()) return false;

@@ -3,13 +3,13 @@ const home={
  id:'dashboard',title:'Dashboard',heading:'Your novel at a glance',eyebrow:'Overview',
  metaDescription:'Your writing workspace: characters, factions, places, open questions, and story dates.',
  actions:[{label:'Open characters',href:'/characters/',icon:'↗'}],
- script:'/dashboard/dashboard.js?v=species-cards-1',loadingText:'Loading your novel…'
+ script:'/dashboard/dashboard.js',loadingText:'Loading your novel…'
 };
 const lore={
  id:'lore-dashboard',title:'Lore',eyebrow:'Worldbuilding',
  description:'The notes, objects, and species that give your world depth.',
  actions:[{id:'new-lore',label:'New entry',icon:'＋',disabled:true}],
- script:'/lore/dashboard.js?v=collection-order-1',styles:['/lore/dashboard.css?v=5'],loadingText:'Loading your lore…',
+ script:'/lore/dashboard.js',styles:['/lore/dashboard.css'],loadingText:'Loading your lore…',
  slots:{
  toolbar:`  <div class="lore-tools">
    <div class="lore-toolbar">

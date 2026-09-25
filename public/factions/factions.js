@@ -1,4 +1,5 @@
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
+import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
 
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
 const directory=initDirectoryShell({
@@ -10,14 +11,8 @@ const directory=initDirectoryShell({
   return reversed?matches.reverse():matches;
  },
  renderItem(f,filters,index){
-  const article=node('article','faction-entry'),link=node('a','faction-summary'),heading=node('div','faction-heading'),name=f.name||'Untitled faction';
-  link.href='/factions/'+encodeURIComponent(f.id)+'/';
-  const initials=name.replace(/^The /,'').split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase(),avatar=node('span','faction-avatar',initials),info=node('div','faction-info'),arrow=node('span','faction-arrow','›');
-  avatar.setAttribute('aria-hidden','true');arrow.setAttribute('aria-hidden','true');
-  info.append(node('h2','',`${index+1}. ${name}`),node('p','faction-meta',[f.type,f.status,f.location].filter(Boolean).join(' · ')||'Faction in development'),node('p','faction-motto',f.motto||f.purpose||''));
-  heading.append(avatar,info,arrow);
-  link.append(heading,node('p','faction-preview',f.summary||f.introduction||'A blank faction, ready to take its place in your world.'));
-  article.append(link);return article;
+  const record={...f,name:f.name||'Untitled faction',href:'/factions/'+encodeURIComponent(f.id)+'/',image:f.imageUrl||''};
+  return createProfileStoryCard(record,{headingLevel:2,label:f.type||'Faction',contextLabel:[f.status,f.location].filter(Boolean).join(' · ')||'Faction',contextText:f.motto||f.purpose||f.summary||f.introduction||'Open this faction to add its story.',sections:[{label:'Overview',hash:'overview',icon:'overview'},{label:'Relations',hash:'relations',icon:'relationships'},{label:'Open questions',hash:'field-questions',icon:'notes'},{label:'Ratings',hash:'ratings',icon:'overview'}],cardClass:'faction-card'});
  }
 });
 

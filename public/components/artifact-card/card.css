@@ -1,5 +1,6 @@
 /* Landscape tile: 280px artwork, 16:9 crop, and an unboxed two-line caption. */
 .artifact-card { width:min(280px,calc(100vw - 40px)); height:auto; gap:8px; border:0; background:transparent; overflow:visible; }
+.artifact-card .compact-story-card-main { display:flex; flex-direction:column; gap:8px; color:inherit; text-decoration:none; }
 .artifact-card .cover { width:100%; aspect-ratio:16 / 9; flex:none; border-radius:8px; background:linear-gradient(135deg,var(--tone),#172330); }
 .artifact-card .monogram { font-size:4rem; opacity:.5; }
 .artifact-card-badge { position:absolute; top:0; right:0; z-index:1; padding:8px; border-bottom-left-radius:4px; background:#c74611; color:#fff; font-size:.75rem; font-weight:600; line-height:16px; text-transform:uppercase; }

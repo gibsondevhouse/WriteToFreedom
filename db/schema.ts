@@ -9,6 +9,15 @@ export const loreEntries = sqliteTable('lore_entries', {
  updatedAt: text('updated_at').notNull(),
 }, table => [index('idx_lore_entries_owner_updated').on(table.ownerId,table.updatedAt)]);
 
+export const storyArcs = sqliteTable('story_arcs', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ document: text('document').notNull(),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [index('idx_story_arcs_owner_updated').on(table.ownerId,table.updatedAt)]);
+
 export const characterDrafts = sqliteTable('character_drafts', {
   id: text('id').primaryKey(),
   ownerId: text('owner_id').notNull(),

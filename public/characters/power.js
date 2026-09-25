@@ -1,4 +1,4 @@
-import {attributeKeys} from './attributes.js';
+import {attributeKeys} from './attributes.js?v=__WTF_ASSET_REVISION__';
 
 // Equal weight for every attribute. Missing ratings contribute zero to a provisional score.
 export function characterPower(ratings={}) {

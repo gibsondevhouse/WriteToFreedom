@@ -1,4 +1,5 @@
 import {escape} from './profile-components.js';
+import {assetUrl} from './asset-url.js';
 
 function localUrl(value){
  if(typeof value!=='string'||!/^\/(?!\/)/.test(value))throw new Error('Dashboard assets and links must use local absolute URLs.');
@@ -34,8 +35,8 @@ export function renderDashboardPage({
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
 <title>${escape(title)} — Write to Freedom</title><meta name="description" content="${escape(metaDescription)}">
 <link rel="icon" href="/crest.svg" type="image/svg+xml">
-${[...new Set(['/dashboard/shell.css?v=species-cards-1',...styles])].map(path=>`<link rel="stylesheet" href="${localUrl(path)}">`).join('\n')}
-<script type="module" src="${localUrl(script)}"></script>
+${[...new Set(['/dashboard/shell.css',...styles])].map(path=>`<link rel="stylesheet" href="${localUrl(assetUrl(path))}">`).join('\n')}
+<script type="module" src="${localUrl(assetUrl(script))}"></script>
 </head><body class="workspace">
 <a class="skip-link" href="#${id}">Skip to ${escape(title.toLowerCase())}</a>
 <main id="${id}" class="dashboard-shell" data-dashboard-shell tabindex="-1" aria-labelledby="${id}-title">

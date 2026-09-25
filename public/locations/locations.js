@@ -1,5 +1,6 @@
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
 import {locationHref,ancestors,selectLocations,typeLabels,typePlurals,locationTypes,parentTypes,requiresParent,parentChoices} from './data.js?v=location-profiles-1';
+import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
 const root=document.querySelector('[data-directory-shell]'),search=root.querySelector('[data-directory-search]');
 const dialog=document.querySelector('#new-location-dialog'),form=document.querySelector('#new-location-form'),fields=document.querySelector('#location-fields'),type=document.querySelector('#location-type'),name=document.querySelector('#location-name'),parent=document.querySelector('#location-parent'),parentField=document.querySelector('#parent-field'),parentHint=document.querySelector('#parent-hint'),createError=document.querySelector('#create-error'),save=document.querySelector('#save-location'),cancel=document.querySelector('#cancel-location');
 const newButton=document.querySelector('#new-location'),areaType=document.querySelector('#area-type'),areaTypeField=document.querySelector('#area-type-field');
@@ -7,9 +8,10 @@ const requestedType=new URLSearchParams(location.search).get('type');
 let filter=locationTypes.includes(requestedType)?requestedType:'',loading=true,catalogReady=false,opening=false,saving=false,pendingId,editing=null;
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
 async function api(options={}){const response=await fetch('/api/locations',{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load locations.');return data;}
-const filters=document.querySelector('.type-filters');
+const filterControl=document.querySelector('.directory-filter-control'),filterToggle=document.querySelector('#location-filter-toggle'),filterMenu=document.querySelector('#location-filter-menu'),filters=filterMenu.querySelector('.type-filters');
 for(const kind of locationTypes){const button=node('button','',typePlurals[kind]);button.type='button';button.dataset.type=kind;filters.append(button);type.append(new Option(typeLabels[kind],kind));}
-function syncFilters(){filters.querySelectorAll('[data-type]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.type===filter)));}
+function setFilterOpen(open){filterMenu.hidden=!open;filterToggle.setAttribute('aria-expanded',String(open));}
+function syncFilters(){filters.querySelectorAll('[data-type]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.type===filter)));filterToggle.dataset.active=String(Boolean(filter));filterToggle.title=filter?'Filtered by '+typePlurals[filter]:'Filter locations';filterToggle.setAttribute('aria-label',filter?'Filter locations, '+typePlurals[filter]+' selected':'Filter locations');}
 syncFilters();
 const href=locationHref;
 const directory=initDirectoryShell({
@@ -21,27 +23,15 @@ const directory=initDirectoryShell({
  },
  select:(records,{query,sort,reversed})=>selectLocations(records,query,filter,sort,reversed),
  isFiltered:()=>Boolean(filter),
- onReset(){filter='';syncFilters();},
+ onReset(){filter='';syncFilters();setFilterOpen(false);},
  onData(){catalogReady=true;newButton.disabled=opening;revealHash();},
  renderItem(location,state,index){
-  const records=directory.records,row=node('article','location-row');row.id='location-'+location.id;
-  const avatar=node('span','avatar '+location.type,location.name.replace(/^The /,'').split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase());avatar.setAttribute('aria-hidden','true');
-  const info=node('div','location-info'),heading=node('h2','',`${index+1}. ${location.name}`);heading.tabIndex=-1;
-  {heading.textContent='';const link=node('a','',`${index+1}. ${location.name}`);link.href=href(location);heading.append(link);}
-  info.append(node('span','location-type',typeLabels[location.type]+(location.areaType?' · '+location.areaType:'')),heading);
-  const path=node('p','location-path'),parents=ancestors(location,records);
-  parents.forEach((p,i)=>{if(i)path.append(node('span','','›'));const link=node('a','',p.name);link.href=href(p);path.append(link);});if(parents.length)info.append(path);
-  if(location.type!=='landmark'){
-   const children=records.filter(r=>r.parentId===location.id);
-   const summary=locationTypes.map(kind=>{const n=children.filter(r=>r.type===kind).length;return n?`${n} ${n===1?typeLabels[kind].toLowerCase():typePlurals[kind].toLowerCase()}`:'';}).filter(Boolean).join(' · ');
-   info.append(node('p','location-children',summary||'No locations within it yet'));
-
-  }
-  if(location.linkedNotes?.length){const details=node('details','location-linked-notes'),summary=node('summary','',location.linkedNotes.length+' linked '+(location.linkedNotes.length===1?'note':'notes')),notes=node('ul');
-   for(const note of location.linkedNotes){const li=node('li'),link=node('a','',note.title||note.text);link.href=note.href;link.title=note.text;li.append(link,node('small','',note.source));notes.append(li);}details.append(summary,notes);info.append(details);}
-  row.append(avatar,info);
-  {const edit=node('a','edit-location','Edit');edit.href=href(location);edit.setAttribute('aria-label','Edit '+location.name);row.append(edit);}
-  return row;
+  const records=directory.records,parents=ancestors(location,records),children=records.filter(r=>r.parentId===location.id);
+  const childSummary=locationTypes.map(kind=>{const n=children.filter(r=>r.type===kind).length;return n?`${n} ${n===1?typeLabels[kind].toLowerCase():typePlurals[kind].toLowerCase()}`:'';}).filter(Boolean).join(' · ');
+  const path=parents.map(parent=>parent.name).join(' › '),record={...location,href:href(location),image:location.image||location.imageUrl||location.skylineUrl||location.flagUrl||''};
+  const noteItems=(location.linkedNotes||[]).slice(0,5).map(note=>({label:'Note: '+(note.title||note.text),href:note.href}));
+  const card=createProfileStoryCard(record,{headingLevel:2,label:typeLabels[location.type]+(location.areaType?' · '+location.areaType:''),contextLabel:path?'Within':'Contents',contextText:path||childSummary||location.summary||'No locations within it yet',sections:[{label:'Overview',hash:'overview',icon:'overview'},{label:'History',hash:'history',icon:'story'},{label:'Open questions',hash:'field-questions',icon:'notes'},{label:'Ratings',hash:'ratings',icon:'overview'}],menuItems:noteItems,cardClass:'location-card '+location.type});
+  card.id='location-'+location.id;return card;
  }
 });
 function revealHash(){
@@ -85,7 +75,10 @@ form.addEventListener('submit',async event=>{event.preventDefault();if(saving)re
  finally{saving=false;fields.disabled=false;type.disabled=!!editing;parent.disabled=!(parentTypes[type.value]||[]).length;areaType.disabled=type.value!=='area';save.disabled=false;cancel.disabled=false;save.textContent=editing?'Save changes':'Add location';}
 });
 
-filters.querySelectorAll('[data-type]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.type;syncFilters();directory.render();}));
+filterToggle.addEventListener('click',()=>setFilterOpen(filterMenu.hidden));
+filters.querySelectorAll('[data-type]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.type;syncFilters();directory.render();setFilterOpen(false);filterToggle.focus();}));
+document.addEventListener('pointerdown',event=>{if(!filterMenu.hidden&&!filterControl.contains(event.target))setFilterOpen(false);});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!filterMenu.hidden){event.preventDefault();setFilterOpen(false);filterToggle.focus();}});
 root.querySelector('[data-directory-list]').addEventListener('click',event=>{const link=event.target.closest('a[href^="#location-"]');if(link){event.preventDefault();history.replaceState(null,'',link.getAttribute('href'));revealHash();}});
 window.addEventListener('hashchange',revealHash);
 window.addEventListener('pageshow',event=>{if(event.persisted){dialog.close();pendingId=undefined;opening=false;newButton.disabled=!catalogReady;}});

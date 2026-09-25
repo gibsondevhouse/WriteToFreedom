@@ -1,8 +1,12 @@
 import {locationTemplates,validImageUrl} from './template.js';
 import {initProfileEditor} from '../profiles/editor.js?v=location-profiles-1';
+import {ratingGroupsFor} from '../profiles/ratings.js?v=__WTF_ASSET_REVISION__';
+import {initProfileRatings} from '../profiles/ratings-controls.js?v=__WTF_ASSET_REVISION__';
 
 const record=JSON.parse(document.querySelector('#profile-data').textContent),template=locationTemplates[record.type];
+const readRatings=initProfileRatings(record,ratingGroupsFor('location',record.type));
 initProfileEditor({fieldNames:template.fields,endpoint:'/api/locations',type:record.type,imageFields:template.imageFields,validImageUrl,
+ readExtra:readRatings,
  onSaved(data){
   const path=document.querySelector('[data-location-ancestry]');
   path.replaceChildren();

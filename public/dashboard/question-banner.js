@@ -20,7 +20,7 @@ export function createQuestionBanner(records,{el,tone,initial,idPrefix='',emptyS
   section.append(banner);return {element:section,destroy(){}};
  }
  const banner=el('div','question-banner'),stage=el('div','question-stage'),footer=el('div','question-controls'),link=el('a','question-profile-link','Open profile ↗'),transport=el('div','question-transport'),count=el('span','question-position'),live=el('span','sr-only');
- banner.setAttribute('role','region');banner.setAttribute('aria-roledescription','carousel');banner.setAttribute('aria-label','Open questions');stage.id=prefix+'question-stage';stage.setAttribute('aria-live','off');live.setAttribute('aria-live','polite');live.setAttribute('aria-atomic','true');
+ banner.setAttribute('role','region');banner.setAttribute('aria-roledescription','carousel');banner.setAttribute('aria-label','Open questions');stage.id=prefix+'question-stage';stage.setAttribute('aria-live','off');stage.setAttribute('aria-atomic','true');footer.setAttribute('aria-label','Question controls');transport.setAttribute('role','group');transport.setAttribute('aria-label','Question playback');live.setAttribute('aria-live','polite');live.setAttribute('aria-atomic','true');
  const button=(name,glyph)=>{const node=el('button','question-control',glyph);node.type='button';node.setAttribute('aria-label',name);node.title=name;node.setAttribute('aria-controls',stage.id);return node;};
  const pause=button('Pause slideshow','Ⅱ'),prev=button('Previous question','‹'),next=button('Next question','›');
  transport.append(count);if(slides.length>1)transport.append(pause,prev,next);footer.append(link,transport);banner.append(stage,footer,live);section.append(banner);
@@ -33,31 +33,33 @@ export function createQuestionBanner(records,{el,tone,initial,idPrefix='',emptyS
   info.append(el('p','question-kind',record.label),el('p','question-name',record.name));owner.append(avatar,info);
   group.append(owner,el('h3','question-text',record.question));content.append(art,group);return content;
  }
- function canPlay(){return slides.length>1&&!paused&&!hovered&&visible&&!document.hidden&&!destroyed;}
- function schedule(){stopTimer();if(canPlay())timer=setTimeout(()=>show(index+1,false),8000);}
+ function canPlay(){return slides.length>1&&!reduced.matches&&!paused&&!hovered&&visible&&!document.hidden&&!destroyed;}
+ function schedule(){stopTimer();if(canPlay())timer=setTimeout(()=>show(index+1,false,1),8000);}
  function playback(){
-  pause.textContent=paused?'▶':'Ⅱ';pause.setAttribute('aria-label',paused?'Play slideshow':'Pause slideshow');pause.title=paused?'Play slideshow':'Pause slideshow';banner.dataset.playing=String(canPlay());schedule();
+  const motionDisabled=reduced.matches;
+  pause.disabled=motionDisabled;pause.textContent=paused?'▶':'Ⅱ';pause.setAttribute('aria-pressed',String(paused||motionDisabled));
+  const label=motionDisabled?'Automatic rotation disabled by reduced motion preference':paused?'Play slideshow':'Pause slideshow';pause.setAttribute('aria-label',label);pause.title=label;banner.dataset.playing=String(canPlay());schedule();
  }
- function show(position,manual){
+ function show(position,manual,direction=1){
   if(destroyed)return;stopTimer();cancelTransition();index=(position+slides.length)%slides.length;
   const record=slides[index],incoming=slideContent(record),outgoing=current;current=incoming;stage.append(incoming);
   link.href=record.href;link.setAttribute('aria-label','Open '+record.name+' profile');count.textContent=`${index+1} / ${slides.length}`;banner.dataset.index=String(index);
   if(manual)live.textContent=`Question ${index+1} of ${slides.length}. ${record.name}.`;
   if(outgoing&&!reduced.matches){
    leaving=outgoing;outgoing.setAttribute('aria-hidden','true');outgoing.inert=true;
-   const options={duration:1100,easing:'cubic-bezier(.3,0,.15,1)'};
-   animations=[outgoing.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(-100%)',opacity:0}],options),incoming.animate([{transform:'translateY(100%)',opacity:0},{transform:'translateY(0)',opacity:1}],options)];
+   const easing='cubic-bezier(.22,1,.36,1)';
+   animations=[outgoing.animate([{transform:'translateY(0)',opacity:1},{transform:`translateY(${direction*-12}px)`,opacity:0}],{duration:220,easing,fill:'both'}),incoming.animate([{transform:`translateY(${direction*18}px)`,opacity:0},{transform:'translateY(0)',opacity:1}],{duration:360,easing,fill:'both'})];
    const arriving=animations[1];arriving.finished.then(()=>{if(current!==incoming||destroyed)return;outgoing.remove();leaving=null;animations=[];schedule();}).catch(()=>{});
   }else{outgoing?.remove();schedule();}
  }
  function setPaused(value){paused=value;if(paused)cancelTransition();playback();}
  pause.addEventListener('click',()=>{hovered=false;setPaused(!paused);});
- prev.addEventListener('click',()=>{setPaused(true);show(index-1,true);});next.addEventListener('click',()=>{setPaused(true);show(index+1,true);});
+ prev.addEventListener('click',()=>{setPaused(true);show(index-1,true,-1);});next.addEventListener('click',()=>{setPaused(true);show(index+1,true,1);});
  banner.addEventListener('pointerenter',event=>{if(event.pointerType!=='mouse')return;hovered=true;cancelTransition();playback();});
  banner.addEventListener('pointerleave',()=>{hovered=false;playback();});
  banner.addEventListener('focusin',event=>{if(event.target!==pause)setPaused(true);});
  const visibility=()=>{if(document.hidden)cancelTransition();playback();};document.addEventListener('visibilitychange',visibility);
- const preference=()=>{if(reduced.matches)setPaused(true);};reduced.addEventListener('change',preference);
+ const preference=()=>{cancelTransition();if(reduced.matches)paused=true;playback();};reduced.addEventListener('change',preference);
  const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting&&entries[0].intersectionRatio>=.25;if(!visible)cancelTransition();playback();},{threshold:.25});observer.observe(banner);
  show(0,false);playback();
  return {element:section,destroy(){destroyed=true;stopTimer();cancelTransition();observer.disconnect();document.removeEventListener('visibilitychange',visibility);reduced.removeEventListener('change',preference);}};

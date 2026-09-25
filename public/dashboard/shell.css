@@ -1,12 +1,13 @@
 /* One dependency for the complete dashboard visual system, in cascade order. */
-@import url('./dashboard.css');
-@import url('../styles.css?v=shared-1');
-@import url('../components/character-card/card.css?v=2');
-@import url('../components/character-card/details.css?v=1');
-@import url('../components/note-card/card.css?v=2');
-@import url('../components/artifact-card/card.css?v=1');
-@import url('../components/book-cover-card/card.css?v=3');
-@import url('../components/lore-card/card.css?v=1');
+@import url('./dashboard.css?v=__WTF_ASSET_REVISION__');
+@import url('../styles.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/story-card/card.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/character-card/card.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/character-card/details.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/note-card/card.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/artifact-card/card.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/book-cover-card/card.css?v=__WTF_ASSET_REVISION__');
+@import url('../components/lore-card/card.css?v=__WTF_ASSET_REVISION__');
 
 .dashboard-shell { min-width:0; }
 .dashboard-shell .dashboard-heading-copy { min-width:0; }
@@ -29,3 +30,51 @@
 .dashboard-empty p { margin:0; max-width:550px; font-size:1rem; }
 .dashboard-empty .dashboard-actions { margin-top:20px; }
 @media(max-width:540px) { .dashboard-shell .dashboard-empty { padding:24px 20px; } }
+
+/* The banner owns two stable rows: animated content and stationary controls. */
+.dashboard-shell .question-banner {
+ display:grid;
+ grid-template-rows:minmax(0,1fr) auto;
+ height:17.5rem;
+ min-height:0;
+ overflow:hidden;
+ border:1px solid #3b5167;
+ border-radius:8px;
+ background:linear-gradient(110deg,#22364b,#1d303b);
+}
+.dashboard-shell .question-stage { position:relative; min-height:0; overflow:hidden; mask-image:none; }
+.dashboard-shell .question-slide { position:absolute; inset:0; display:flex; align-items:center; padding:20px 24px; }
+.dashboard-shell .question-controls {
+ position:relative;
+ z-index:2;
+ display:grid;
+ grid-template-columns:minmax(0,1fr) auto;
+ align-items:center;
+ gap:16px;
+ min-height:68px;
+ padding:10px 24px 16px;
+ border-top:1px solid #ffffff12;
+ background:#152434;
+}
+.dashboard-shell .question-profile-link { justify-self:start; }
+.dashboard-shell .question-transport { display:flex; align-items:center; gap:8px; min-width:0; }
+.dashboard-shell .question-control,
+.dashboard-shell .question-profile-link { border-radius:8px; }
+
+/* Collection rails use one card contract; specialized covers keep their proportions. */
+.dashboard-shell .rail > li { display:flex; align-items:stretch; }
+.dashboard-shell .rail > li > .card { flex:0 0 auto; }
+.dashboard-shell :is(.faction-card,.location-card) { --character-card-width:min(340px,calc(100vw - 40px)); --character-card-height:440px; }
+
+@media(max-width:760px) {
+ .dashboard-shell .question-banner { height:21.25rem; }
+ .dashboard-shell .question-slide { padding-inline:18px; }
+ .dashboard-shell .question-controls { padding-inline:18px; gap:12px; }
+}
+@media(max-width:420px) {
+ .dashboard-shell .question-banner { height:24rem; }
+ .dashboard-shell .question-controls { grid-template-columns:1fr; gap:10px; }
+ .dashboard-shell .question-transport { width:100%; }
+ .dashboard-shell .question-position { margin-right:auto; text-align:left; }
+ .dashboard-shell .question-control { width:40px; height:40px; }
+}

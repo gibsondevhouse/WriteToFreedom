@@ -22,14 +22,10 @@
 .workspace .portrait-card .monogram { font-size: 1.625rem; }
 .workspace .portrait-card h3 { font-size: 1rem; }
 .workspace .portrait-card .meta { font-size: .875rem; }
-.workspace .question-banner { height: 17.5rem; border-radius: 8px; background: linear-gradient(110deg,#22364b,#1d303b); border-color: #3b5167; }
-.workspace .question-slide { padding: 20px 24px 16px; align-items: center; }
 .workspace .question-text { font-size: 1.5rem; line-height: 1.35; letter-spacing: 0; -webkit-line-clamp: 3; }
 .workspace .question-owner { margin-bottom: 12px; }
 .workspace .question-art { display: none; }
-.workspace .question-controls { padding: 0 24px 20px; }
-.workspace .question-profile-link { border-radius: 8px; padding-inline: 14px; }
-.workspace .question-control,.workspace .rail-arrow { border-radius: 6px; }
+.workspace .rail-arrow { border-radius: 6px; }
 .workspace .empty-row { background: #1b2838; border-color: #354459; border-radius: 8px; padding: 18px; }
 .workspace :is(a,button,input,summary):focus-visible { outline: 2px solid #a4bdff; outline-offset: 4px; }
 .workspace .workspace-search input:focus-visible { outline: none; }
@@ -40,11 +36,7 @@
 @media(max-width:760px) {
   .workspace main { padding: 24px 20px 32px; }
   .workspace h1 { font-size: 1.875rem; }
-  .workspace .question-banner { height: 21.25rem; }
-  .workspace .question-slide { padding-inline: 18px; }
-  .workspace .question-controls { padding-inline: 18px; gap: 12px; }
   .workspace .question-text { font-size: 1.375rem; -webkit-line-clamp: 4; }
-  .workspace .question-transport { margin-left: auto; }
 }
 @media(max-width:380px) {
   .workspace main { padding-inline: 14px; }

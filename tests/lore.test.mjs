@@ -6,6 +6,7 @@ import {createWorker} from '../server/app.js';
 import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
 import {loreTypes,loreTemplates,primaryCollection,loreHref} from '../public/lore/template.js';
 import {searchCatalog} from '../public/dashboard/search.js';
+import {ratingGroupsFor} from '../public/profiles/ratings.js';
 
 const origin='https://novel.example';
 function setup(t){
@@ -21,21 +22,26 @@ function setup(t){
 for(const type of Object.keys(loreTypes))test(`${type}: standalone lore template saves, reopens and stays private`,async t=>{
  const {request,get,create}=setup(t),record=await create(type),url='/api/lore/'+record.id,page=loreHref(record),template=loreTemplates[type];
  assert.deepEqual(record.collections,[primaryCollection[type]]);assert.equal(record.version,1);
+ assert.deepEqual(record.profileRatings,{});
  for(const key of template.fields)assert.equal(typeof record[key],'string');
  let html=await (await request(page)).text();for(const key of template.fields)assert.equal(html.split(`name="${key}"`).length-1,1,key);
+ assert.equal(html.split('id="ratings"').length-1,1);assert.equal(html.split('data-profile-ratings=').length-1,new Set(ratingGroupsFor('lore',type).map(group=>group.sectionId)).size);
  assert.ok(html.includes('data-app-shell'));assert.ok(html.includes('/lore/'));assert.ok(html.includes('What is true'));assert.ok(html.includes('What people believe'));
- const changed={...record,truth:'The stone transfers illness.',beliefs:'Everyone calls it a healing stone.',knowledge:'Only Claude knows.',history:'Before </textarea><script>escape</script>',questions:'Who made it?\nWhat was the cost?',hiddenFields:['truth'],originDate:'1200 BCE',pinned:true,featured:true,imageUrl:'https://example.com/entry.png'};
+ const ratingKey=ratingGroupsFor('lore',type)[0].fields[0][0];
+ const changed={...record,truth:'The stone transfers illness.',beliefs:'Everyone calls it a healing stone.',knowledge:'Only Claude knows.',history:'Before </textarea><script>escape</script>',questions:'Who made it?\nWhat was the cost?',hiddenFields:['truth'],profileRatings:{[ratingKey]:61},originDate:'1200 BCE',pinned:true,featured:true,imageUrl:'https://example.com/entry.png'};
  for(const key of template.fields)if(key!=='name'&&!changed[key])changed[key]='Details for '+key;
  let r=await request(url,'PUT',changed);assert.equal(r.status,200);let saved=await r.json();assert.equal(saved.version,2);
  const reopened=await get(url);assert.deepEqual(reopened,saved);assert.notEqual(saved.truth,saved.beliefs);
+ assert.deepEqual(reopened.profileRatings,{[ratingKey]:61});
  html=await (await request(page)).text();assert.ok(html.includes('data-profile-field="truth" hidden'));assert.ok(html.includes('&lt;/textarea&gt;&lt;script&gt;escape&lt;/script&gt;'));
  assert.equal((await request(url,'PUT',changed)).status,409);assert.equal((await request(url,'GET',undefined,'other')).status,404);assert.equal((await request(page,'GET',undefined,'other')).status,404);
- const partial=await request(url,'PUT',{version:saved.version,summary:'Updated summary'});assert.equal(partial.status,200);saved=await partial.json();assert.equal(saved.truth,changed.truth);assert.deepEqual(saved.hiddenFields,['truth']);assert.equal(saved.pinned,true);
+ const partial=await request(url,'PUT',{version:saved.version,summary:'Updated summary'});assert.equal(partial.status,200);saved=await partial.json();assert.equal(saved.truth,changed.truth);assert.deepEqual(saved.hiddenFields,['truth']);assert.equal(saved.pinned,true);assert.deepEqual(saved.profileRatings,{[ratingKey]:61});
  const dashboard=await get('/api/dashboard');assert.ok(searchCatalog(dashboard,'Updated summary').some(r=>r.id===record.id));assert.ok(dashboard.characters.find(c=>c.id==='claude').mentions.some(m=>m.href===page+'#field-knowledge'));
  const lore=await get('/api/lore');assert.equal(lore.entries.length,1);assert.equal(lore.entries[0].featured,true);assert.equal(lore.questions[0].questionCount,2);
  const timeline=await get('/api/timeline');assert.equal(timeline.events.filter(e=>e.entityId==='lore:'+record.id).length,1);assert.equal(timeline.events.find(e=>e.entityId==='lore:'+record.id).href,page+'#field-originDate');
  assert.equal((await request(page,'HEAD')).status,200);assert.equal(await (await request(page,'HEAD')).text(),'');assert.equal((await request(page.slice(0,-1)+'?a=1')).headers.get('location'),origin+page+'?a=1');
  for(const bad of [{type:type==='note'?'species':'note'},{name:' '},{imageUrl:'javascript:alert(1)'},{history:42},{hiddenFields:['name']},{collections:null},{featured:'true'},{version:0}])assert.equal((await request(url,'PUT',{...saved,...bad})).status,400,JSON.stringify(bad));
+ for(const profileRatings of [{[ratingKey]:100},{[ratingKey]:-1},{unknown:40},[]])assert.equal((await request(url,'PUT',{...saved,profileRatings})).status,400);
 });
 
 test('overlapping object collections share one identity, chronology and search result',async t=>{

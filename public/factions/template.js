@@ -14,5 +14,5 @@ export const factionSections=[
  {id:'notes',title:'Open questions',fields:[['questions','Unresolved questions','textarea']]}
 ];
 export const factionFields=factionSections.flatMap(s=>s.fields.map(f=>f[0]));
-export const blankFaction=()=>({...Object.fromEntries(factionFields.map(k=>[k,''])),hiddenFields:[]});
+export const blankFaction=()=>({...Object.fromEntries(factionFields.map(k=>[k,''])),hiddenFields:[],profileRatings:{}});
 export const factionHideableFields=hiddenFieldNames(factionSections);

@@ -1,7 +1,9 @@
+import {assetUrl} from './asset-url.js';
+
 const sections = [
   ['Overview', [['Dashboard', '/dashboard/', 'dashboard']]],
   ['Worldbuilding', [['Characters', '/characters/', 'characters'], ['Factions', '/factions/', 'factions'], ['Locations', '/locations/', 'locations'], ['Lore', '/lore/', 'lore']]],
-  ['Structure', [['Timeline', '/timeline/', 'timeline']]],
+  ['Structure', [['Timeline', '/timeline/', 'timeline'], ['Story Arcs', '/story-arcs/', 'storyArcs']]],
 ];
 
 const iconPaths = {
@@ -11,6 +13,7 @@ const iconPaths = {
  factions:'<path d="M5 21V4m0 0c5-4 9 4 14 0v10c-5 4-9-4-14 0"/>',
  locations:'<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/>',
  timeline:'<path d="M4 4v16m8-16v16m8-16v16"/><rect x="2" y="6" width="10" height="4" rx="1"/><rect x="12" y="14" width="10" height="4" rx="1"/>',
+ storyArcs:'<path d="M4 18 9 9l5 5 6-10"/><path d="M4 21h16M4 4v17"/><circle cx="9" cy="9" r="1.5"/><circle cx="14" cy="14" r="1.5"/>',
  sidebar:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
  search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
 };
@@ -28,19 +31,20 @@ function shellIcon(name){return `<svg width="18" height="18" viewBox="0 0 24 24"
  */
 export function workspaceShell(html, path) {
   if (!html.includes('<body') || html.includes('data-app-shell')) return html;
+  html=html.replace(/\b(href|src)="(\/(?!\/)[^"]+\.(?:css|js)(?:\?[^"#]*)?(?:#[^"]*)?)"/g,(_,attribute,asset)=>`${attribute}="${assetUrl(asset)}"`);
   const current = path === '/' || path === '/index.html' ? '/dashboard/' : path;
   const navigation = sections.map(([group, links]) => `<div class="nav-group"><p class="nav-label">${group}</p>${links.map(([label, href, icon]) => `<a class="nav-link${current.startsWith(href) ? ' active' : ''}" href="${href}" aria-label="${label}" title="${label}"${current.startsWith(href) ? ' aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true">${shellIcon(icon)}</span><span class="nav-text">${label}</span></a>`).join('')}</div>`).join('');
   const shell = `<aside id="workspace-sidebar" class="workspace-sidebar" aria-label="Workspace sidebar">
     <a class="workspace-brand" href="/" aria-label="Write to Freedom home"><img src="/crest.svg" width="24" height="28" alt=""><span>Write to Freedom</span></a>
-    <nav id="workspace-navigation" aria-label="Novel sections">${navigation}<details class="upcoming"><summary>Upcoming modules</summary><p>Still in development</p><ul><li>Chapters</li><li>Scenes</li><li>Story Arcs</li><li>Story Beats</li></ul></details></nav>
+    <nav id="workspace-navigation" aria-label="Novel sections">${navigation}<details class="upcoming"><summary>Upcoming modules</summary><p>Still in development</p><ul><li>Chapters</li><li>Scenes</li><li>Story Beats</li></ul></details></nav>
   </aside><div class="workspace-canvas">
     <header class="workspace-topbar">
       <button class="sidebar-toggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar">${shellIcon('sidebar')}</button>
       <span class="workspace-context">My workspace</span>
-      <search class="workspace-search" aria-label="Search your novel"><label class="shell-sr-only" for="novel-search">Search characters, factions, locations, and lore</label><span class="search-symbol" aria-hidden="true">${shellIcon('search')}</span><input id="novel-search" type="search" placeholder="Search your novel…" aria-controls="search-results" autocomplete="off"><kbd aria-hidden="true">⌘ K</kbd></search>
+      <search class="workspace-search" aria-label="Search your novel"><label class="shell-sr-only" for="novel-search">Search characters, factions, locations, lore, and story arcs</label><span class="search-symbol" aria-hidden="true">${shellIcon('search')}</span><input id="novel-search" type="search" placeholder="Search your novel…" aria-controls="search-results" autocomplete="off"><kbd aria-hidden="true">⌘ K</kbd></search>
       <section id="search-results" class="search-results" aria-label="Search results" hidden><p id="search-status" role="status"></p><ul id="search-list"></ul></section>
     </header><div class="workspace-page">`;
-  return html.replace('</head>', '<link rel="stylesheet" href="/workspace-shell.css?v=2"><script src="/workspace-state.js?v=1"></script><script type="module" src="/dashboard/workspace.js?v=shared-1"></script></head>')
+  return html.replace('</head>', `<link rel="stylesheet" href="${assetUrl('/workspace-shell.css')}"><script src="${assetUrl('/workspace-state.js')}"></script><script type="module" src="${assetUrl('/dashboard/workspace.js')}"></script></head>`)
     .replace(/<body([^>]*)>/, (_, attrs) => `<body${attrs} data-app-shell>${shell}`)
     .replace('</body>', '</div></div></body>');
 }

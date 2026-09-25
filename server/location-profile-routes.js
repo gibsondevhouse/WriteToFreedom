@@ -4,6 +4,7 @@ import {characterCast} from './sample-characters.js';
 import {locationTemplates,defaultLocation,validImageUrl} from '../public/locations/template.js';
 import {parentChoices,requiresParent,areaTypes,locationPaths,ancestors,locationHref} from '../public/locations/data.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
+import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
 import {renderLocation} from './render-location.js';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
@@ -42,6 +43,7 @@ export async function locationProfileRoute(request,env){
   if(!document.name)return json({error:'Enter a location name.'},400);
   document.hiddenFields=readHiddenFields(input,current,template.hideableFields);
   if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
+  try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),ratingGroupsFor('location',location.type));}catch(error){return json({error:error.message},400);}
   // Universes have no parent field; reject attempts to add a parent through JSON.
   if(location.type==='universe'&&input.parentId)return json({error:'A universe cannot have a parent location.'},400);
   document.parentId=document.parentId||null;

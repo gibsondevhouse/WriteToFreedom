@@ -1,5 +1,5 @@
-import {hiddenFieldNames} from '../profiles/schema.js';
-export {validImageUrl} from '../locations/countries/template.js';
+import {hiddenFieldNames} from '../profiles/schema.js?v=__WTF_ASSET_REVISION__';
+export {validImageUrl} from '../locations/countries/template.js?v=__WTF_ASSET_REVISION__';
 
 export const loreTypes={note:'Note',artifact:'Artifact',relic:'Relic',book:'Book',jewel:'Jewel',species:'Species'};
 export const loreCollections={notes:'Notes',artifacts:'Artifacts',relics:'Relics',books:'Books',jewels:'Jewels',species:'Species'};
@@ -38,5 +38,5 @@ export const loreTemplates=Object.fromEntries(Object.keys(loreTypes).map(type=>{
 }));
 // Union by field rather than section: species adds its own limits field.
 export const loreMentionSections=[{fields:[...new Map(Object.values(loreTemplates).flatMap(t=>t.sections.flatMap(s=>s.fields)).map(f=>[f[0],f])).values()]}];
-export function blankLore(type){return {...Object.fromEntries(loreTemplates[type].fields.map(k=>[k,''])),type,collections:[primaryCollection[type]],connections:[],hiddenFields:[],pinned:false,featured:false};}
+export function blankLore(type){return {...Object.fromEntries(loreTemplates[type].fields.map(k=>[k,''])),type,collections:[primaryCollection[type]],connections:[],hiddenFields:[],profileRatings:{},pinned:false,featured:false};}
 export function allowedCollections(type){return ['note','species'].includes(type)?[primaryCollection[type]]:objectCollections;}

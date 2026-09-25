@@ -1,7 +1,7 @@
-import {factionCard,locationCard,loreEntryCard,eventCard} from './components.js?v=species-cards-1';
-import {createCharacterCard} from '../components/character-card/card.js?v=2';
-import {updateWorkspace} from './workspace.js?v=shared-1';
-import {initDashboardShell} from './shell.js?v=shell-2';
+import {factionCard,locationCard,loreEntryCard,eventCard} from './components.js?v=__WTF_ASSET_REVISION__';
+import {createCharacterCard} from '../components/character-card/card.js?v=__WTF_ASSET_REVISION__';
+import {updateWorkspace} from './workspace.js?v=__WTF_ASSET_REVISION__';
+import {initDashboardShell} from './shell.js?v=__WTF_ASSET_REVISION__';
 
 initDashboardShell({
  endpoint:'/api/dashboard',onData:updateWorkspace,

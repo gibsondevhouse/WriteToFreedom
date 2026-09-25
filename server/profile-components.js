@@ -43,7 +43,7 @@ export function renderDateControl(key,label,val,attrs){return `<div class="date-
  * No data lookup or persistence occurs here; the caller supplies scoped choices.
  */
 export function createFieldRenderer(record,{options=()=>null,required=[],links={}}={}){
- return ([key,label,type])=>{
+ return ([key,label,type,placeholder])=>{
   const val=record[key]||'',attrs=`id="field-${key}" name="${key}" aria-label="${escape(label)}"${required.includes(key)?' required':''}`,choices=options(key,type);let control;
   if(type==='date')control=renderDateControl(key,label,val,attrs);
   else if(type==='choice')control=renderChoice(key,label,val,attrs);
@@ -51,7 +51,7 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
    if(val&&!choices.some(([value])=>value===val))choices.push([val,val]);
    control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(([v,l])=>`<option value="${escape(v)}"${v===val?' selected':''}>${escape(l)}</option>`).join('')}</select>`;
    if(links[key])control+=`<a class="person-link" data-for="${key}" href="${links[key]}${escape(val)}/"${!val?' hidden':''}>Open profile →</a>`;
-  }else if(type==='textarea')control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="Add ${escape(label.toLowerCase())}…">${escape(val)}</textarea>`;
+  }else if(type==='textarea')control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="${escape(placeholder||'Add '+label.toLowerCase()+'…')}">${escape(val)}</textarea>`;
   else control=`<input ${attrs} type="${type==='url'?'url':'text'}"${type==='url'?' pattern="https://.*" title="Use an HTTPS image URL"':''} autocomplete="off" maxlength="${key==='name'?160:type==='url'?2048:10000}" value="${escape(val)}" placeholder="${type==='url'?'https://…':'Add '+escape(label.toLowerCase())+'…'}">`;
   return renderFieldWrapper(record,key,label,type,control);
  };
@@ -64,6 +64,12 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
 export function renderSection(section,content,record,{fullWidth=false,menuFields=section.fields,allowNotes=false}={}){
  const menu=menuFields.length?`<details class="field-menu"><summary aria-label="Choose visible fields for ${escape(section.title)}" title="Choose visible fields"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg></summary><div class="field-menu-panel">${menuFields.map(([key,label])=>`<label><input type="checkbox" data-visibility="${key}"${record.hiddenFields?.includes(key)?'':' checked'}> ${escape(label)}</label>`).join('')}<div class="visibility-actions"><button type="button" data-visibility-all="show">Show all</button><button type="button" data-visibility-all="hide">Hide all</button></div>${allowNotes?'<button type="button" class="create-profile-note" data-create-note>Create a note</button>':''}</div></details>`:'';
  return `<section id="${section.id}" class="profile-section${fullWidth?' full-width':''}"><div class="section-header"><h2>${headingButton(section.title,section.id+'-body')}</h2>${menu}</div><div id="${section.id}-body" class="collapsible-region">${content}</div></section>`;
+}
+/** Render the client mount for rating groups assigned to one article section. */
+export function renderRatingsHost(groups,sectionId){
+ const selected=groups.filter(group=>group.sectionId===sectionId);if(!selected.length)return '';
+ const first=groups[0]?.sectionId===sectionId?' id="ratings"':'';
+ return `<div${first} class="profile-ratings-slot" data-profile-ratings="${escape(sectionId)}" aria-label="${escape(selected.map(group=>group.title).join(' and '))} ratings"></div>`;
 }
 /** Render a collapsible infobox group; id must be unique and template-controlled. */
 export function renderInfoGroup(title,id,content){return `<div class="card-group"><h3>${headingButton(title,id)}</h3><div id="${id}" class="collapsible-region">${content}</div></div>`;}
@@ -80,6 +86,6 @@ export function renderProfileName(record,type,{official=false}={}){return `<h1 c
  * @returns {string} Full HTML for the outer Worker to decorate with workspaceShell.
  */
 export function renderProfilePage({record,type,collection,collectionUrl,infobox,content,script,styles=[],initial=record,boxClass=''}){
- const name=escape(record.name?.trim()||'Untitled '+type),displayType=type.replaceAll('-',' '),label=displayType[0].toUpperCase()+displayType.slice(1);
+ const displayType=type.replaceAll('-',' '),name=escape(record.name?.trim()||'Untitled '+displayType),label=displayType[0].toUpperCase()+displayType.slice(1);
  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${name} — Write to Freedom</title><link rel="icon" href="/crest.svg">${['/profiles/profile.css','/profiles/editor.css','/profiles/date-picker.css',...styles].map(path=>`<link rel="stylesheet" href="${path}?v=${profileRevision}">`).join('')}<script type="module" src="${script}?v=${profileRevision}"></script></head><body class="entity-profile ${type}-profile"><div class="page-layout"><main id="profile"><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${collectionUrl}">${collection}</a> / <span aria-current="page" data-display-name>${name}</span></nav><form id="profile-form" data-id="${escape(record.id)}" data-version="${record.version}"><div class="article-bar"><span class="current-view">${label} profile</span><div class="save-actions"><span id="save-status" role="status">Saved</span><button id="save-character" type="submit">Save changes</button></div></div><p class="byline">Click any field to edit your ${displayType}.</p><p id="editor-error" role="alert" hidden></p><noscript>Enable JavaScript to edit and save this profile.</noscript><fieldset id="editor-fields"><legend class="sr-only">${label} profile</legend><article><aside class="infobox ${boxClass}" id="identity" tabindex="0" aria-label="${label} information">${infobox}</aside><div class="profile-content">${content}<footer class="profile-footer"><a href="${collectionUrl}">← Back to ${collection.toLowerCase()}</a><a href="#profile">Back to top ↑</a></footer></div></article></fieldset></form></main></div><script id="profile-data" type="application/json">${jsonData(initial)}</script></body></html>`;
 }

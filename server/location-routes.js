@@ -41,7 +41,7 @@ export async function locationRoute(request,env){
   const document={name:input.name.trim().replace(/\s+/g,' '),parentId,...(input.type==='area'?{areaType:input.areaType}:{})};
   if(request.method==='PUT'){
    const template=locationTemplates[existing.type];
-   const preserved=Object.fromEntries([...template.fields,'hiddenFields'].filter(key=>Object.hasOwn(existing,key)).map(key=>[key,existing[key]]));
+   const preserved=Object.fromEntries([...template.fields,'hiddenFields','profileRatings'].filter(key=>Object.hasOwn(existing,key)).map(key=>[key,existing[key]]));
    const saved=await db.saveLocationDetails(owner,input.id,input.version,{...preserved,...document});
    return saved?json({...existing,...saved}):json({error:'This location changed in another tab. Close and reopen this editor before saving.'},409);
   }

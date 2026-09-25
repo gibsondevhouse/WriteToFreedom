@@ -2,8 +2,11 @@ import {initProfileEditor} from '../profiles/editor.js?v=lore-1';
 import {loreTemplates,primaryCollection,validImageUrl} from './template.js';
 import {referenceKey,cleanNoteReference} from '../characters/notes.js';
 import {el} from '../dashboard/components.js';
+import {ratingGroupsFor} from '../profiles/ratings.js?v=__WTF_ASSET_REVISION__';
+import {initProfileRatings} from '../profiles/ratings-controls.js?v=__WTF_ASSET_REVISION__';
 
 const {record,targets}=JSON.parse(document.querySelector('#profile-data').textContent),form=document.querySelector('#profile-form'),host=document.querySelector('#lore-connections');
+const readRatings=initProfileRatings(record,ratingGroupsFor('lore',record.type));
 const rows=[];
 function dirty(){form.dispatchEvent(new Event('change',{bubbles:true}));}
 function addConnection(connection={target:null,relationship:''},focus=false){
@@ -24,6 +27,6 @@ initProfileEditor({fieldNames:loreTemplates[record.type].fields,endpoint:'/api/l
  readExtra(){
   const connections=rows.map(({select,relationship,original})=>{const target=targets.find(t=>referenceKey(t)===select.value)||original;if(!target)throw new Error('Choose a connected entry.');return {target:cleanNoteReference(target),relationship:relationship.value};});
   if(new Set(connections.map(c=>referenceKey(c.target))).size!==connections.length)throw new Error('Each connected entry should appear only once.');
-  return {collections:[...new Set([primaryCollection[record.type],...Array.from(form.querySelectorAll('[data-collection]:checked'),n=>n.dataset.collection)])],pinned:document.querySelector('#lore-pinned').checked,featured:document.querySelector('#lore-featured').checked,connections};
+  return {...readRatings(),collections:[...new Set([primaryCollection[record.type],...Array.from(form.querySelectorAll('[data-collection]:checked'),n=>n.dataset.collection)])],pinned:document.querySelector('#lore-pinned').checked,featured:document.querySelector('#lore-featured').checked,connections};
  }
 });

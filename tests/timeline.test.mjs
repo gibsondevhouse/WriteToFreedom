@@ -52,5 +52,6 @@ test('zoom keeps the pointer date fixed at every scale and rulers stay bounded a
  const view={start:-100,scale:120,y:10},pixel=720,date=view.start+pixel/view.scale;
  for(const factor of [1.5,.25,1e20,1e-20]){const next=zoomAt(view,factor,pixel);assert.ok(Math.abs(next.start+pixel/next.scale-date)<1e-6);assert.ok(next.scale>=minScale&&next.scale<=maxScale);assert.equal(next.y,10);}
  for(const scale of [minScale,.1,1,24,120,1200,3000,maxScale]){const ticks=rulerTicks(-40.5,1222,scale);assert.ok(ticks.length>0);assert.ok(ticks.length<100);for(let i=1;i<ticks.length;i++)assert.ok(ticks[i].value>ticks[i-1].value);}
- const events=[{date:{position:1800}},{date:{position:2000}}],fit=fitView(events,1222);assert.ok((1800-fit.start)*fit.scale>=0);assert.ok((2000-fit.start)*fit.scale<=1222);
+ const events=[{date:{position:1800}},{date:{position:2000}}],fit=fitView(events,1222);assert.ok((1800-fit.start)*fit.scale>=50-1e-6);assert.ok((2000-fit.start)*fit.scale<=1172+1e-6);
+ const single=fitView([{date:{position:1876.5}}],320);assert.ok(Math.abs((1876.5-single.start)*single.scale-160)<1e-6,'a single event stays centered');
 });

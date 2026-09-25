@@ -47,6 +47,7 @@ Shared data modules such as templates, dates, notes validation, attribute valida
 | Profile HTML primitives | `server/profile-components.js` | Shared character, faction, country, city, location, and Lore renderers. |
 | Field lists/defaults/options | Entity `template.js` files; `public/profiles/choices.js` | Renderers, validators, editors, derived models. |
 | Shared profile interaction | `public/profiles/controls.js`, `viewport.js`, `date-picker.js` | All profile editors. |
+| Shared profile ratings | `public/profiles/ratings.js`, `ratings-controls.js`, `ratings.css` | Factions, all ten location types, and all six Lore types. |
 | Generic profile saving | `public/profiles/editor.js` | Faction, country, city, shared location, and Lore adapters. |
 | Character-specific saving | `public/characters/profile-editor.js` | Character profile only. |
 | Authored notes and links | `public/characters/note-*.js`, `notes.js`, `server/note-connections.js` | Character editor, linked-note displays, card projections. |
@@ -108,6 +109,7 @@ Source: [server/profile-components.js](../server/profile-components.js). These f
 | `renderInfoGroup(title, id, content)` | Collapsible group inside the infobox. | ID is the controlled region's stable identifier. |
 | `renderProfileName(record, type, { official })` | Name heading and `#edit-name` focus button. | Official names use `#official-heading`; normal names use `data-display-name`. |
 | `renderProfilePage(config)` | Full HTML document with form, save bar, infobox, article, footer and initial JSON. | Does not add the workspace shell; outer Worker does that. One profile form is assumed per page. |
+| `renderRatingsHost(groups, sectionId)` | Client mount for rating groups assigned to an existing article section. | The first assigned group supplies the stable `#ratings` card-menu target. |
 
 `renderProfilePage` requires `record`, `type`, `collection`, `collectionUrl`, `infobox`, `content`, and `script`; optional `styles`, `initial`, and `boxClass` customize it. `initial` defaults to the record. It includes shared profile/editor/date-picker styles and the entity script with `profileRevision` query values. The revision is an asset URL/cache marker, unrelated to a persisted document's optimistic `version`.
 
@@ -147,6 +149,12 @@ Renderers receive already owner-scoped data from routes; they do not authenticat
 
 `locationProfileGroups` produces the eight defaulted groups for dashboard questions, timeline events, and character mentions. Saved detail content already arrives through the owner-scoped location catalog. All ten location types share `locationPaths`/`locationHref` for directory rows, note targets, featured connections, derived cards, and source links.
 
+### Story arc profiles
+
+`public/story-arcs/template.js` defines the shared arc fields, three guided questions for each of the six narrative beats, drafting metadata, and default tension/pace/action values. `server/render-story-arc.js` composes these into the standard profile shell: logistics and linked key entities stay in the right infobox, while the central article begins with an editable SVG pacing graph followed by collapsible beat, stakes, subplot, scene, and question sections. `public/story-arcs/profile.js` owns the pacing projection and the dynamic connected-arc and key-scene rows, then passes their serialized values through `initProfileEditor.readExtra()`.
+
+Story arc documents are owner-scoped and versioned in `story_arcs`. Start and end dates use the shared story-date picker and feed the derived global timeline. Arc titles, summaries, dates, type, and status are included in workspace search.
+
 ### `initProfileControls(form, markDirty, options)`
 
 Source: [public/profiles/controls.js](../public/profiles/controls.js).
@@ -172,13 +180,19 @@ Source: [public/profiles/editor.js](../public/profiles/editor.js).
 
 The faction, country, city, Lore, and shared location profile scripts pass `fieldNames`, API collection `endpoint`, singular `type`, and optional `imageFields`/`validImageUrl`. The initializer reads the page's form hooks, calls shared controls, and holds `version`, `dirty`, and `saving` in its closure. It returns no controller object. An optional `readExtra()` hook serializes domain-specific controls before the request. An optional `onSaved(data)` callback receives the successful response; the shared location adapter uses its derived ancestry to refresh navigation without reloading.
 
+`ratingGroupsFor(kind, type)` selects a declarative rating definition. Each group names the existing article section that owns it. `initProfileRatings(record, groups)` distributes the common 0–99 dial controls across those section hosts while retaining one draft and returns a `readExtra()` compatible function. Location definitions distinguish inhabited places, cosmic places, and landmarks; Lore definitions distinguish notes, objects, and species. Route handlers validate allowlisted integer values from 0 through 99 and preserve saved ratings when an older client omits the property.
+
 Submit commits custom choices, checks native validity, serializes configured fields plus `hiddenFields` and `version`, disables editing, and sends PUT to `endpoint + '/' + form.dataset.id`. It verifies JSON responses, retains the returned version, updates names/links, and clears dirty state only after success. Errors preserve field values. Finally it restores the controls. Ctrl/Cmd+S submits and `beforeunload` warns for unsaved changes.
 
 The character adapter implements its own save flow because it also serializes relationships, notes, nationality-continent assignments, and attribute ratings, and coordinates inline faction creation. It uses the same controls and page hooks. A new shared save behavior must be reviewed in both save implementations.
 
-## Reusable character cards
+## Reusable story cards
 
-Canonical source: [public/components/character-card](../public/components/character-card/README.md).
+Canonical shell: [public/components/story-card](../public/components/story-card). Character-specific behavior is documented in [public/components/character-card](../public/components/character-card/README.md).
+
+`story-card/card.js` owns the complete card frame: safe artwork, deterministic tones, title hierarchy, context row, consistent action sizing, accessible labels, and the overflow menu. The native disclosure menu closes after an action and supports Escape with focus restoration. `story-card/profile-card.js` adapts profile-backed records and provides section links in both the footer and menu. Domain adapters supply content and callbacks while the component retains the interaction chrome.
+
+Character, faction, location, Jewel, and Species cards use the complete shell. Notes retain their review-card composition, and Artifacts, Books, and Relics retain their media-specific landscape or cover proportions; all use the shared action and menu primitives. `character-card/frame.js` and `character-card/card.css` are compatibility entry points.
 
 ### Data preparation
 
@@ -196,7 +210,7 @@ Use `/api/characters?view=cards` or dashboard `characters` for cards. Ordinary c
 
 ### `createCharacterCard(data, options = {})`
 
-This DOM factory returns an `HTMLElement` (`article.story-character-card`). The shared `createStoryCardFrame` in `public/components/character-card/frame.js` owns its artwork, title, detail row and four-action footer; the Character adapter supplies power, affiliation and dialog actions. The shared Lore adapter reuses that frame and canonical CSS for Jewels and Species with Lore navigation actions. It normalizes input, assigns a stable ID-based tone, and builds artwork, name/role, derived power, featured-item row, and action footer. Mounting the card performs no API request; remote image elements may load their URLs.
+This DOM factory returns an `HTMLElement` (`article.story-character-card`). The shared `createStoryCardFrame` in `public/components/story-card/card.js` owns its artwork, title, detail row and action footer; the Character adapter supplies power, affiliation and dialog actions. The Lore and profile adapters reuse that frame and canonical CSS. The adapter normalizes input, assigns a stable ID-based tone, and builds character-specific content. Mounting the card performs no API request; remote image elements may load their URLs.
 
 | Option | Meaning |
 | --- | --- |
@@ -255,11 +269,11 @@ Source markers `[1]`, `[2]`, etc. are positional references into textarea fields
 
 ## Dates, reading viewport, and timeline
 
-`initDatePicker(form)` creates the shared date dialog for that form. It dispatches input/change events to update the existing field; it does not save to the API. `datePickerPlacement` is pure placement math suitable for unit tests. Date parsing and formatting live in `dates.js` so picker output and timeline interpretation share precision and BCE rules.
+`createDateControl(options)` creates the standard read-only input and calendar trigger for dynamically rendered interfaces. `initDatePicker(root, options)` attaches one shared date dialog to every `data-date-input` beneath a form, dialog, or other root. It dispatches input/change events into the owning draft and returns a controller with `destroy()` for dynamic overlays; it does not write to an API. Server-rendered profiles use the matching `renderDateControl` markup. `datePickerPlacement` is pure placement math suitable for unit tests. Date parsing and formatting live in `dates.js` so picker output and timeline interpretation share precision and BCE rules. All editable story-date fields use this control rather than a plain text or native date input.
 
 `initProfileViewport(form)` observes headings, the sticky bar, content, and infobox. It schedules layout updates with animation frames, updates `--profile-header-height`, toggles `.profile-reading`, and animates the current heading with reduced-motion handling. It registers window/form listeners and a `ResizeObserver` but exposes no teardown API. `sectionAtHeader` is the pure selection helper tested independently.
 
-The timeline page controller owns its filters, viewport, DOM virtualization, refresh requests, and user gestures. The shared model owns `collectTimeline`, filtering, row grouping, anchored zoom, fitting, and ruler density. Keep new rendering behavior out of the server projection, and keep new date semantics out of one-off browser handlers.
+The timeline page controller owns its filters, viewport, DOM virtualization, refresh requests, and user gestures. `workspace-events.js` announces successful saves to the current document and other same-origin tabs using a content-free storage revision; the timeline also refreshes on `pageshow`, focus, and visibility restoration. The shared model owns `collectTimeline`, filtering, row grouping, anchored zoom, fitting, and ruler density. Keep new rendering behavior out of the server projection, and keep new date semantics out of one-off browser handlers.
 
 ## Lifecycle inventory
 
