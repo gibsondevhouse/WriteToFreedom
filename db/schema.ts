@@ -1,3 +1,5 @@
+// JSON fields and nested shapes are defined in document-contracts.js and
+// generated documents.schema.json; raw text storage does not erase that contract.
 // Cross-row and JSON invariants also live in the custom 0011 migration;
 // Drizzle does not model SQLite triggers. Preserve them in future table rebuilds.
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
@@ -103,4 +105,6 @@ export const locationDetails = sqliteTable('location_details', {
  document: text('document').notNull(),
  schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
+ // Existing profiles have no historical edit time; null means unknown.
+ updatedAt: text('updated_at'),
 }, table => [uniqueIndex('idx_location_details_owner_location').on(table.ownerId,table.locationId)]);

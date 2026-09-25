@@ -9,6 +9,7 @@ import {locationCatalog,defaultCountry} from './countries.js';
 import {defaultCity} from './cities.js';
 import {ancestors,typeLabels} from '../public/locations/data.js';
 import {collectTimeline} from '../public/timeline/model.js';
+import {choicesFor} from '../public/profiles/choice-selections.js';
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/',storyArc:'/story-arcs/'};
@@ -38,7 +39,7 @@ export function dashboardData({characters,factions,locations,countries,cities,lo
   questions,
   lore:lore.map(loreCard),
   storyArcs:storyArcs.map(r=>({...profileCard(r,'storyArc'),type:r.arcType,status:r.status,startDate:r.startDate,endDate:r.endDate})),
-  characters:cast.map(r=>({...profileCard(r,'character'),roles:r.roles.split(/\s*[·,;]\s*/).filter(Boolean),storyRole:r.storyRole,affiliation:r.affiliation,...characterCardDetails(r,{cast,factions,countries:countryProfiles,locations,profiles})})),
+  characters:cast.map(r=>({...profileCard(r,'character'),roles:choicesFor(r,'roles'),storyRole:r.storyRole,affiliation:r.affiliation,...characterCardDetails(r,{cast,factions,countries:countryProfiles,locations,profiles})})),
   factions:factions.map(r=>({...profileCard(r,'faction'),type:r.type,members:cast.filter(c=>c.factionId===r.id).length})),
   locations:locations.map(r=>{const profile=profiles[r.type].find(p=>p.id===r.id);return {...profileCard(profile,r.type),parent:ancestors(r,locations).map(a=>a.name).join(' / '),image:profile?.imageUrl||profile?.skylineUrl||profile?.flagUrl||'',areaType:r.areaType||''};}),
   timeline:collectTimeline(profiles)

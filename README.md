@@ -7,6 +7,7 @@ This README is the developer entry point: it describes how to run the project, h
 For detailed implementation contracts, use these companion references:
 
 - [Data model and integrity](docs/data-model.md): canonical identities, revision/format versions, database guards, migrations, and decisions before AI integration.
+- [UI persistence audit](docs/ui-persistence.md): field-by-field save/reload coverage, explicit JSON document schemas, nested control contracts, and temporary UI state.
 - [Routing and request contracts](docs/routing.md): dispatch precedence, handler annotations, projections, validation/write boundaries, redirects, and method differences.
 - [Reusable dashboard shell](docs/dashboard-shell.md): complete page definitions, slots, actions, loading/retry, sections, and lifecycle for Home, Lore, and future dashboards.
 - [Component boundaries and extension contracts](docs/components.md): shared renderers, DOM hooks, browser adapters, state and cleanup ownership, cards, notes, and workspace navigation.
@@ -100,6 +101,7 @@ To start with a fresh local database while keeping a backup, stop the server and
 | `npm test` | Run all Node test files | Database fixtures use isolated in-memory SQLite. |
 | `npm run test:browser` | Run Playwright against a freshly built Worker | Install Chromium once with `npx playwright install chromium`; uses a temporary database and port 4175 (override with `WTF_BROWSER_TEST_PORT`). |
 | `npm run db:generate` | Generate SQL migrations with Drizzle Kit | Reads `db/schema.ts`; writes SQL and metadata under `drizzle/`. |
+| `npm run schema:documents` | Regenerate JSON document schemas and UI field inventory | Reads UI templates and nested contracts; tests verify generated files and actual stored documents. |
 
 There is currently no watch mode, hot reload, lint script, or npm deployment script. Local development serves compiled assets from the same origin as the APIs; it does not use a Vite development proxy.
 
@@ -257,7 +259,7 @@ Drizzle describes the schema and generates migrations. Runtime queries in `serve
 | `lore_entries` | Standalone Lore JSON documents with primary type, collections, fields and connections | Primary UUID, owner scope, integer version and timestamps; added in migration `0007`. |
 | `story_arcs` | Story arc JSON documents with beats, pacing, linked entities, subplots, and key scenes | Primary UUID, owner scope, integer version and timestamps; added in migration `0008`. |
 | `chapters`, `scenes` | Chapter metadata and schema-versioned rich-text scene documents | Owner scope, optimistic versions and timestamps; scene-to-chapter relationship; added in migration `0009`. |
-| `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair and integer version. |
+| `location_details` | Full JSON profiles for the other eight location types, including name, parent, article fields, images, dates, visibility, and area subtype | Unique owner/location pair, integer version, and edit timestamp (unknown legacy times remain null). |
 
 Document fields live inside JSON text columns. Adding a field to an existing document does not inherently require a SQL migration; it requires compatible defaults, validation, serialization, and rendering. Adding a column, table, or index does require a migration.
 
@@ -513,7 +515,7 @@ The fixed-size glass card opens beside its source infobox when space permits, di
 
 `server/render-location.js`, `server/location-profile-routes.js`, and `public/locations/profile.js` provide one renderer, handler, and editor adapter. Pages use `/locations/{plural-type}/{id}/` (`solar-systems` for solar systems); country/city paths remain unchanged. `locationPaths` and `locationHref` in `public/locations/data.js` are the common URL source for all ten types. The directory opens a profile after creation and links every row to its profile; legacy directory anchors still work.
 
-These profiles reuse `location_details`; no new table or migration is required. Existing basic records receive blank template defaults on read. Full-profile and legacy directory writes share one version counter, and legacy updates preserve article text and visibility. The profile endpoint keeps IDs/types immutable, validates existing parent rules and cycles, and returns refreshed ancestry after saving. The editor updates ancestry links without reloading or clearing the saved form. `GET /api/locations` includes saved detail content in its owner-scoped catalog; `GET /api/locations/{id}` supplies a complete defaulted profile.
+These profiles reuse `location_details`; migration `0012` adds their edit timestamp without rewriting existing documents. Existing basic records receive blank template defaults on read. Full-profile and legacy directory writes share one version counter, and legacy updates preserve article text and visibility. The profile endpoint keeps IDs/types immutable, validates existing parent rules and cycles, and returns refreshed ancestry after saving. The editor updates ancestry links without reloading or clearing the saved form. `GET /api/locations` includes saved detail content in its owner-scoped catalog; `GET /api/locations/{id}` supplies a complete defaulted profile.
 
 ### Derived events
 

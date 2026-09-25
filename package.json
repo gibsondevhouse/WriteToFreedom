@@ -9,7 +9,8 @@
     "dev": "npm run build && node scripts/dev.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "playwright test",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "schema:documents": "node scripts/document-schema.mjs"
   },
   "engines": {
     "node": ">=22.13.0"
@@ -20,6 +21,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "ajv": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.2",
     "typescript": "~5.9.3",

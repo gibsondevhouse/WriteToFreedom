@@ -27,6 +27,7 @@ class FakeElement {
  close(){this.open=false;this.dispatch('close');}
  remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(child=>child!==this);this.parentNode=null;}
  checkValidity(){return this.validity.valid;}
+ setCustomValidity(message){this.validationMessage=message;this.validity.valid=!message;this.validity.customError=!!message;}
  reportValidity(){return this.validity.valid;}
  closest(selector){let node=this;while(node){if(node.matches(selector))return node;node=node.parentNode;}return null;}
  getBoundingClientRect(){return {left:0,right:560,top:0,bottom:760};}
@@ -86,9 +87,9 @@ test('character More opens accessible About, Ratings, and reserved Mentions tabs
   const height=about.querySelector('#character-about-height'),heightUnit=about.querySelector('#character-about-heightUnit');
   const weight=about.querySelector('#character-about-weight'),weightUnit=about.querySelector('#character-about-weightUnit');
   const birthday=about.querySelector('#character-about-birthDate'),alignment=about.querySelector('#character-about-alignment');
-  assert.equal(height.value,'172');assert.equal(height.type,'number');assert.equal(height.min,'0');assert.equal(height.step,'any');assert.equal(height.getAttribute('aria-label'),'Height');
+  assert.equal(height.value,'172');assert.equal(height.type,'text');assert.equal(height.inputMode,'decimal');assert.equal(height.maxLength,10000);assert.equal(height.getAttribute('aria-label'),'Height');
   assert.equal(heightUnit.value,'cm');assert.equal(heightUnit.getAttribute('aria-label'),'Height unit');
-  assert.equal(weight.value,'64');assert.equal(weight.type,'number');assert.equal(weight.min,'0');assert.equal(weight.step,'any');assert.equal(weight.getAttribute('aria-label'),'Weight');
+  assert.equal(weight.value,'64');assert.equal(weight.type,'text');assert.equal(weight.inputMode,'decimal');assert.equal(weight.maxLength,10000);assert.equal(weight.getAttribute('aria-label'),'Weight');
   assert.equal(weightUnit.value,'kg');assert.equal(weightUnit.getAttribute('aria-label'),'Weight unit');
   assert.equal(birthday.value,'Late Frost, Year 18');assert.equal(birthday.type,'text');assert.equal(birthday.readOnly,true);assert.equal(birthday.dataset.dateInput,'');assert.equal(birthday.getAttribute('aria-label'),'Birthday');assert.equal(birthday.getAttribute('aria-haspopup'),'dialog');assert.equal(birthday.getAttribute('aria-controls'),'profile-date-picker');
   assert.equal(alignment.value,'Legacy compass');assert.equal(alignment.getAttribute('aria-label'),'Moral alignment');assert.match(alignment.textContent,/Legacy compass/);

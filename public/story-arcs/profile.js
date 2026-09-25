@@ -2,7 +2,7 @@ import {initProfileEditor} from '../profiles/editor.js?v=__WTF_ASSET_REVISION__'
 import {arcBeats,pacingMetrics,storyArcFields} from './template.js?v=__WTF_ASSET_REVISION__';
 
 const {record,targets,otherArcs}=JSON.parse(document.querySelector('#profile-data').textContent),form=document.querySelector('#profile-form');
-const targetMap=new Map(targets.map(target=>[target.kind+':'+target.id,target])),keyEntityIds=new Set(record.keyEntities.map(target=>target.kind+':'+target.id)),connectedRows=[],sceneRows=[];
+const targetMap=new Map(targets.map(target=>[target.kind+':'+target.id,target])),keyEntities=new Map(record.keyEntities.map(target=>[target.kind+':'+target.id,{kind:target.kind,id:target.id}])),connectedRows=[],sceneRows=[];
 const dirty=()=>form.dispatchEvent(new Event('change',{bubbles:true}));
 function element(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;}
 
@@ -24,10 +24,10 @@ window.addEventListener('scroll',scheduleStickyPacing,{passive:true});window.add
 const entityValues=document.querySelector('#key-entity-values'),entitySelect=document.querySelector('#key-entity-select');
 function paintEntities(){
  entityValues.replaceChildren();
- for(const key of keyEntityIds){const target=targetMap.get(key);if(!target)continue;const chip=element('span','key-entity-chip'),link=element('a','',target.label),remove=element('button','','×');link.href=target.href;remove.type='button';remove.setAttribute('aria-label','Remove '+target.label);remove.addEventListener('click',()=>{keyEntityIds.delete(key);paintEntities();dirty();entitySelect.focus();});chip.append(link,remove);entityValues.append(chip);}
- for(const option of entitySelect.options)option.disabled=keyEntityIds.has(option.value);entitySelect.value='';
+ for(const [key,reference] of keyEntities){const target=targetMap.get(key),label=target?.label||`Unavailable ${reference.kind} (${reference.id})`,chip=element('span','key-entity-chip'),link=element(target?'a':'span','',label),remove=element('button','','×');if(target)link.href=target.href;remove.type='button';remove.setAttribute('aria-label','Remove '+label);remove.addEventListener('click',()=>{keyEntities.delete(key);paintEntities();dirty();entitySelect.focus();});chip.append(link,remove);entityValues.append(chip);}
+ for(const option of entitySelect.options)option.disabled=keyEntities.has(option.value);entitySelect.value='';
 }
-entitySelect.addEventListener('change',()=>{if(entitySelect.value){keyEntityIds.add(entitySelect.value);paintEntities();dirty();}});paintEntities();
+entitySelect.addEventListener('change',()=>{const target=targetMap.get(entitySelect.value);if(target){keyEntities.set(entitySelect.value,{kind:target.kind,id:target.id});paintEntities();dirty();}});paintEntities();
 
 function addConnectedArc(id='',focus=false){
  const row=element('div','connected-arc-row'),select=element('select'),open=element('a','connected-arc-link','Open arc →'),remove=element('button','quiet-button','Remove');
@@ -43,7 +43,7 @@ document.querySelector('#add-connected-arc').addEventListener('click',()=>addCon
 function field(label,control){const wrapper=element('label');wrapper.append(element('span','',label),control);return wrapper;}
 function addKeyScene(scene={title:'',chapter:'',beat:'',summary:''},focus=false){
  const row=element('div','key-scene-row'),title=element('input'),chapter=element('input'),beat=element('select'),summary=element('textarea'),remove=element('button','quiet-button','Remove scene');
- title.value=scene.title;title.maxLength=160;title.required=true;title.placeholder='Scene title';chapter.value=scene.chapter;chapter.maxLength=160;chapter.placeholder='Chapter or section';
+ title.value=scene.title;title.maxLength=160;title.required=true;title.placeholder='Scene title';chapter.value=scene.chapter;chapter.maxLength=10000;chapter.placeholder='Chapter or section';
  beat.append(new Option('Choose a narrative beat',''));for(const item of arcBeats)beat.append(new Option(item.title,item.id));beat.value=scene.beat;summary.value=scene.summary;summary.maxLength=10000;summary.rows=2;summary.placeholder='What changes in this scene?';remove.type='button';
  const source={id:scene.id||crypto.randomUUID(),row,title,chapter,beat,summary};sceneRows.push(source);for(const control of [title,chapter,beat,summary])control.addEventListener('input',dirty);
  remove.addEventListener('click',()=>{sceneRows.splice(sceneRows.indexOf(source),1);row.remove();dirty();document.querySelector('#add-key-scene').focus();});
@@ -55,8 +55,8 @@ document.querySelector('#add-key-scene').addEventListener('click',()=>addKeyScen
 form.elements.namedItem('arcType').addEventListener('change',event=>{document.querySelector('.arc-type-label').textContent=event.target.value;});
 initProfileEditor({fieldNames:storyArcFields,endpoint:'/api/story-arcs',type:'story arc',readExtra(){
  const connectedArcIds=connectedRows.map(({select})=>select.value);if(connectedArcIds.some(id=>!id))throw new Error('Choose an arc for every connected subplot.');if(new Set(connectedArcIds).size!==connectedArcIds.length)throw new Error('Choose every connected subplot once.');
- const keyEntities=Array.from(keyEntityIds,key=>{const target=targetMap.get(key);return {kind:target.kind,id:target.id};});
+ const references=Array.from(keyEntities.values(),reference=>({...reference}));
  const keyScenes=sceneRows.map(({id,title,chapter,beat,summary})=>({id,title:title.value,chapter:chapter.value,beat:beat.value,summary:summary.value}));
  const pacing=Object.fromEntries(arcBeats.map(beat=>[beat.id,Object.fromEntries(pacingMetrics.map(([metric])=>[metric,Number(form.querySelector(`[data-pacing-beat="${beat.id}"][data-pacing-metric="${metric}"]`).value)]))]));
- return {keyEntities,connectedArcIds,keyScenes,pacing};
+ return {keyEntities:references,connectedArcIds,keyScenes,pacing};
 }});

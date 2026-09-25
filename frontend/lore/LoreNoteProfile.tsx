@@ -42,7 +42,7 @@ export function LoreNoteProfile({record, targets, incoming}: ProfileData) {
       const data: unknown = await response.json();
       if (!response.ok) throw new Error(data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : 'Could not save. Please try again.');
       const saved = readNoteRecord(data);
-      if (saved.id !== record.id || saved.version <= version.current) throw new Error('The save response could not be verified. Your changes are still here. Reload before saving again.');
+      if (saved.id !== record.id || saved.version !== version.current + 1) throw new Error('The save response could not be verified. Your changes are still here. Reload before saving again.');
       if (!mounted.current) return;
       version.current = saved.version;
       const next = {...draftFromRecord(saved), connections: saved.connections.map((connection, index) => ({...connection, key: draftRef.current.connections[index]?.key || crypto.randomUUID()}))};

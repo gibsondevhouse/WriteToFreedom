@@ -5,6 +5,7 @@ import {createConnectionsMap} from './connections-map.js?v=__WTF_ASSET_REVISION_
 import {moralityIcons} from '../../characters/attributes.js?v=__WTF_ASSET_REVISION__';
 import {createDateControl,initDatePicker} from '../../profiles/date-picker.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange} from '../../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {bindNumericText} from '../../characters/numeric-text.js?v=__WTF_ASSET_REVISION__';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function button(text,cls,action){const n=el('button',cls,text);n.type='button';n.addEventListener('click',action);return n;}
@@ -116,7 +117,7 @@ export function openCharacter(record,view,onUpdate){
  }
  function buildMeasurementFact(label,key,unitKey,units){
   const {fact,fields}=factShell(label),value=el('input','character-about-value'),unit=el('select','character-about-unit');
-  value.id='character-about-'+key;value.type='number';value.min='0';value.step='any';value.inputMode='decimal';value.placeholder='Not set';value.value=aboutDraft[key]||'';value.setAttribute('aria-label',label);
+  value.id='character-about-'+key;value.type='text';value.inputMode='decimal';value.maxLength=10000;value.placeholder='Not set';value.value=aboutDraft[key]||'';value.setAttribute('aria-label',label);bindNumericText(value,key);
   unit.id='character-about-'+unitKey;unit.setAttribute('aria-label',label+' unit');
   for(const choice of ['',...units]){const option=el('option','',choice||'—');option.value=choice;unit.append(option);}unit.value=aboutDraft[unitKey]||'';
   value.addEventListener('input',()=>{aboutDraft[key]=value.value;markDirty();});unit.addEventListener('change',()=>{aboutDraft[unitKey]=unit.value;markDirty();});

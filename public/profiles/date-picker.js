@@ -117,7 +117,15 @@ export function initDatePicker(root,{requestSave}={}){
  approx.addEventListener('change',()=>{approximate=approx.checked;if(parsed){draft.value=formatStoryDate({...parsed,approximate});parsed=parseStoryDate(draft.value);}describe();});
  tabs.addEventListener('keydown',event=>{const current=modes.indexOf(mode);let index;if(event.key==='ArrowRight')index=(current+1)%modes.length;else if(event.key==='ArrowLeft')index=(current+modes.length-1)%modes.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=modes.length-1;else return;event.preventDefault();setMode(modes[index]);tabs.children[index].focus();});
  dialog.addEventListener('click',event=>{const rect=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom))dialog.close();});
- dialog.addEventListener('close',()=>{document.body.classList.remove('date-picker-open');if(restoreFocus)active?.focus({preventScroll:true});});
+ dialog.addEventListener('close',()=>{
+  // The native dialog restores its opener synchronously, but delivers `close`
+  // later. Respect any field the writer has focused since dismissal: refocusing
+  // the date here can redirect their next keystroke into a read-only control.
+  if(dialog.open)return;
+  document.body.classList.remove('date-picker-open');
+  const focusedElement=document.activeElement;
+  if(restoreFocus&&(focusedElement===document.body||dialog.contains(focusedElement)))active?.focus({preventScroll:true});
+ });
  const saveShortcut=event=>{if(dialog.open&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='s'){event.preventDefault();event.stopImmediatePropagation();restoreFocus=false;if(applyDraft())(requestSave||(()=>root.requestSubmit?.()))();else restoreFocus=true;}};
  document.addEventListener('keydown',saveShortcut,true);
  window.addEventListener('scroll',position,{passive:true,capture:true});window.addEventListener('resize',position);window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);

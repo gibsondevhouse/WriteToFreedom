@@ -12,11 +12,11 @@ export const ratingFields = [['clarity', 'Clarity'], ['reliability', 'Reliabilit
 export type RatingKey = typeof ratingFields[number][0];
 export type ProfileRatings = Partial<Record<RatingKey, number>>;
 export type LoreNoteDocument = NoteText & {type: 'note'; hiddenFields: TextField[]; collections: ['notes']; pinned: boolean; featured: boolean; connections: Connection[]; profileRatings: ProfileRatings};
-export type LoreNoteRecord = LoreNoteDocument & {id: string; version: number};
+export type LoreNoteRecord = LoreNoteDocument & {id: string; schemaVersion: 1; version: number};
 export interface ProfileData {record: LoreNoteRecord; targets: NoteTarget[]; incoming: Backlink[]}
 export type ConnectionDraft = {key: string; target: NoteReference | null; relationship: string};
-export type LoreNoteDraft = Omit<LoreNoteDocument, 'connections' | 'profileRatings'> & {connections: ConnectionDraft[]; profileRatings: Record<RatingKey, string>};
-export type SaveNotePayload = LoreNoteDocument & {version: number};
+export type LoreNoteDraft = Omit<LoreNoteDocument, 'connections' | 'profileRatings'> & {schemaVersion: 1; connections: ConnectionDraft[]; profileRatings: Record<RatingKey, string>};
+export type SaveNotePayload = LoreNoteDocument & {schemaVersion: 1; version: number};
 export type FieldDefinition = [TextField, string, 'input' | 'textarea' | 'url' | 'date'];
 export interface SectionDefinition {id: string; title: string; fields: FieldDefinition[]}
 export const noteTemplate = loreTemplates.note as {sections: SectionDefinition[]; fields: TextField[]; hideableFields: TextField[]};
@@ -40,7 +40,8 @@ function localHref(value: unknown): string {
 /** Read API documents separately from display projections; neither is a write payload. */
 export function readNoteRecord(value: unknown): LoreNoteRecord {
   const data = object(value);
-  if (data.type !== 'note' || typeof data.id !== 'string' || !Number.isInteger(data.version) || Number(data.version) < 1) throw new Error('Reload this note before editing.');
+  if (data.schemaVersion !== 1) throw new Error('This note uses an unsupported data format. Your saved note has not been changed.');
+  if (data.type !== 'note' || typeof data.id !== 'string' || !Number.isSafeInteger(data.version) || Number(data.version) < 1) throw new Error('Reload this note before editing.');
   if (typeof data.pinned !== 'boolean' || typeof data.featured !== 'boolean' || !Array.isArray(data.connections) || !Array.isArray(data.hiddenFields) || !Array.isArray(data.collections) || data.collections.some(c => c !== 'notes') || !data.collections.includes('notes')) throw new Error('This note could not be read. Reload to try again.');
   const fields = Object.fromEntries(textFields.map(key => [key, string(data[key])])) as NoteText;
   const hiddenFields = data.hiddenFields.map(key => {
@@ -52,7 +53,7 @@ export function readNoteRecord(value: unknown): LoreNoteRecord {
     if (!ratingFields.some(([allowed]) => allowed === key) || typeof rating !== 'number' || !Number.isInteger(rating) || rating < 0 || rating > 99) throw new Error('This note contains an unreadable rating.');
     profileRatings[key as RatingKey] = rating;
   }
-  return {...fields, type: 'note', id: data.id, version: Number(data.version), hiddenFields, collections: ['notes'], pinned: data.pinned, featured: data.featured, profileRatings,
+  return {...fields, type: 'note', id: data.id, schemaVersion: 1, version: Number(data.version), hiddenFields, collections: ['notes'], pinned: data.pinned, featured: data.featured, profileRatings,
     connections: data.connections.map(value => {const entry = object(value); return {target: reference(entry.target), relationship: string(entry.relationship)};})};
 }
 export function readProfileData(value: unknown): ProfileData {
@@ -65,8 +66,10 @@ export function draftFromRecord(record: LoreNoteRecord): LoreNoteDraft {
   return {...record, hiddenFields: [...record.hiddenFields], connections: record.connections.map(connection => ({...connection, key: crypto.randomUUID()})), profileRatings: Object.fromEntries(ratingFields.map(([key]) => [key, record.profileRatings[key]?.toString() ?? ''])) as Record<RatingKey, string>};
 }
 
-/** Explicit allowlist: display data, local row keys, IDs, and metadata never enter writes. */
+/** Explicit allowlist: display data, local row keys, and server-owned identity never enter writes. */
 export function serializeNote(draft: LoreNoteDraft, version: number): SaveNotePayload {
+  if (draft.schemaVersion !== 1) throw new Error('This note uses an unsupported data format. Your saved note has not been changed.');
+  if (!Number.isSafeInteger(version) || version < 1 || version === Number.MAX_SAFE_INTEGER) throw new Error('Reload this note before saving.');
   const fields = Object.fromEntries(textFields.map(key => [key, draft[key]])) as NoteText;
   if (!fields.name.trim()) throw new Error('Enter a name for this entry.');
   for (const key of textFields) if (fields[key].length > (key === 'name' ? 160 : key === 'imageUrl' ? 2048 : 10000)) throw new Error('One or more fields exceed the allowed length.');
@@ -89,5 +92,5 @@ export function serializeNote(draft: LoreNoteDraft, version: number): SaveNotePa
     if (!connection.relationship.trim() || connection.relationship.length > 160) throw new Error('Describe each connection in 160 characters or fewer.');
     return {target, relationship: connection.relationship};
   });
-  return {...fields, type: 'note', version, hiddenFields: [...draft.hiddenFields], collections: ['notes'], profileRatings, pinned: draft.pinned, featured: draft.featured, connections};
+  return {...fields, type: 'note', schemaVersion: 1, version, hiddenFields: [...draft.hiddenFields], collections: ['notes'], profileRatings, pinned: draft.pinned, featured: draft.featured, connections};
 }

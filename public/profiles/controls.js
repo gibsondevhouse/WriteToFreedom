@@ -1,5 +1,6 @@
 import {initProfileViewport} from './viewport.js?v=profile-reading-1';
 import {initDatePicker} from './date-picker.js?v=profile-reading-1';
+import {choicesFor} from './choice-selections.js?v=__WTF_ASSET_REVISION__';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
@@ -13,16 +14,17 @@ function node(tag,text,className){const n=document.createElement(tag);if(text!==
  * @param {object} options Name focus field and custom nationality assignments.
  * @returns {object} choiceValues Map, commitChoices(), hiddenFields(), revealAncestors().
  */
-export function initProfileControls(form,markDirty,{nameField="name",nationalityContinents={}}={}){
+export function initProfileControls(form,markDirty,{nameField="name",nationalityContinents={},choiceSelections={}}={}){
 initDatePicker(form);
-const pendingChoiceEditors=[],choiceValues=new Map();
+const pendingChoiceEditors=[],choiceValues=new Map(),selectionValues=new Map();
 function buildChoiceControl(control){
  const value=control.querySelector('input[type="hidden"]'),select=control.querySelector('[data-choice-select]'),list=control.querySelector('.choice-values');
  const custom=control.querySelector('.choice-custom'),input=control.querySelector('[data-choice-custom-input]'),multiple=control.dataset.multiple==='true';
  const continent=control.querySelector('[data-nationality-continent]');
  const key=control.dataset.choiceField;let current=value.value||'';choiceValues.set(key,current);
- let chosen=multiple?current.split(/\s*·\s*/).filter(Boolean):[];
- function storeChoice(text){current=text;choiceValues.set(key,text);value.value=text;}
+ let chosen=multiple?choicesFor({[key]:current,choiceSelections},key):[];
+ if(multiple){selectionValues.set(key,chosen);current=chosen.join(' · ');choiceValues.set(key,current);value.value=current;}
+ function storeChoice(text){current=text;choiceValues.set(key,text);value.value=text;if(multiple)selectionValues.set(key,[...chosen]);}
  function paint(){
   if(!multiple){
    if(current&&![...select.options].some(option=>option.value===current)){const option=node('option',current);option.value=current;select.insertBefore(option,select.lastElementChild);}
@@ -108,5 +110,5 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')document.que
  form.querySelectorAll('textarea').forEach(resize);
  window.addEventListener('resize',()=>form.querySelectorAll('textarea').forEach(resize));
  initProfileViewport(form);
- return {choiceValues,commitChoices:()=>pendingChoiceEditors.every(commit=>commit()),hiddenFields:()=>[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility),revealAncestors};
+ return {choiceValues,choiceSelections:()=>Object.fromEntries([...selectionValues].map(([key,values])=>[key,[...values]])),commitChoices:()=>pendingChoiceEditors.every(commit=>commit()),hiddenFields:()=>[...form.querySelectorAll('[data-visibility]:not(:checked)')].map(input=>input.dataset.visibility),revealAncestors};
 }

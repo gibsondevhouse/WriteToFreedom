@@ -1,4 +1,5 @@
 import {profileChoices,multiChoiceFields,nationalityGroups} from '../public/profiles/choices.js';
+import {choicesFor} from '../public/profiles/choice-selections.js';
 export const profileRevision='location-profiles-1';
 /** Escape user text/attribute values; does not sanitize supplied HTML fragments. */
 export const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,14 +19,14 @@ export function renderFieldWrapper(record,key,label,type,control){return `<div d
  * continent context groups custom nationalities; multiple values use " · ".
  * Browser controls own interaction and draft updates, not this string renderer.
  */
-export function renderChoice(key,label,val,attrs,{continents=[],nationalityContinents={}}={}){
+export function renderChoice(key,label,val,attrs,{continents=[],nationalityContinents={},choiceSelections={}}={}){
  const multiple=multiChoiceFields.includes(key),choices=[...profileChoices[key]];
  if(!multiple&&val&&!choices.includes(val))choices.unshift(val);
  const option=(value,label=value)=>`<option value="${escape(value)}">${escape(label)}</option>`;
  let options=choices.map(v=>`<option value="${escape(v)}"${!multiple&&v===val?' selected':''}>${escape(v)}</option>`).join('')+option('__custom__','Custom…');
  let continentControl='';
  if(key==='nationality'){
-  const chosen=val.split(/\s*·\s*/).filter(Boolean),custom=chosen.filter(v=>!choices.includes(v));
+  const chosen=choicesFor({[key]:val,choiceSelections},key),custom=chosen.filter(v=>!choices.includes(v));
   options=Object.entries(nationalityGroups).map(([group,values])=>`<optgroup label="${escape(group)}">${values.map(v=>option(v)).join('')}</optgroup>`).join('');
   const known=new Set(continents.map(c=>c.id));
   options+=continents.map(c=>`<optgroup data-continent="${escape(c.id)}" label="${escape(c.name)}">${custom.filter(v=>nationalityContinents[v]===c.id).map(v=>option(v)).join('')}</optgroup>`).join('');
@@ -46,7 +47,7 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
  return ([key,label,type,placeholder])=>{
   const val=record[key]||'',attrs=`id="field-${key}" name="${key}" aria-label="${escape(label)}"${required.includes(key)?' required':''}`,choices=options(key,type);let control;
   if(type==='date')control=renderDateControl(key,label,val,attrs);
-  else if(type==='choice')control=renderChoice(key,label,val,attrs);
+  else if(type==='choice')control=renderChoice(key,label,val,attrs,{choiceSelections:record.choiceSelections});
   else if(choices){
    if(val&&!choices.some(([value])=>value===val))choices.push([val,val]);
    control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(([v,l])=>`<option value="${escape(v)}"${v===val?' selected':''}>${escape(l)}</option>`).join('')}</select>`;

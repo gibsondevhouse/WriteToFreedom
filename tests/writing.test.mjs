@@ -1,3 +1,4 @@
+import {assertDocumentSchema} from './helpers/document-schema.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
@@ -30,6 +31,8 @@ test('chapters and scenes round-trip structured writing with deterministic conte
  assert.equal(first.title,'The beginning');assert.equal(first.schemaVersion,1);assert.equal(first.version,1);assert.ok(first.createdAt);assert.equal(first.updatedAt,first.createdAt);
  const rich={type:'doc',content:[{type:'heading',attrs:{level:3},content:[text('A scene')]},{type:'paragraph',content:[{type:'text',text:'Exact <script> text & spaces  ',marks:[{type:'bold'},{type:'italic'},{type:'underline'},{type:'strike'}]},{type:'hardBreak'},text('Second line'),{type:'text',text:'const dawn = true',marks:[{type:'code'}]}]},{type:'orderedList',attrs:{start:3,type:'A'},content:[{type:'listItem',content:[paragraph('First'),{type:'bulletList',content:[{type:'listItem',content:[paragraph('Nested')]}]}]}]},{type:'blockquote',content:[paragraph('Remember this.')]},{type:'horizontalRule'}]};
  const one=await scene(first.id,{content:rich,summary:'Outline text'}),two=await scene(first.id,{title:'Second scene'}),other=await scene(second.id);
+ for(const row of sqlite.prepare('SELECT document FROM chapters').all())assertDocumentSchema('chapter',JSON.parse(row.document));
+ for(const row of sqlite.prepare('SELECT document FROM scenes').all())assertDocumentSchema('scene',JSON.parse(row.document));
  assert.deepEqual(one.content,rich);assert.deepEqual((await get('/api/scenes/'+one.id)).content,rich);assert.equal(one.chapterId,first.id);
  sqlite.prepare('UPDATE chapters SET created_at = ?').run('2026-01-01T00:00:00.000Z');sqlite.prepare('UPDATE scenes SET created_at = ?').run('2026-01-01T00:00:00.000Z');
  assert.deepEqual((await get('/api/chapters')).chapters.map(c=>c.id),[first.id,second.id].sort());

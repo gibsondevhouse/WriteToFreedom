@@ -23,12 +23,14 @@ export function initProfileEditor({fieldNames,endpoint,type,imageFields=[],valid
   document.querySelectorAll('.person-link').forEach(link=>{const value=form.elements.namedItem(link.dataset.for).value;link.hidden=!value;link.href='/characters/'+value+'/';});
  }
  function markDirty(){dirty=true;status.textContent='Unsaved changes';update();}
- const controls=initProfileControls(form,markDirty);
+ const initial=JSON.parse(document.querySelector('#profile-data').textContent);
+ const controls=initProfileControls(form,markDirty,{choiceSelections:initial.choiceSelections});
  form.addEventListener('input',event=>{resize(event.target);markDirty();});form.addEventListener('change',markDirty);
  form.addEventListener('submit',async event=>{
   event.preventDefault();if(saving||!controls.commitChoices()||!form.reportValidity())return;
   let extra;try{extra=readExtra();}catch(e){error.hidden=false;error.textContent=e.message;return;}
-  const payload={...Object.fromEntries(fieldNames.map(key=>[key,controls.choiceValues.has(key)?controls.choiceValues.get(key):form.elements.namedItem(key).value])),...extra,hiddenFields:controls.hiddenFields(),version};
+  const selections=controls.choiceSelections();
+  const payload={...Object.fromEntries(fieldNames.map(key=>[key,controls.choiceValues.has(key)?controls.choiceValues.get(key):form.elements.namedItem(key).value])),...extra,...(Object.keys(selections).length?{choiceSelections:selections}:{}),hiddenFields:controls.hiddenFields(),schemaVersion:initial.schemaVersion??1,version};
   saving=true;fields.disabled=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
   try{
    const response=await fetch(endpoint+'/'+form.dataset.id,{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});

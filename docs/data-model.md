@@ -2,6 +2,8 @@
 
 Reviewed September 24, 2026. The current model combines relational identity and ownership with validated JSON content. That is a suitable foundation for the existing worldbuilding and writing features. Future AI features should use the same validated write boundary and preserve the distinction between author content, derived displays, and generated proposals.
 
+The follow-up [UI persistence audit](ui-persistence.md) verifies every current profile template and nested editor through save/reload. The fields inside SQL JSON columns are now explicitly described by [documents.schema.json](../db/documents.schema.json), generated from [document-contracts.js](../db/document-contracts.js). See [the field inventory](ui-field-inventory.md) for UI labels, persisted paths, and nested shapes.
+
 ## Canonical records
 
 | Entity | Canonical storage | Reference identity |
@@ -26,6 +28,8 @@ Catalog cards, mentions, backlinks, timeline events, computed ratings, and searc
 - `contentSchemaVersion` is specific to manuscript scenes' rich-text tree. Current format: 1. Its allowed nodes, marks, nesting, and size limits live in `public/writing/document.js`.
 
 Changing a document format requires an explicit decoder/migration strategy. Do not repurpose the edit revision as a format indicator. Server-controlled IDs, revisions, and timestamps are overlaid from SQL columns rather than trusted from the submitted document.
+
+Exact multi-select labels live in `choiceSelections` arrays; the older scalar fields remain synchronized display/compatibility projections. Prefer the arrays when consuming these fields programmatically. Migration `0012` records generic-location edit times; historical records with no known edit time retain null, rather than an invented timestamp.
 
 ## Enforced boundaries
 

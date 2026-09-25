@@ -4,7 +4,15 @@ export async function locationCatalog(db,owner){
  const [locations,countries,cities,details]=await Promise.all([db.listLocations(owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLocationDetails(owner)]);
  const countryProfiles=new Map(countries.map(p=>[p.id,p])),cityProfiles=new Map(cities.map(p=>[p.id,p]));
  const locationDetails=new Map(details.map(p=>[p.id,p]));
- return [...seedLocations,...locations].map(r=>{if(!['country','city'].includes(r.type)){const detail=locationDetails.get(r.id);return {...r,version:0,schemaVersion:1,...detail};}const profile=cityProfiles.get(r.id);return r.type==='city'&&profile?{...r,name:profile.name,parentId:profile.parentId}:{...r,name:countryProfiles.get(r.id)?.name??r.name,parentId:countryProfiles.get(r.id)?.parentId??r.parentId};});
+ return [...seedLocations,...locations].map(r=>{
+  if(!['country','city'].includes(r.type)){const detail=locationDetails.get(r.id);return {...r,version:0,schemaVersion:1,...detail};}
+  const profile=(r.type==='city'?cityProfiles:countryProfiles).get(r.id);
+  if(!profile)return {...r};
+  // Directory cards need the saved preview and revision, not the full profile.
+  return {...r,name:r.type==='city'?profile.name:profile.name??r.name,parentId:r.type==='city'?profile.parentId:profile.parentId??r.parentId,
+   summary:profile.summary||'',flagUrl:profile.flagUrl||'',...(r.type==='city'?{skylineUrl:profile.skylineUrl||''}:{}),
+   version:profile.version,schemaVersion:profile.schemaVersion,updatedAt:profile.updatedAt};
+ });
 }
 export function defaultCountry(location){const record={...blankCountry(),...(location.id==='sample-kingdom'?{
  capitalId:'sample-capital',governmentType:'Kingdom',

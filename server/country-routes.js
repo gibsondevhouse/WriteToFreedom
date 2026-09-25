@@ -1,6 +1,7 @@
 import {validateSchemaVersion} from './document-storage.js';
 import {parentChoices} from '../public/locations/data.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
+import {validateChoiceSelections} from '../public/profiles/choice-selections.js';
 import {repository} from './db.js';
 import {locationCatalog,defaultCountry} from './countries.js';
 import {countryHideableFields,countryFields,countryImageFields,validImageUrl} from '../public/locations/countries/template.js';
@@ -37,6 +38,7 @@ export async function countryRoute(request,env){
   if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A country’s ID cannot change.'},400);
   if(Object.hasOwn(input,'type')&&input.type!=='country')return json({error:'A country’s type cannot change.'},400);
   const document={};for(const key of countryFields){const value=Object.hasOwn(input,key)?input[key]:current[key]||'';if(typeof value!=='string'||value.length>(key==='name'?160:countryImageFields.includes(key)?2048:10000))return json({error:'One or more fields exceed the allowed length.'},400);document[key]=value;}
+  try{document.choiceSelections=validateChoiceSelections(input,current,document,['officialLanguages']);}catch(error){return json({error:error.message},400);}
   document.hiddenFields=readHiddenFields(input,current,countryHideableFields);if(!document.hiddenFields)return json({error:'Choose visible fields from this profile’s template.'},400);
   try{document.profileRatings=validateProfileRatings(Object.hasOwn(input,'profileRatings')?input.profileRatings:(current.profileRatings||{}),ratingGroupsFor('location','country'));}catch(error){return json({error:error.message},400);}
   document.name=document.name.trim().replace(/\s+/g,' ');if(!document.name)return json({error:'Enter a country name.'},400);

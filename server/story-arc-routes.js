@@ -48,7 +48,7 @@ function validate(input,current,targets,arcs,allowBlankName=false){
   if(typeof id!=='string'||(!idPattern.test(id)&&!currentSceneIds.has(id))||sceneIds.has(id))throw new Error('Give each key scene a unique valid ID.');
   sceneIds.add(id);
   const clean={id};
-  for(const key of ['title','chapter','beat','summary']){if(typeof scene[key]!=='string'||scene[key].length>(key==='title'?160:10000))throw new Error('Check the key scene details.');clean[key]=scene[key].trim();}
+  for(const key of ['title','chapter','beat','summary']){if(typeof scene[key]!=='string'||scene[key].length>(key==='title'?160:10000))throw new Error('Check the key scene details.');clean[key]=key==='summary'?scene[key]:scene[key].trim();}
   if(!clean.title)throw new Error('Give every key scene a title.');
   if(clean.beat&&!arcBeats.some(beat=>beat.id===clean.beat))throw new Error('Choose a valid narrative beat for every key scene.');
   return clean;
