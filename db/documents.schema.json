@@ -9085,6 +9085,364 @@
         "schemaVersion": 1
       }
     },
+    "novel": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 480,
+          "title": "Title"
+        },
+        "synopsis": {
+          "type": "string",
+          "maxLength": 10000,
+          "title": "Synopsis"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "drafting",
+            "revising",
+            "complete",
+            "archived"
+          ],
+          "title": "Status"
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "title": "Cover image URL",
+          "description": "Empty or an HTTPS URL without embedded credentials."
+        },
+        "seriesId": {
+          "type": "string",
+          "title": "Primary series ID",
+          "description": "UUID of the owning series, or empty."
+        },
+        "seriesOrder": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Position in series"
+        },
+        "hiddenFields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "synopsis",
+              "status",
+              "coverUrl",
+              "seriesId",
+              "seriesOrder"
+            ]
+          },
+          "maxItems": 5,
+          "uniqueItems": true,
+          "description": "Hidden field names. Their underlying content remains stored."
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false,
+      "title": "Novel",
+      "x-storage": {
+        "table": "novels",
+        "column": "document",
+        "schemaVersion": 1
+      }
+    },
+    "series": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 480,
+          "title": "Title"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 10000,
+          "title": "Summary"
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "title": "Cover image URL",
+          "description": "Empty or an HTTPS URL without embedded credentials."
+        },
+        "hiddenFields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "coverUrl"
+            ]
+          },
+          "maxItems": 2,
+          "uniqueItems": true,
+          "description": "Hidden field names. Their underlying content remains stored."
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false,
+      "title": "Series",
+      "x-storage": {
+        "table": "series",
+        "column": "document",
+        "schemaVersion": 1
+      }
+    },
+    "collection_manual": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Name"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 10000,
+          "title": "Summary"
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "title": "Cover image URL",
+          "description": "Empty or an HTTPS URL without embedded credentials."
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "maxItems": 1000,
+          "uniqueItems": true,
+          "title": "Entry order",
+          "description": "Ordered typed library keys: kind + parent character ID (for notes) + target ID. Membership identities are stored in collection_members."
+        }
+      },
+      "required": [
+        "name",
+        "summary",
+        "coverUrl",
+        "order"
+      ],
+      "additionalProperties": false,
+      "title": "Manual collection",
+      "x-storage": {
+        "table": "collections",
+        "column": "document",
+        "schemaVersion": 1,
+        "discriminator": {
+          "table": "collections",
+          "column": "kind",
+          "value": "manual"
+        }
+      }
+    },
+    "collection_smart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Name"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 10000,
+          "title": "Summary"
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "title": "Cover image URL",
+          "description": "Empty or an HTTPS URL without embedded credentials."
+        },
+        "rules": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "predicates": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "entityType"
+                      },
+                      "value": {
+                        "type": "string",
+                        "enum": [
+                          "character",
+                          "faction",
+                          "location",
+                          "lore",
+                          "story_arc",
+                          "note"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "subtype"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "location",
+                          "lore"
+                        ]
+                      },
+                      "value": {
+                        "type": "string",
+                        "maxLength": 160,
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "kind",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "linkedNovel"
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+                        "x-reference": {
+                          "kind": "novel",
+                          "scope": "owner"
+                        }
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "series"
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+                        "x-reference": {
+                          "kind": "series",
+                          "scope": "owner"
+                        }
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "minNovelCount"
+                      },
+                      "value": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "const": "unassigned"
+                      }
+                    },
+                    "required": [
+                      "field"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "version",
+            "mode",
+            "predicates"
+          ],
+          "additionalProperties": false,
+          "title": "Criteria",
+          "description": "Bounded owner-scoped criteria evaluated against canonical entries; this document stores no copied result list."
+        }
+      },
+      "required": [
+        "name",
+        "summary",
+        "coverUrl",
+        "rules"
+      ],
+      "additionalProperties": false,
+      "title": "Smart collection",
+      "x-storage": {
+        "table": "collections",
+        "column": "document",
+        "schemaVersion": 1,
+        "discriminator": {
+          "table": "collections",
+          "column": "kind",
+          "value": "smart"
+        }
+      }
+    },
     "entityReference": {
       "oneOf": [
         {

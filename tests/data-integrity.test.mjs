@@ -26,7 +26,7 @@ function fixture(table){
 
 test('all document tables reject malformed envelopes and unsafe revisions at the SQL boundary',t=>{
  const sqlite=setup(t);insert(sqlite,'chapters',row('chapter'));
- for(const table of ['character_drafts','lore_entries','story_arcs','chapters','scenes',...Object.keys(profileTargets)]){
+ for(const table of ['character_drafts','lore_entries','story_arcs','novels','series','chapters','scenes',...Object.keys(profileTargets)]){
   const valid=fixture(table);
   for(const document of ['not json','null','[]','"text"','42'])assert.throws(()=>insert(sqlite,table,{...valid,document}),/invalid JSON|must be an object/,table);
   for(const version of [0,-1,1.5,9007199254740992])assert.throws(()=>insert(sqlite,table,{...valid,version}),/invalid revision/,table);
@@ -38,6 +38,33 @@ test('all document tables reject malformed envelopes and unsafe revisions at the
   const idColumn=profileTargets[table]?.[0]||'id';
   assert.throws(()=>sqlite.prepare(`UPDATE ${table} SET ${idColumn} = ?`).run('renamed'),/immutable identity|invalid owner-scoped target/,table);
  }
+});
+
+test('novel and series revisions advance exactly once and typed associations keep immutable owner-scoped identities',t=>{
+ const sqlite=setup(t);sqlite.exec('PRAGMA foreign_keys = OFF');
+ for(const table of ['novels','series']){
+  const id=table+'-revision';insert(sqlite,table,row(id));
+  assert.throws(()=>sqlite.prepare(`UPDATE ${table} SET version = version + 2 WHERE id = ?`).run(id),/revision must advance exactly once/);
+  assert.throws(()=>sqlite.prepare(`UPDATE ${table} SET schema_version = 2 WHERE id = ?`).run(id),/revision must advance exactly once/);
+  sqlite.prepare(`UPDATE ${table} SET document = ?, version = version + 1 WHERE id = ?`).run('{"title":"Saved"}',id);
+  assert.equal(sqlite.prepare(`SELECT version FROM ${table} WHERE id = ?`).get(id).version,2);
+ }
+ insert(sqlite,'novels',row('association-novel'));
+ insert(sqlite,'novels',row('foreign-novel','{}','another-author'));
+ insert(sqlite,'character_drafts',row('character'));
+ const association={id:'association',owner_id:'author',novel_id:'association-novel',target_kind:'character',target_id:'character',relation_kind:'appears_in',prose:'',version:1,created_at:now,updated_at:now};
+ for(const field of ['id','owner_id','novel_id','target_kind','target_id'])assert.throws(()=>insert(sqlite,'novel_associations',{...association,[field]:' '}),/identity is required/);
+ assert.throws(()=>insert(sqlite,'novel_associations',{...association,relation_kind:'invalid'}),/invalid relation kind/);
+ for(const version of [0,-1,1.5,9007199254740992])assert.throws(()=>insert(sqlite,'novel_associations',{...association,version}),/invalid revision/);
+ assert.throws(()=>insert(sqlite,'novel_associations',{...association,novel_id:'foreign-novel'}),/same owner/);
+ assert.throws(()=>insert(sqlite,'novel_associations',{...association,novel_id:'missing'}),/same owner/);
+ insert(sqlite,'novel_associations',association);
+ for(const field of ['id','owner_id','novel_id','target_kind','target_id'])assert.throws(()=>sqlite.prepare(`UPDATE novel_associations SET ${field} = ? WHERE id = ?`).run('changed','association'),/immutable identity/);
+ assert.throws(()=>sqlite.prepare('UPDATE novel_associations SET version = version + 2 WHERE id = ?').run('association'),/revision must advance exactly once/);
+ assert.throws(()=>sqlite.prepare('UPDATE novel_associations SET prose = ? WHERE id = ?').run('Unsafely changed','association'),/revision must advance exactly once/);
+ assert.throws(()=>insert(sqlite,'novel_associations',{...association,id:'duplicate'}),/UNIQUE constraint failed/);
+ sqlite.prepare('UPDATE novel_associations SET prose = ?, relation_kind = ?, version = version + 1 WHERE id = ?').run('Saved appearance','linked','association');
+ assert.equal(sqlite.prepare('SELECT version FROM novel_associations WHERE id = ?').get('association').version,2);
 });
 
 test('scene parent ownership and duplicate chapter identities cannot diverge even with foreign keys disabled',t=>{

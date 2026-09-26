@@ -16,6 +16,7 @@ import {loreTemplates,loreTypes,allowedCollections,primaryCollection} from '../p
 import {ratingGroupsFor} from '../public/profiles/ratings.js';
 import {storyArcSections,storyArcHideableFields,arcTypes,arcStatuses,arcBeats,pacingMetrics} from '../public/story-arcs/template.js';
 import {writingContentLimits} from '../public/writing/document.js';
+import {smartKinds} from '../public/collections/rules.js';
 
 const ref=name=>({$ref:'#/$defs/'+name});
 const text=(maxLength=10000)=>({type:'string',maxLength});
@@ -115,6 +116,47 @@ register('scene','Manuscript scene','scenes',{
  ...writingMetadata,chapterId:{...uuid,...reference('chapter'),description:'Must equal scenes.chapter_id and refer to a chapter owned by the same author.'},
  status:{type:'string',enum:['draft','revising','complete']},contentSchemaVersion:{const:1},content:ref('writingContent'),
 },['title','summary','chapterId','status','contentSchemaVersion','content']);
+
+register('novel','Novel','novels',{
+ title:{...text(480),title:'Title'},
+ synopsis:{...text(10000),title:'Synopsis'},
+ status:{type:'string',enum:['drafting','revising','complete','archived'],title:'Status'},
+ coverUrl:{...text(2048),title:'Cover image URL',description:'Empty or an HTTPS URL without embedded credentials.'},
+ seriesId:{type:'string',title:'Primary series ID',description:'UUID of the owning series, or empty.'},
+ seriesOrder:{type:'integer',minimum:0,title:'Position in series'},
+ hiddenFields:visibility(['synopsis','status','coverUrl','seriesId','seriesOrder']),
+},['title']);
+
+register('series','Series','series',{
+ title:{...text(480),title:'Title'},
+ summary:{...text(10000),title:'Summary'},
+ coverUrl:{...text(2048),title:'Cover image URL',description:'Empty or an HTTPS URL without embedded credentials.'},
+ hiddenFields:visibility(['summary','coverUrl']),
+},['title']);
+
+const collectionMetadata={
+ name:{...text(160),minLength:1,pattern:'\\S',title:'Name'},
+ summary:{...text(10000),title:'Summary'},
+ coverUrl:{...text(2048),title:'Cover image URL',description:'Empty or an HTTPS URL without embedded credentials.'},
+};
+register('collection_manual','Manual collection','collections',{
+ ...collectionMetadata,
+ order:{...list(text(400),1000,{uniqueItems:true}),title:'Entry order',description:'Ordered typed library keys: kind + parent character ID (for notes) + target ID. Membership identities are stored in collection_members.'},
+},['name','summary','coverUrl','order'],{discriminator:{table:'collections',column:'kind',value:'manual'}});
+register('collection_smart','Smart collection','collections',{
+ ...collectionMetadata,
+ rules:{...object({
+  version:{const:1},mode:{type:'string',enum:['all','any']},
+  predicates:list({oneOf:[
+   object({field:{const:'entityType'},value:{type:'string',enum:smartKinds}},['field','value']),
+   object({field:{const:'subtype'},kind:{type:'string',enum:['location','lore']},value:{...text(160),minLength:1}},['field','kind','value']),
+   object({field:{const:'linkedNovel'},value:{...uuid,...reference('novel')}},['field','value']),
+   object({field:{const:'series'},value:{...uuid,...reference('series')}},['field','value']),
+   object({field:{const:'minNovelCount'},value:{type:'integer',minimum:0,maximum:1000}},['field','value']),
+   object({field:{const:'unassigned'}},['field']),
+  ]},8,{minItems:1}),
+ },['version','mode','predicates']),title:'Criteria',description:'Bounded owner-scoped criteria evaluated against canonical entries; this document stores no copied result list.'},
+},['name','summary','coverUrl','rules'],{discriminator:{table:'collections',column:'kind',value:'smart'}});
 
 const entityReference={oneOf:[
  object({kind:{type:'string',enum:['character','location','faction','lore']},id:identity},['kind','id']),

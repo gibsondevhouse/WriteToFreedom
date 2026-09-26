@@ -13,9 +13,30 @@ import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
 test('generated schema and field inventory stay synchronized with UI and nested contracts',()=>{
  assert.equal(readFileSync('db/documents.schema.json','utf8'),JSON.stringify(documentSchema,null,2)+'\n','Run npm run schema:documents after changing a template or document contract');
  assert.equal(readFileSync('docs/ui-field-inventory.md','utf8'),renderFieldInventory());
- assert.equal(Object.keys(documentSchemas).length,21);
+ assert.equal(Object.keys(documentSchemas).length,25);
  for(const key of Object.keys(documentSchemas))assert.equal(typeof documentValidator(key),'function',key);
  for(const section of templateSections)for(const [key,label] of section.fields){assert.ok(documentSchemas.character.properties[key],key);assert.equal(documentSchemas.character.properties[key].title,label);}
+});
+
+test('novel and series contracts preserve profile fields and exclude association data',()=>{
+ const novel={title:'A new novel',synopsis:'A synopsis',status:'drafting',coverUrl:'',seriesId:'',seriesOrder:0,hiddenFields:['synopsis']};
+ const series={title:'A series',summary:'A shared setting',coverUrl:'',hiddenFields:['summary']};
+ assertDocumentSchema('novel',novel);assertDocumentSchema('series',series);
+ for(const extra of [{status:'published'},{seriesOrder:-1},{seriesOrder:1.5},{title:'x'.repeat(481)},{hiddenFields:['prose']},{associations:[]}])assert.equal(documentValidator('novel')({...novel,...extra}),false);
+ assert.equal(documentValidator('series')({...series,summary:'x'.repeat(10001)}),false);
+ assert.equal(documentValidator('series')({...series,novelIds:[]}),false);
+ assert.equal(documentSchemas.novel['x-storage'].table,'novels');
+ assert.equal(documentSchemas.series['x-storage'].table,'series');
+});
+
+test('manual and smart collections have separate bounded document contracts',()=>{
+ const metadata={name:'A collection',summary:'Entries',coverUrl:''};
+ assertDocumentSchema('collection_manual',{...metadata,order:['character::claude']});
+ assertDocumentSchema('collection_smart',{...metadata,rules:{version:1,mode:'all',predicates:[{field:'linkedNovel',value:crypto.randomUUID()},{field:'minNovelCount',value:2}]}});
+ assert.equal(documentValidator('collection_manual')({...metadata,order:[],rules:{}}),false);
+ assert.equal(documentValidator('collection_smart')({...metadata,rules:{version:1,mode:'any',predicates:[{field:'customSql',value:'SELECT *'}]}}),false);
+ assert.equal(documentValidator('collection_smart')({...metadata,rules:{version:1,mode:'all',predicates:Array.from({length:9},()=>({field:'unassigned'}))}}),false);
+ assert.equal(documentValidator('collection_manual')({...metadata,order:['duplicate','duplicate']}),false);
 });
 
 test('document schemas reject silently lost fields, invalid ratings, reference shapes and unsupported rich text',()=>{

@@ -1112,6 +1112,56 @@ Storage: `scenes.document`.
 | `contentSchemaVersion` | contentSchemaVersion | 1 |
 | `content` | content | writingContent |
 
+## Novel (novel)
+
+Storage: `novels.document`.
+
+| JSON path | UI label / meaning | Shape |
+| --- | --- | --- |
+| `title` | Title | string |
+| `synopsis` | Synopsis | string |
+| `status` | Status | string |
+| `coverUrl` | Cover image URL | string |
+| `seriesId` | Primary series ID | string |
+| `seriesOrder` | Position in series | integer |
+| `hiddenFields` | Hidden field names. Their underlying content remains stored. | array |
+
+## Series (series)
+
+Storage: `series.document`.
+
+| JSON path | UI label / meaning | Shape |
+| --- | --- | --- |
+| `title` | Title | string |
+| `summary` | Summary | string |
+| `coverUrl` | Cover image URL | string |
+| `hiddenFields` | Hidden field names. Their underlying content remains stored. | array |
+
+## Manual collection (collection_manual)
+
+Storage: `collections.document`.
+
+| JSON path | UI label / meaning | Shape |
+| --- | --- | --- |
+| `name` | Name | string |
+| `summary` | Summary | string |
+| `coverUrl` | Cover image URL | string |
+| `order` | Entry order | array |
+
+## Smart collection (collection_smart)
+
+Storage: `collections.document`.
+
+| JSON path | UI label / meaning | Shape |
+| --- | --- | --- |
+| `name` | Name | string |
+| `summary` | Summary | string |
+| `coverUrl` | Cover image URL | string |
+| `rules` | Criteria | object |
+| `rules.version` | version | 1 |
+| `rules.mode` | mode | string |
+| `rules.predicates` | predicates | array |
+
 ## Shared nested structures
 
 `characterNote`, `entityReference`, and recursive `writingContent` are defined fully under `$defs` in [documents.schema.json](../db/documents.schema.json). Their nested fields, limits, enums, and relationship discriminators are part of that schema.

@@ -2,17 +2,22 @@
 // generated documents.schema.json; raw text storage does not erase that contract.
 // Cross-row and JSON invariants also live in the custom 0011 migration;
 // Drizzle does not model SQLite triggers. Preserve them in future table rebuilds.
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {sql} from 'drizzle-orm';
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey, check } from 'drizzle-orm/sqlite-core';
 
 export const chapters = sqliteTable('chapters', {
  id: text('id').primaryKey(),
  ownerId: text('owner_id').notNull(),
+ novelId: text('novel_id'),
  document: text('document').notNull(),
  schemaVersion: integer('schema_version').notNull().default(1),
  version: integer('version').notNull().default(1),
  createdAt: text('created_at').notNull(),
  updatedAt: text('updated_at').notNull(),
-}, table => [index('idx_chapters_owner_created').on(table.ownerId,table.createdAt,table.id)]);
+}, table => [
+ index('idx_chapters_owner_created').on(table.ownerId,table.createdAt,table.id),
+ index('idx_chapters_novel').on(table.novelId),
+]);
 
 export const scenes = sqliteTable('scenes', {
  id: text('id').primaryKey(),
@@ -108,3 +113,73 @@ export const locationDetails = sqliteTable('location_details', {
  // Existing profiles have no historical edit time; null means unknown.
  updatedAt: text('updated_at'),
 }, table => [uniqueIndex('idx_location_details_owner_location').on(table.ownerId,table.locationId)]);
+
+export const novels = sqliteTable('novels', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [index('idx_novels_owner_updated').on(table.ownerId, table.updatedAt)]);
+
+export const series = sqliteTable('series', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [index('idx_series_owner_updated').on(table.ownerId, table.updatedAt)]);
+
+export const novelAssociations = sqliteTable('novel_associations', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ novelId: text('novel_id').notNull().references(() => novels.id),
+ targetKind: text('target_kind').notNull(),
+ targetId: text('target_id').notNull(),
+ relationKind: text('relation_kind').notNull().default('appears_in'),
+ prose: text('prose').notNull().default(''),
+ version: integer('version').notNull().default(1),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [
+ uniqueIndex('idx_novel_assoc_owner_novel_target').on(table.ownerId, table.novelId, table.targetKind, table.targetId),
+ index('idx_novel_assoc_owner_target').on(table.ownerId, table.targetKind, table.targetId),
+]);
+
+// The automatic legacy-chapter bridge keeps this identity when a writer renames
+// their imported novel. A title lookup alone would create a second default.
+export const ownerDefaultNovels = sqliteTable('owner_default_novels', {
+ ownerId: text('owner_id').primaryKey(),
+ novelId: text('novel_id').notNull().references(() => novels.id),
+});
+
+export const collections = sqliteTable('collections', {
+ id: text('id').primaryKey(),
+ ownerId: text('owner_id').notNull(),
+ kind: text('kind').notNull(),
+ document: text('document').notNull(),
+ schemaVersion: integer('schema_version').notNull().default(1),
+ version: integer('version').notNull().default(1),
+ mutationToken: text('mutation_token').notNull().default(''),
+ createdAt: text('created_at').notNull(),
+ updatedAt: text('updated_at').notNull(),
+}, table => [
+ index('idx_collections_owner_updated').on(table.ownerId, table.updatedAt, table.id),
+ check('collections_kind_check', sql`${table.kind} IN ('manual', 'smart')`),
+]);
+
+export const collectionMembers = sqliteTable('collection_members', {
+ ownerId: text('owner_id').notNull(),
+ collectionId: text('collection_id').notNull().references(() => collections.id),
+ targetKind: text('target_kind').notNull(),
+ targetId: text('target_id').notNull(),
+ targetParentId: text('target_parent_id').notNull().default(''),
+ createdAt: text('created_at').notNull(),
+}, table => [
+ primaryKey({columns: [table.ownerId, table.collectionId, table.targetKind, table.targetId, table.targetParentId]}),
+ check('collection_members_target_kind_check', sql`${table.targetKind} IN ('character', 'faction', 'location', 'lore', 'story_arc', 'note', 'novel', 'series', 'chapter', 'scene')`),
+]);
