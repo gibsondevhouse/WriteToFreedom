@@ -10,6 +10,7 @@ export function validateCollectionRules(input){
    return {field:rule.field,value:rule.value};
   }
   if(typeof rule.value!=='string'||!rule.value||rule.value.length>160)throw new Error('Choose a value for each criterion.');
+  if(['linkedNovel','series'].includes(rule.field)&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rule.value))throw new Error('Choose an existing novel or series.');
   if(rule.field==='entityType'&&!smartKinds.includes(rule.value))throw new Error('Choose a supported entry type.');
   if(rule.field==='subtype'&&!['location','lore'].includes(rule.kind))throw new Error('Choose Location or Lore for a subtype criterion.');
   return {field:rule.field,value:rule.value,...(rule.field==='subtype'?{kind:rule.kind}:{})};

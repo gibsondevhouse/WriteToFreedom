@@ -3,6 +3,7 @@ import {locationProfileGroups} from '../public/locations/template.js';
 import {locationPaths} from '../public/locations/data.js';
 import {characterCardDetails} from './character-card-data.js';
 import {repository} from './db.js';
+import {collectionRepository} from './collection-repository.js';
 import {characterCast} from './sample-characters.js';
 import {factionCatalog,attachFactionNames} from './factions.js';
 import {locationCatalog,defaultCountry} from './countries.js';
@@ -26,7 +27,7 @@ function profileCard(record,kind){return {id:record.id,name:record.name?.trim()|
  * countries (saved profiles), cities (saved profiles), lore (optional standalone entries).
  * @returns {object} {questions, characters, factions, locations, lore, timeline}.
  */
-export function dashboardData({characters,factions,locations,countries,cities,lore=[],storyArcs=[],novels=[],series=[]}){
+export function dashboardData({characters,factions,locations,countries,cities,lore=[],storyArcs=[],novels=[],series=[],collections=[]}){
  const cast=attachFactionNames(characterCast(characters),factions);
  const countryMap=new Map(countries.map(r=>[r.id,r])),cityMap=new Map(cities.map(r=>[r.id,r]));
  const countryProfiles=locations.filter(r=>r.type==='country').map(r=>({...defaultCountry(r),...countryMap.get(r.id)}));
@@ -39,6 +40,7 @@ export function dashboardData({characters,factions,locations,countries,cities,lo
   questions,
   novels:novels.map(r=>({id:r.id,name:r.title||'Untitled novel',kind:'novel',label:'Novel',href:'/novels/'+encodeURIComponent(r.id)+'/',image:r.coverUrl||'',summary:r.synopsis||'',status:r.status||'drafting'})),
   series:series.map(r=>({id:r.id,name:r.title||'Untitled series',kind:'series',label:'Series',href:'/series/'+encodeURIComponent(r.id)+'/',image:r.coverUrl||'',summary:r.summary||'',status:''})),
+  collections:collections.map(r=>({id:r.id,name:r.name,kind:'collection',label:r.kind==='smart'?'Smart collection':'Collection',href:'/collections/'+encodeURIComponent(r.id)+'/',image:r.coverUrl||'',summary:r.summary||''})),
   lore:lore.map(loreCard),
   storyArcs:storyArcs.map(r=>({...profileCard(r,'storyArc'),type:r.arcType,status:r.status,startDate:r.startDate,endDate:r.endDate})),
   characters:cast.map(r=>({...profileCard(r,'character'),roles:choicesFor(r,'roles'),storyRole:r.storyRole,affiliation:r.affiliation,...characterCardDetails(r,{cast,factions,countries:countryProfiles,locations,profiles})})),
@@ -62,7 +64,7 @@ export async function dashboardRoute(request,env){
  if(request.method!=='GET')return json({error:'Method not allowed.'},405);
  try{
   const db=repository(env.DB);
-  const [characters,factions,locations,countries,cities,lore,storyArcs,novels,series]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner),db.listStoryArcs(owner),db.listNovels(owner),db.listSeries(owner)]);
-  return json(dashboardData({characters,factions,locations,countries,cities,lore,storyArcs,novels,series}));
+  const [characters,factions,locations,countries,cities,lore,storyArcs,novels,series,collections]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner),db.listStoryArcs(owner),db.listNovels(owner),db.listSeries(owner),collectionRepository(env.DB).list(owner)]);
+  return json(dashboardData({characters,factions,locations,countries,cities,lore,storyArcs,novels,series,collections}));
  }catch(error){console.error('Dashboard request failed',error.message);return json({error:'Your dashboard could not be loaded. Please try again.'},503);}
 }

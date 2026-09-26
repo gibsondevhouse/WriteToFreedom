@@ -1,7 +1,7 @@
 import {assetUrl} from './asset-url.js';
 
 const sections = [
-  ['My workspace', [['Dashboard', '/dashboard/', 'dashboard'], ['My novels', '/novels/', 'novels'], ['Series', '/series/', 'series']]],
+  ['My workspace', [['Dashboard', '/dashboard/', 'dashboard'], ['My novels', '/novels/', 'novels'], ['Series', '/series/', 'series'], ['Collections', '/collections/', 'collections']]],
   ['Worldbuilding', [['Characters', '/characters/', 'characters'], ['Factions', '/factions/', 'factions'], ['Locations', '/locations/', 'locations'], ['Lore', '/lore/', 'lore']]],
   ['Structure', [['Chapters', '/chapters/', 'chapters'], ['Scenes', '/scenes/', 'scenes'], ['Timeline', '/timeline/', 'timeline'], ['Story Arcs', '/story-arcs/', 'storyArcs']]],
 ];

@@ -9,6 +9,7 @@ initDashboardShell({
   view.questions(data.questions);
   view.rail({id:'novels',title:'My novels',records:data.novels||[],card:record=>bookCoverCard(record,{menuItems:[{label:'Open profile',href:record.href},{label:'Write scenes',href:'/scenes/?novel='+encodeURIComponent(record.id)}]}),href:'/novels/',emptyText:'Your novels will appear here.'});
   view.rail({id:'series',title:'Series',records:data.series||[],card:record=>bookCoverCard(record,{menuItems:[{label:'Open profile',href:record.href}]}),href:'/series/',emptyText:'Your series will appear here.',hideWhenEmpty:true});
+  view.rail({id:'collections',title:'Collections',records:data.collections||[],card:record=>bookCoverCard(record,{menuItems:[{label:'Open collection',href:record.href}]}),href:'/collections/',emptyText:'Group saved material in manual or smart collections.',hideWhenEmpty:true});
   view.rail({id:'characters',title:'Characters',records:data.characters,card:createCharacterCard,href:'/characters/',emptyText:'Your characters will appear here.'});
   view.rail({id:'factions',title:'Factions',records:data.factions,card:factionCard,href:'/factions/',emptyText:'Your houses, families, and alliances will appear here.'});
   view.rail({id:'locations',title:'Locations',records:data.locations,card:locationCard,href:'/locations/',emptyText:'Your places will appear here.'});

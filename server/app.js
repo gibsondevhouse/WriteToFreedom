@@ -9,6 +9,9 @@ import {loreRoute} from './lore-routes.js';
 import {writingRoute} from './writing-routes.js';
 import {novelRoute} from './novel-routes.js';
 import {novelPageRoute} from './novel-pages.js';
+import {collectionRoute} from './collection-routes.js';
+import {collectionPageRoute} from './collection-pages.js';
+import {validateCollectedNotes} from './collection-repository.js';
 import {enhanceNovelAppearances} from './novel-appearances.js';
 import {renderWritingWorkspace} from './render-writing.js';
 import {storyArcRoute} from './story-arc-routes.js';
@@ -97,6 +100,10 @@ function validate(input,current) {
 function createAppWorker(assets) { return {async fetch(request,env) {
  // Canonicalize/delegate specific location routes before broad APIs and assets.
  const url=new URL(request.url);const path=url.pathname;
+ if(/^\/api\/(novels|series|novel-associations)(?:\/|$)/.test(path))return novelRoute(request,env);
+ if(/^\/(novels|series)(?:\/(?:index\.html)?|\/[0-9a-f-]+(?:\/(?:index\.html)?)?|)$/.test(path))return novelPageRoute(request,env);
+ if(path==='/api/library'||/^\/api\/collections(?:\/|$)/.test(path))return collectionRoute(request,env);
+ if(/^\/collections(?:\/(?:index\.html)?|\/[0-9a-f-]+(?:\/(?:index\.html)?)?|)$/.test(path))return collectionPageRoute(request,env);
  if(path==='/chapters'||path==='/scenes'){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
   return Response.redirect(url.origin+path+'/'+url.search,308);
@@ -105,8 +112,6 @@ function createAppWorker(assets) { return {async fetch(request,env) {
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
   return new Response(request.method==='HEAD'?null:renderWritingWorkspace(path==='/chapters/'?'chapters':'scenes'),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
  }
- if(/^\/api\/(novels|series|novel-associations)(?:\/|$)/.test(path))return novelRoute(request,env);
- if(/^\/(novels|series)(?:\/(?:index\.html)?|\/[0-9a-f-]+(?:\/(?:index\.html)?)?|)$/.test(path))return novelPageRoute(request,env);
  if(/^\/api\/(chapters|scenes)(?:\/|$)/.test(path))return writingRoute(request,env);
  // Dashboard definitions all share one complete main-area shell.
  const dashboard=dashboardPages.get(path);
@@ -225,6 +230,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     try{
      const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations,await db.listLore(owner));
      validateNoteConnections(document.notes,targets,current.notes||[],id);
+     await validateCollectedNotes(env.DB,owner,current.id,document);
      if(document.cardConnection){
       const key=referenceKey(document.cardConnection);
       if(document.cardConnection.kind==='character'&&document.cardConnection.id===id)throw new Error('Choose another item to feature on this card.');
@@ -263,7 +269,11 @@ function createAppWorker(assets) { return {async fetch(request,env) {
 export function createWorker(assets) {
  const app=createAppWorker(assets);
  return {async fetch(request,env,ctx) {
-  const response=await enhanceNovelAppearances(request,env,await app.fetch(request,env,ctx));
+  let response;
+  try{
+   response=await app.fetch(request,env,ctx);
+   response=await enhanceNovelAppearances(request,env,response);
+  }catch(error){console.error('Workspace request failed',error.message);return json({error:'This workspace request could not be completed. Your draft is still here.'},503);}
   if(request.method==='HEAD'||!response.headers.get('content-type')?.includes('text/html'))return response;
   const headers=new Headers(response.headers);headers.delete('content-length');
   return new Response(workspaceShell(await response.text(),new URL(request.url).pathname),{status:response.status,headers});
