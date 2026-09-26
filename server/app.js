@@ -12,6 +12,7 @@ import {novelPageRoute} from './novel-pages.js';
 import {collectionRoute} from './collection-routes.js';
 import {collectionPageRoute} from './collection-pages.js';
 import {validateCollectedNotes} from './collection-repository.js';
+import {validateNovelContext,applyNovelContext} from './novel-context.js';
 import {enhanceNovelAppearances} from './novel-appearances.js';
 import {renderWritingWorkspace} from './render-writing.js';
 import {storyArcRoute} from './story-arc-routes.js';
@@ -271,7 +272,8 @@ export function createWorker(assets) {
  return {async fetch(request,env,ctx) {
   let response;
   try{
-   response=await app.fetch(request,env,ctx);
+   const invalidContext=await validateNovelContext(request,env);if(invalidContext)return invalidContext;
+   response=await applyNovelContext(request,env,await app.fetch(request,env,ctx));
    response=await enhanceNovelAppearances(request,env,response);
   }catch(error){console.error('Workspace request failed',error.message);return json({error:'This workspace request could not be completed. Your draft is still here.'},503);}
   if(request.method==='HEAD'||!response.headers.get('content-type')?.includes('text/html'))return response;

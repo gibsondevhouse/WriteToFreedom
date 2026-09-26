@@ -13,7 +13,10 @@ The follow-up [UI persistence audit](ui-persistence.md) verifies every current p
 | Location | `locations` identity/type/parent plus country, city, or generic profile document | Location ID; type is immutable |
 | Lore | `lore_entries.document` | Lore ID and immutable type |
 | Story arc | `story_arcs.document` | Arc ID; embedded key scenes also have stable IDs |
-| Manuscript chapter | `chapters.document` | Chapter UUID |
+| Novel / series | `novels.document` / `series.document` | Owner-scoped UUID |
+| Novel appearance/reference | `novel_associations` | Novel ID plus typed canonical target; independent edit revision |
+| Collection | `collections`, with `collection_members` for manual lists | Owner-scoped UUID; typed references or bounded smart criteria |
+| Manuscript chapter | `chapters.document` and relational `novel_id` | Chapter UUID; belongs to one owned novel |
 | Manuscript scene | `scenes.document` and `scenes.chapter_id` | Scene UUID; chapter must belong to the same owner |
 | Character note | Embedded in its character document | Character ID **and** note ID |
 
@@ -50,7 +53,7 @@ Profile and catalog edits execute in one database batch. Hierarchy checks run in
 
 Source-defined samples are virtual defaults with private owner overrides. Their IDs are reserved compatibility identifiers. Keep seed IDs stable: removing one from the source catalogs can hide saved overrides, and changing character seed recognition changes its private storage mapping. Profile target triggers also encode the reserved sample IDs. A future removal must migrate both identity and references, or materialize samples as owner-owned records first.
 
-`owner_id` currently scopes an author's entire collection. There is no separate book, manuscript, project, world, membership, or collaborative permission model. Add that boundary deliberately before supporting multiple independent worlds or shared writing; do not infer it from tags or names.
+`owner_id` scopes the author's entire library. Novels now organize independently owned manuscripts within that library; series, associations, and collections preserve shared article identity. None creates a separate security or collaborative permission boundary. See [novels and collections](novels-and-collections.md) for migration, scope, and lifecycle decisions.
 
 ## Migrations and verification
 

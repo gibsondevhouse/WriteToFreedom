@@ -10,7 +10,11 @@
 
 The toolbar supports paragraphs, three heading levels, bold, italic, underline, strikethrough, lists, quotes, scene breaks and undo/redo. Standard keyboard shortcuts work. Paste retains supported formatting through the editor schema and excludes scripts, styles and embedded objects. The first format does not support images, tables, links or code blocks. Inline code remains a supported text mark for compatible pasted content.
 
-The reference panel reads the existing owner-scoped worldbuilding catalog. It opens reference profiles in another tab; it does not insert or rewrite positional note anchors in the scene document.
+The reference panel starts with material linked to the selected novel and offers an explicit whole-library expansion. It opens reference profiles in another tab; it does not insert or rewrite positional note anchors in the scene document.
+
+## Novel context
+
+`?novel=<UUID>` selects a manuscript. Chapter and scene catalogs use `?novelId=<UUID>` and the server checks ownership. Legacy `?chapter=` and `?scene=` links resolve the parent novel. With multiple novels, chapter creation requires an explicit choice. Chapter cards select the correct novel and chapter, including empty chapters. Ordinary scene moves stay within one novel; chapter transfer is a separate future operation. Changing context uses full-page navigation and the existing dirty-draft warning. See [novels and collections](novels-and-collections.md).
 
 ## Persistence contract
 
@@ -19,7 +23,7 @@ Migration `0009_concerned_war_machine.sql` adds `chapters` and `scenes` without 
 | Endpoint | Contract |
 | --- | --- |
 | `GET /api/chapters` | `{chapters: ChapterRecord[]}` |
-| `POST /api/chapters` | `{id, title, summary}` → created chapter |
+| `POST /api/chapters` | `{id, novelId, title, summary}` → created chapter; legacy omission is allowed when the owner has at most one novel |
 | `GET /api/chapters/:id` | One owner-scoped chapter |
 | `PUT /api/chapters/:id` | `{version, title, summary}` → saved chapter with incremented version |
 | `GET /api/scenes` | `{scenes: SceneSummary[]}`; prose is excluded at the SQL query boundary |

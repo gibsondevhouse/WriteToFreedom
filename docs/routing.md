@@ -1,5 +1,7 @@
 # Routing and request contracts
 
+Novels, series, and collections have HTML directories and profiles at `/novels/`, `/series/`, and `/collections/`. Private JSON routes live under `/api/novels`, `/api/series`, `/api/novel-associations`, `/api/collections`, and `/api/library`. HTML dispatch is limited to indexes and UUID profile paths so adjacent JavaScript/CSS assets reach the static fallback. The outer Worker validates optional novel catalog context, filters declared links, enhances canonical profiles with separately edited appearances, and applies the workspace shell once. See [novels and collections](novels-and-collections.md) for scope and write contracts.
+
 Chapters/Scenes add public workspace shells at `/chapters/` and `/scenes/`, with private JSON data at `/api/chapters` and `/api/scenes`. Their item reads and versioned mutations are owner-scoped through `server/writing-routes.js`; scene catalogs exclude prose. See [writing workspace](writing-workspace.md) for the full schema, size limits and request contract. These routes are dispatched before existing domain handlers and the static-asset fallback.
 
 This guide describes the routing implemented in `server/`, including dispatch order, dependencies, mutation boundaries, and current edge cases. Start with the [developer README](../README.md) for setup and the [component guide](components.md) for rendering and browser behavior. Comments beside the functions summarize these contracts without changing runtime behavior.

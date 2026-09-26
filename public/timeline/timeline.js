@@ -1,4 +1,5 @@
 import {observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 import {types,kinds,filterEvents,timelineRows,zoomAt,fitView,rulerTicks,parseStoryDate,minScale,maxScale} from './model.js?v=__WTF_ASSET_REVISION__';
 const $=selector=>document.querySelector(selector),stage=$('#timeline'),ruler=$('#ruler'),grid=$('#grid'),lanes=$('#lanes'),message=$('#timeline-message'),filters=$('#filters'),orb=$('#filter-toggle');
 const ROW=104,RULER=57;
@@ -58,7 +59,7 @@ function populateMetadata(){
 }
 async function load(){
  if(loading)return;loading=true;
- try{const response=await fetch('/api/timeline',{credentials:'same-origin',cache:'no-store'});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Sign in again to load your saved timeline.');const next=await response.json();if(!response.ok)throw new Error(next.error||'Please try again.');const needsFit=!loaded||!data.events.length&&next.events.length;data=next;loaded=true;populateMetadata();applyFilters({fit:needsFit});}
+ try{const response=await fetch(scopedCatalogUrl('/api/timeline'),{credentials:'same-origin',cache:'no-store'});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Sign in again to load your saved timeline.');const next=await response.json();if(!response.ok)throw new Error(next.error||'Please try again.');showCatalogScope(next.scope,document.querySelector('.timeline-header'));const scopeMessage=document.querySelector('[data-novel-scope]');if(scopeMessage&&next.scope?.note&&!scopeMessage.querySelector('small'))scopeMessage.append(node('small',' '+next.scope.note));if(scopeMessage){document.documentElement.style.setProperty('--timeline-scope-height',document.querySelector('.timeline-header').offsetHeight+'px');}const needsFit=!loaded||!data.events.length&&next.events.length;data=next;loaded=true;populateMetadata();applyFilters({fit:needsFit});}
  catch(error){if(!loaded){showMessage('Timeline unavailable',error.message);const retry=node('button','Try again');retry.type='button';retry.addEventListener('click',load);message.append(retry);$('#timeline-count').textContent='Not loaded';}else $('#timeline-count').textContent='Could not refresh · showing last loaded events';}
  finally{loading=false;}
 }

@@ -5,6 +5,14 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {characters} from '../public/characters/data.js';
 import {seedFactions} from '../public/characters/factions.js';
 import {seedLocations} from '../public/locations/data.js';
+import {blankCharacter} from '../public/characters/template.js';
+import {blankLore, loreHref} from '../public/lore/template.js';
+import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
+import {repository} from '../server/db.js';
+import {characterCast} from '../server/sample-characters.js';
+import {factionCatalog} from '../server/factions.js';
+import {locationCatalog} from '../server/countries.js';
+import {noteTargets, connectedNotes} from '../server/note-connections.js';
 
 const files = readdirSync('drizzle').filter(name => name.endsWith('.sql')).sort();
 const migration = readFileSync('drizzle/0017_novel_ownership_backfill.sql', 'utf8');
@@ -81,6 +89,58 @@ test('SQL-only upgrade preserves populated manuscripts and reuses titled or rena
   apply(sqlite, migration); // Data and guard installation remain repeatable.
   assert.deepEqual(sqlite.prepare('SELECT * FROM chapters ORDER BY created_at, id').all(), chaptersAfter);
   assert.equal(sqlite.prepare('SELECT count(*) AS count FROM novels').get().count, 4);
+});
+
+test('the complete milestone upgrade preserves mixed authored samples, nested links and legacy manuscripts', async t => {
+  const sqlite = setup(t, '0013'), db = repository(d1Adapter(sqlite));
+  const owner = 'mixed-author', customId = crypto.randomUUID(), loreId = crypto.randomUUID(), factionId = crypto.randomUUID(), countryId = crypto.randomUUID(), cityId = crypto.randomUUID(), noteId = crypto.randomUUID();
+  const sampleNote = {id: noteId, field: 'biography', position: 0, title: 'Authored source note', type: 'lore', tags: ['treaty'], text: 'Read the chronicle and the witness.',
+    links: [{kind: 'lore', id: loreId}, {kind: 'note', id: noteId, characterId: customId}],
+    content: [{text: 'Read the chronicle', ref: {kind: 'lore', id: loreId}}, {text: ' and '}, {text: 'the witness.', ref: {kind: 'note', id: noteId, characterId: customId}}]};
+  await db.save(owner, 'claude', 0, {...blankCharacter(), firstName: 'Authored Claude', name: 'Authored Claude', biography: '[1]Private biography — preserved.', birthDate: '14 Harvest, 112', factionId, residenceId: cityId,
+    hiddenFields: ['biography'], relationships: [{targetId: customId, type: 'Witness', description: 'Original relationship'}], notes: [sampleNote]});
+  await db.save('other-author', 'claude', 0, {...blankCharacter(), firstName: 'Other private Claude', name: 'Other private Claude', biography: 'Other owner prose', notes: []});
+  const custom = {...blankCharacter(), firstName: 'Authored witness', name: 'Authored witness', biography: '[1]Witness account', notes: [{id: noteId, field: 'biography', position: 0, title: 'Witness note', type: 'detail', text: 'Preserved independent note', links: [{kind: 'character', id: 'claude'}, {kind: 'faction', id: factionId}, {kind: 'location', id: cityId}]}]};
+  insert(sqlite, 'character_drafts', {...row(customId, owner, ' ' + JSON.stringify(custom) + '\n'), version: 6});
+  insert(sqlite, 'factions', {id: factionId, owner_id: owner, name: 'Custom guild', name_key: 'custom guild', created_at: now});
+  insert(sqlite, 'faction_profiles', {owner_id: owner, faction_id: 'sample-ember', document: '{"name":"Private Ember","leaderId":"claude","founded":"1200 BCE"}', version: 4, updated_at: now});
+  insert(sqlite, 'locations', {id: countryId, owner_id: owner, name: 'Custom country', type: 'country', parent_id: null, created_at: now});
+  insert(sqlite, 'locations', {id: cityId, owner_id: owner, name: 'Custom city', type: 'city', parent_id: countryId, created_at: now});
+  insert(sqlite, 'city_profiles', {owner_id: owner, location_id: cityId, document: JSON.stringify({name: 'Custom city', parentId: countryId, founded: '1984-02'}), version: 3, updated_at: now});
+  const lore = {...blankLore('book'), name: 'In-world chronicle', contents: 'Original text\nwith two  spaces.', originDate: '1200 BCE', connections: [{target: {kind: 'character', id: 'claude'}, relationship: 'Compiled by'}, {target: {kind: 'note', id: noteId, characterId: customId}, relationship: 'Source testimony'}]};
+  insert(sqlite, 'lore_entries', {...row(loreId, owner, '\n ' + JSON.stringify(lore) + ' '), version: 8});
+  const first = crypto.randomUUID(), second = crypto.randomUUID(), sceneId = crypto.randomUUID();
+  insert(sqlite, 'chapters', {...row(second, owner, '{"title":"Later chapter","summary":"Original later summary"}'), version: 4, created_at: '2026-09-23T00:00:00.000Z'});
+  insert(sqlite, 'chapters', {...row(first, owner, ' { "title": "Earlier chapter", "summary": "Original earlier summary" } '), version: 7, created_at: '2026-09-22T00:00:00.000Z'});
+  const content = {type: 'doc', content: [{type: 'paragraph', content: [{type: 'text', text: 'Original manuscript — two  spaces.', marks: [{type: 'bold'}]}]}]};
+  insert(sqlite, 'scenes', {...row(sceneId, owner, ' ' + JSON.stringify({chapterId: first, title: 'Legacy scene', summary: 'Original scene summary', status: 'revising', contentSchemaVersion: 1, content}) + '\n'), chapter_id: first, version: 9});
+  const sourceTables = ['character_drafts', 'factions', 'faction_profiles', 'locations', 'city_profiles', 'lore_entries', 'scenes'];
+  const snapshot = () => Object.fromEntries(sourceTables.map(table => [table, sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
+  const sourcesBefore = snapshot(), chaptersBefore = sqlite.prepare('SELECT * FROM chapters ORDER BY created_at, id').all();
+  const storedSampleId = sqlite.prepare("SELECT id FROM character_drafts WHERE owner_id = ? AND json_extract(document, '$.sampleId') = 'claude'").get(owner).id;
+  assert.notEqual(storedSampleId, 'claude');
+  for (const file of files.filter(name => name >= '0013' && name < '0019')) apply(sqlite, readFileSync('drizzle/' + file, 'utf8'));
+  assert.deepEqual(snapshot(), sourcesBefore);
+  const chaptersAfter = sqlite.prepare('SELECT * FROM chapters ORDER BY created_at, id').all();
+  assert.deepEqual(chaptersAfter.map(({novel_id, ...chapter}) => chapter), chaptersBefore.map(chapter => ({...chapter})));
+  const defaultNovel = sqlite.prepare('SELECT novel_id FROM owner_default_novels WHERE owner_id = ?').get(owner).novel_id;
+  assert.ok(chaptersAfter.every(chapter => chapter.novel_id === defaultNovel));
+  assert.equal(sqlite.prepare('SELECT count(*) AS count FROM novels').get().count, 1);
+  assert.equal(sqlite.prepare('SELECT count(*) AS count FROM novel_associations').get().count, 0);
+  const effective = await db.get(owner, 'claude');
+  assert.equal(effective.id, 'claude'); assert.equal(effective.name, 'Authored Claude'); assert.equal(effective.birthDate, '14 Harvest, 112');
+  assert.deepEqual(effective.notes, [sampleNote]);
+  assert.equal((await db.get('other-author', 'claude')).name, 'Other private Claude');
+  const cast = characterCast(await db.list(owner)), factions = await factionCatalog(db, owner), locations = await locationCatalog(db, owner), savedLore = await db.listLore(owner);
+  assert.equal(cast.filter(character => character.id === 'claude').length, 1); assert.ok(!cast.some(character => character.id === storedSampleId));
+  assert.ok(!cast.some(character => character.name === 'Other private Claude'));
+  assert.equal(factions.find(faction => faction.id === 'sample-ember').name, 'Private Ember');
+  assert.equal(locations.find(location => location.id === cityId).parentId, countryId);
+  assert.equal(savedLore[0].type, 'book'); assert.equal(loreHref(savedLore[0]), '/lore/' + loreId + '/'); assert.deepEqual(savedLore[0].connections, lore.connections);
+  const notes = noteTargets(cast, factions, locations, savedLore).filter(target => target.kind === 'note' && target.id === noteId);
+  assert.deepEqual(notes.map(note => note.characterId).sort(), ['claude', customId].sort());
+  assert.ok(notes.some(note => note.href === '/characters/claude/#note-' + noteId));
+  assert.deepEqual(connectedNotes(cast, {kind: 'note', id: noteId, characterId: customId}, savedLore).map(note => note.source).sort(), ['Authored Claude', 'In-world chronicle'].sort());
 });
 
 test('an invalid legacy association rolls back the SQL backfill and can be repaired before retry', t => {

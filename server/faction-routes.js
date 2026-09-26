@@ -40,6 +40,7 @@ export async function factionRoute(request,env){
   try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
   if(request.method==='POST'&&!id){
    if(!idPattern.test(input.id))return json({error:'Invalid faction ID.'},400);
+   const createdPreviously=factions.find(f=>f.id===input.id);if(createdPreviously)return json(createdPreviously,201);
    if(input.blank===true){const existing=factions.find(f=>f.id===input.id);if(existing)return json(existing,201);const created=await db.createBlankFaction(owner,input.id);return created?json({...blankFaction(),...created,version:0,schemaVersion:1},201):json({error:'Could not create this faction. Try again.'},409);}
    if(typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>160)return json({error:'Enter a faction name of 1–160 characters.'},400);
    const name=input.name.trim().replace(/\s+/g,' '),key=name.normalize('NFKC').toLocaleLowerCase();

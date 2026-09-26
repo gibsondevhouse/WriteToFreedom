@@ -2,6 +2,7 @@ import {el,loreEntryCard} from '../dashboard/components.js?v=__WTF_ASSET_REVISIO
 import {initDashboardShell} from '../dashboard/shell.js?v=__WTF_ASSET_REVISION__';
 import {loreTypes,loreCollections,primaryCollection,loreHref} from './template.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {scopedCatalogUrl,showCatalogScope,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 
 const $=selector=>document.querySelector(selector);
 const search=$('#lore-search'),dialog=$('#new-lore-dialog'),form=$('#new-lore-form');
@@ -25,10 +26,11 @@ const collectionCopy={
 const collectionType=id=>Object.keys(primaryCollection).find(type=>primaryCollection[type]===id)||'note';
 const createAction=id=>({label:'New '+loreTypes[collectionType(id)].toLowerCase(),onClick:()=>openNewEntry(collectionType(id))});
 async function api(options={}){
- const response=await fetch('/api/lore',{credentials:'same-origin',cache:'no-store',...options});
+ const response=await fetch(scopedCatalogUrl('/api/lore'),{credentials:'same-origin',cache:'no-store',...options});
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Reload to sign in again. Keep a copy of any unsaved notes.');
  const body=await response.json();
  if(!response.ok)throw new Error(body.error||'Your lore could not be loaded.');
+ showCatalogScope(body.scope);
  return body;
 }
 function setCapture(open,focus=true){
@@ -42,7 +44,7 @@ function openNewEntry(preferredType=collectionType(collection)){
 }
 function setCollection(value){
  collection=value;
- history.pushState(null,'',value?'/lore/?collection='+value:'/lore/');
+ const url=new URL(location.href);if(value)url.searchParams.set('collection',value);else url.searchParams.delete('collection');history.pushState(null,'',url);
  dashboard.render();
 }
 function collectionRail(view,options,id){
@@ -100,7 +102,7 @@ form.addEventListener('submit',async event=>{
  if(!name.value.trim()){name.setCustomValidity('Enter a name.');name.reportValidity();return;}
  saving=true;updateSaving();$('#new-lore-fields').disabled=true;$('#create-lore').disabled=true;$('#cancel-lore').disabled=true;$('#new-lore-error').hidden=true;
  requestId??=crypto.randomUUID();
- try{const record=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:requestId,type:type.value,name:name.value})});location.assign(loreHref(record));}
+ try{const record=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:requestId,type:type.value,name:name.value})});location.assign(novelContextHref(loreHref(record)));}
  catch(e){$('#new-lore-error').textContent=e.message;$('#new-lore-error').hidden=false;}
  finally{saving=false;updateSaving();$('#new-lore-fields').disabled=false;$('#create-lore').disabled=false;$('#cancel-lore').disabled=false;}
 });
@@ -112,7 +114,7 @@ $('#quick-note').addEventListener('submit',async event=>{
  try{
   const record=await api({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:noteId,type:'note',name:text.split('\n')[0].slice(0,100),body:text,summary:text.slice(0,180)})});
   quick.value='';noteId=null;announceWorkspaceChange();
-  const status=$('#capture-status'),link=el('a','','Open note →');link.href=loreHref(record);
+  const status=$('#capture-status'),link=el('a','','Open note →');link.href=novelContextHref(loreHref(record));
   status.replaceChildren(document.createTextNode('Note saved.'),link);status.hidden=false;
   setCapture(false,false);await dashboard.refresh();
  }
