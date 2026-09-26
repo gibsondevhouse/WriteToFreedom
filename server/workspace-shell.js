@@ -1,12 +1,15 @@
 import {assetUrl} from './asset-url.js';
 
 const sections = [
-  ['Overview', [['Dashboard', '/dashboard/', 'dashboard']]],
+  ['My workspace', [['Dashboard', '/dashboard/', 'dashboard'], ['My novels', '/novels/', 'novels'], ['Series', '/series/', 'series']]],
   ['Worldbuilding', [['Characters', '/characters/', 'characters'], ['Factions', '/factions/', 'factions'], ['Locations', '/locations/', 'locations'], ['Lore', '/lore/', 'lore']]],
   ['Structure', [['Chapters', '/chapters/', 'chapters'], ['Scenes', '/scenes/', 'scenes'], ['Timeline', '/timeline/', 'timeline'], ['Story Arcs', '/story-arcs/', 'storyArcs']]],
 ];
 
 const iconPaths = {
+ novels:'<path d="M4 3h12a3 3 0 0 1 3 3v15H7a3 3 0 0 1-3-3Zm0 15a3 3 0 0 1 3-3h12M8 7h7M8 10h5"/>',
+ series:'<rect x="3" y="6" width="5" height="15" rx="1"/><rect x="9.5" y="3" width="5" height="18" rx="1"/><path d="m17 6 4-1 2 14-4 1Z"/>',
+ collections:'<rect x="3" y="6" width="18" height="15" rx="2"/><path d="M7 6V3h10v3M3 11h18M9 15h6"/>',
  chapters:'<path d="M4 3h12a3 3 0 0 1 3 3v15H7a3 3 0 0 1-3-3Zm0 15a3 3 0 0 1 3-3h12M8 7h7M8 10h5"/>',
  scenes:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4 6 9m9-5-3 5m7-4-3 4M9 13l5 2-5 2Z"/>',
  lore:'<path d="M3 4h6a3 3 0 0 1 3 3v14a3 3 0 0 0-3-3H3Zm18 0h-6a3 3 0 0 0-3 3v14a3 3 0 0 1 3-3h6Z"/>',
@@ -43,8 +46,8 @@ export function workspaceShell(html, path) {
   </aside><div class="workspace-canvas">
     <header class="workspace-topbar">
       <button class="sidebar-toggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="workspace-sidebar">${shellIcon('sidebar')}</button>
-      <span class="workspace-context">My workspace</span>
-      <search class="workspace-search" aria-label="Search your novel"><label class="shell-sr-only" for="novel-search">Search characters, factions, locations, lore, and story arcs</label><span class="search-symbol" aria-hidden="true">${shellIcon('search')}</span><input id="novel-search" type="search" placeholder="Search your novel…" aria-controls="search-results" autocomplete="off"><kbd aria-hidden="true">⌘ K</kbd></search>
+      <span class="workspace-context"><a href="/novels/">My library</a></span>
+      <search class="workspace-search" aria-label="Search all material"><label class="shell-sr-only" for="novel-search">Search all novels, series, collections, characters, factions, locations, lore, and story arcs</label><span class="search-symbol" aria-hidden="true">${shellIcon('search')}</span><input id="novel-search" type="search" placeholder="Search all material…" aria-controls="search-results" autocomplete="off"><kbd aria-hidden="true">⌘ K</kbd></search>
       <section id="search-results" class="search-results" aria-label="Search results" hidden><p id="search-status" role="status"></p><ul id="search-list"></ul></section>
     </header><div class="workspace-page">`;
   return html.replace('</head>', `<link rel="stylesheet" href="${assetUrl('/workspace-shell.css')}"><script src="${assetUrl('/workspace-state.js')}"></script><script type="module" src="${assetUrl('/dashboard/workspace.js')}"></script></head>`)

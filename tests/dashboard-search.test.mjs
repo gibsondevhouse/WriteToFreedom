@@ -22,3 +22,9 @@ test('empty and unmatched searches return no results and preserve the catalog', 
   assert.deepEqual(catalog, original);
   assert.equal(searchCatalog(catalog, 'westhaven')[0].href, '/locations/cities/westhaven/');
 });
+
+test('global search includes novel, series and collection profiles alongside the encyclopedia',()=>{
+ const expanded={...catalog,novels:[{name:'Winter passage',summary:'The northern archive',label:'Novel',href:'/novels/one/'}],series:[{name:'Winter sequence',label:'Series',href:'/series/one/'}],collections:[{name:'Winter research',label:'Manual collection',href:'/collections/one/'}]};
+ assert.deepEqual(searchCatalog(expanded,'winter').map(record=>record.label),['Novel','Series','Manual collection']);
+ assert.deepEqual(searchCatalog(expanded,'archive novel').map(record=>record.href),['/novels/one/']);
+});

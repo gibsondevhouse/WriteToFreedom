@@ -1,12 +1,14 @@
 import {el,tone,initial,createRails} from './components.js?v=__WTF_ASSET_REVISION__';
 import {createQuestionBanner} from './question-banner.js?v=__WTF_ASSET_REVISION__';
+import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 
 /** Read a private dashboard without coupling the shell to its data shape. */
 export async function fetchDashboard(endpoint,{signal,errorMessage='Your dashboard could not be loaded.'}={}){
- const response=await fetch(endpoint,{credentials:'same-origin',cache:'no-store',signal});
+ const response=await fetch(scopedCatalogUrl(endpoint),{credentials:'same-origin',cache:'no-store',signal});
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Reload the page to sign in again. Keep a copy of any unsaved work.');
  const data=await response.json();
  if(!response.ok)throw new Error(data.error||errorMessage);
+ showCatalogScope(data.scope);
  return data;
 }
 

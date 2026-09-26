@@ -14,7 +14,7 @@ function search() {
   list.replaceChildren();
   if (!query) return;
   if (!catalog) {
-    status.textContent = searchError || 'Searching your novel…';
+    status.textContent = searchError || 'Searching all material…';
     return;
   }
   const matches = searchCatalog(catalog, query);
@@ -139,7 +139,31 @@ window.addEventListener('storage', event => {
 });
 adaptNavigation();
 
+// Route/query context survives refreshes and copied links. Library search stays
+// global, while manuscript navigation carries the selected novel explicitly.
+async function showNovelContext(){
+ const context=document.querySelector('.workspace-context');if(!context)return;
+ const url=new URL(location.href),profile=url.pathname.match(/^\/novels\/([0-9a-f-]{36})(?:\/|$)/i);
+ const novelId=profile?.[1]||url.searchParams.get('novel');
+ if(!novelId||!/^[0-9a-f-]{36}$/i.test(novelId))return;
+ const library=document.createElement('a'),current=document.createElement('a'),separator=document.createElement('span');
+ library.href='/novels/';library.textContent='My library';library.dataset.libraryLink='';
+ current.href='/novels/'+encodeURIComponent(novelId)+'/';current.textContent='Selected novel';current.dataset.currentNovel='';
+ separator.textContent='/';separator.setAttribute('aria-hidden','true');
+ context.replaceChildren(library,separator,current);
+ for(const path of ['/dashboard/','/characters/','/factions/','/locations/','/lore/','/chapters/','/scenes/','/timeline/','/story-arcs/']){
+  const link=document.querySelector('#workspace-navigation a[href="'+path+'"]');if(link)link.href=path+'?novel='+encodeURIComponent(novelId);
+ }
+ try{
+  const response=await fetch('/api/novels/'+encodeURIComponent(novelId),{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))return;
+  const novel=await response.json();current.textContent=novel.title||'Untitled novel';current.title=novel.title||'Untitled novel';
+ }catch{}
+}
+showNovelContext();
+
 export function updateWorkspace(data) {
+  if(data.scope)return;
   catalog = data;
   searchError = '';
   search();

@@ -26,13 +26,13 @@ export function artifactCard(record){
  copy.append(el('h3','',record.name),el('p','artifact-card-meta',metadata));main.append(art,copy);const menu=createStoryCardMenu(record,profileMenu(record));menu.classList.add('compact-card-menu');card.append(main,menu);return card;
 }
 /** Portrait artwork with the title and a quiet detail line below the cover. */
-export function bookCoverCard(record){
+export function bookCoverCard(record,{menuItems=profileMenu(record)}={}){
  const card=el('article','card book-cover-card compact-story-card '+tone(record)),main=el('a','compact-story-card-main'),copy=el('div','book-cover-copy');main.href=record.href;
  main.setAttribute('aria-label','Open '+(record.label||record.type).toLowerCase()+': '+record.name);
  const title=el('h3','',record.name);title.title=record.name;
  const detail=[record.label,record.pinned&&'Pinned',record.featured&&'Featured'].filter(Boolean).join(' · ');
  const metadata=el('p','book-cover-meta',detail);metadata.title=detail;
- copy.append(title,metadata);main.append(cover(record),copy);const menu=createStoryCardMenu(record,profileMenu(record));menu.classList.add('compact-card-menu');card.append(main,menu);return card;
+ copy.append(title,metadata);main.append(cover(record),copy);const menu=createStoryCardMenu(record,menuItems);menu.classList.add('compact-card-menu');card.append(main,menu);return card;
 }
 function profileMenu(record){return [{label:'Open profile',href:record.href},{label:'Overview',href:record.href+'#overview'},{label:'Ratings',href:record.href+'#ratings'},{label:'Story significance',href:record.href+'#story'},{label:'Connections',href:record.href+'#connections'},{label:'Pin and feature settings',href:record.href+'#identity-dashboard'}];}
 /** A collection's format takes precedence; mixed rails use the entry's type. */

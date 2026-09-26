@@ -43,7 +43,7 @@ export function renderDateControl(key,label,val,attrs){return `<div class="date-
  * missing current values may be appended to preserve legacy/custom selections.
  * No data lookup or persistence occurs here; the caller supplies scoped choices.
  */
-export function createFieldRenderer(record,{options=()=>null,required=[],links={}}={}){
+export function createFieldRenderer(record,{options=()=>null,required=[],links={},maxLengths={}}={}){
  return ([key,label,type,placeholder])=>{
   const val=record[key]||'',attrs=`id="field-${key}" name="${key}" aria-label="${escape(label)}"${required.includes(key)?' required':''}`,choices=options(key,type);let control;
   if(type==='date')control=renderDateControl(key,label,val,attrs);
@@ -53,7 +53,7 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
    control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(([v,l])=>`<option value="${escape(v)}"${v===val?' selected':''}>${escape(l)}</option>`).join('')}</select>`;
    if(links[key])control+=`<a class="person-link" data-for="${key}" href="${links[key]}${escape(val)}/"${!val?' hidden':''}>Open profile →</a>`;
   }else if(type==='textarea')control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="${escape(placeholder||'Add '+label.toLowerCase()+'…')}">${escape(val)}</textarea>`;
-  else control=`<input ${attrs} type="${type==='url'?'url':'text'}"${type==='url'?' pattern="https://.*" title="Use an HTTPS image URL"':''} autocomplete="off" maxlength="${key==='name'?160:type==='url'?2048:10000}" value="${escape(val)}" placeholder="${type==='url'?'https://…':'Add '+escape(label.toLowerCase())+'…'}">`;
+  else control=`<input ${attrs} type="${type==='url'?'url':'text'}"${type==='url'?' pattern="https://.*" title="Use an HTTPS image URL"':''} autocomplete="off" maxlength="${maxLengths[key]??(key==='name'?160:type==='url'?2048:10000)}" value="${escape(val)}" placeholder="${type==='url'?'https://…':'Add '+escape(label.toLowerCase())+'…'}">`;
   return renderFieldWrapper(record,key,label,type,control);
  };
 }

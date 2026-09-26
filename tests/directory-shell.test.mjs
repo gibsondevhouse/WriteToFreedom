@@ -67,8 +67,8 @@ function session(){
  hooks.get('sort').value='order';hooks.get('view').value='cards';hooks.get('empty').hidden=true;
  hooks.get('empty').dataset={emptyTitle:'No entries yet',emptyDescription:'Start writing',filteredTitle:'No matches',filteredDescription:'Try another name'};
  const root={...node(),dataset:{singular:'entry',plural:'entries'},querySelector:selector=>hooks.get(selector.slice(16,-1))},window=node();
- const context=vm.createContext({document:{querySelector:()=>root,createElement:()=>node()},window,AbortController,Promise});
- vm.runInContext(readFileSync('public/directory/shell.js','utf8').replace(/^export /gm,'')+'\nglobalThis.mount=initDirectoryShell;globalThis.fetchDirectory=fetchDirectory;',context);
+ const context=vm.createContext({document:{querySelector:()=>root,createElement:()=>node()},window,AbortController,Promise,scopedCatalogUrl:path=>path,novelContextHref:path=>path,showCatalogScope(){}});
+ vm.runInContext(readFileSync('public/directory/shell.js','utf8').replace(/^import .*\n/gm,'').replace(/^export /gm,'')+'\nglobalThis.mount=initDirectoryShell;globalThis.fetchDirectory=fetchDirectory;',context);
  return {hooks,root,window,context,mount:options=>context.mount({root,autoload:false,...options}),names:()=>Array.from(hooks.get('list').children,item=>item.children[0].textContent)};
 }
 const select=(records,{query,sort,reversed})=>{const matches=records.filter(r=>r.name.toLowerCase().includes(query.trim().toLowerCase()));if(sort==='name')matches.sort((a,b)=>a.name.localeCompare(b.name));return reversed?matches.reverse():matches;};
@@ -129,7 +129,7 @@ test('character adapter retains creation IDs across retries, excludes double sub
  const button=node(),window=node(),calls=[],navigations=[],errors=[];let config,uuid=0,request=defer(),cardOptions;
  const directory={render(){},clearError(){},showError:error=>errors.push(error.message)};
  const context=vm.createContext({document:{querySelector:()=>button},window,location:{hash:'#claude',assign:path=>navigations.push(path),replace:path=>navigations.push(path)},crypto:{randomUUID:()=>String(++uuid)},
-  characters:[{id:'claude',provider:'Anthropic'}],selectCharacters:()=>[],fetchDirectory:async()=>({characters:[{id:'claude',name:'Claude'}]}),
+  characters:[{id:'claude',provider:'Anthropic'}],selectCharacters:()=>[],fetchDirectory:async()=>({characters:[{id:'claude',name:'Claude'}]}),scopedCatalogUrl:path=>path,novelContextHref:path=>path,
   initDirectoryShell:options=>{config=options;return directory;},createCharacterCard:(record,options)=>{cardOptions=options;return record;},
   fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return request.promise;}
  });
@@ -158,7 +158,7 @@ test('faction adapter retains retries, guards double creation, and sorts without
  const directory={clearError(){},showError:error=>errors.push(error.message)};
  const records=[{id:'house',name:'The House',type:'House',motto:'Quiet promises',summary:'Keep the peace'},{id:'guild',name:'The Guild',type:'Guild',location:'Harbor'}];
  const context=vm.createContext({document:{querySelector:()=>button,createElement:()=>node()},window,location:{assign:path=>navigations.push(path)},crypto:{randomUUID:()=>String(++uuid)},
-  fetchDirectory:async()=>({factions:records}),initDirectoryShell:options=>{config=options;return directory;},
+  fetchDirectory:async()=>({factions:records}),initDirectoryShell:options=>{config=options;return directory;},scopedCatalogUrl:path=>path,novelContextHref:path=>path,
   createProfileStoryCard:(record,options)=>({record,options}),
   fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return request.promise;}
  });

@@ -1,7 +1,8 @@
+import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 export async function fetchDirectory(url,{signal,errorMessage='Your entries could not be loaded.'}={}){
- const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal});
+ const response=await fetch(scopedCatalogUrl(url),{credentials:'same-origin',cache:'no-store',signal});
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
- const data=await response.json();if(!response.ok)throw new Error(data.error||errorMessage);return data;
+ const data=await response.json();if(!response.ok)throw new Error(data.error||errorMessage);showCatalogScope(data.scope);return data;
 }
 
 /** Owns directory controls, reads and replaceable items. Adapters own domain data and writes. */

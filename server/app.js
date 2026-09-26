@@ -8,6 +8,8 @@ import {renderDirectoryPage} from './directory-shell.js';
 import {loreRoute} from './lore-routes.js';
 import {writingRoute} from './writing-routes.js';
 import {novelRoute} from './novel-routes.js';
+import {novelPageRoute} from './novel-pages.js';
+import {enhanceNovelAppearances} from './novel-appearances.js';
 import {renderWritingWorkspace} from './render-writing.js';
 import {storyArcRoute} from './story-arc-routes.js';
 import {locationProfileRoute} from './location-profile-routes.js';
@@ -104,6 +106,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
   return new Response(request.method==='HEAD'?null:renderWritingWorkspace(path==='/chapters/'?'chapters':'scenes'),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
  }
  if(/^\/api\/(novels|series|novel-associations)(?:\/|$)/.test(path))return novelRoute(request,env);
+ if(/^\/(novels|series)(?:\/(?:index\.html)?|\/[0-9a-f-]+(?:\/(?:index\.html)?)?|)$/.test(path))return novelPageRoute(request,env);
  if(/^\/api\/(chapters|scenes)(?:\/|$)/.test(path))return writingRoute(request,env);
  // Dashboard definitions all share one complete main-area shell.
  const dashboard=dashboardPages.get(path);
@@ -260,7 +263,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
 export function createWorker(assets) {
  const app=createAppWorker(assets);
  return {async fetch(request,env,ctx) {
-  const response=await app.fetch(request,env,ctx);
+  const response=await enhanceNovelAppearances(request,env,await app.fetch(request,env,ctx));
   if(request.method==='HEAD'||!response.headers.get('content-type')?.includes('text/html'))return response;
   const headers=new Headers(response.headers);headers.delete('content-length');
   return new Response(workspaceShell(await response.text(),new URL(request.url).pathname),{status:response.status,headers});

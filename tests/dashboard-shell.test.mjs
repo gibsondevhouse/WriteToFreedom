@@ -56,7 +56,7 @@ function shellSession(){
  for(const name of ['body','rows','loading','error','error-message','retry','empty'])hooks.set(name,node());
  root.querySelector=selector=>hooks.get(selector.match(/^\[data-dashboard-(.*)\]$/)[1]);
  const counts={rails:0,banners:0,prefixes:[]};
- const context=vm.createContext({window,document:{querySelector:()=>root},AbortController,Promise,
+ const context=vm.createContext({window,document:{querySelector:()=>root},AbortController,Promise,scopedCatalogUrl:path=>path,showCatalogScope(){},
   el:()=>node(),tone:()=>'',initial:()=>'',
   createRails({idPrefix}){counts.rails++;counts.prefixes.push(idPrefix);let destroyed=false;return {rail(title,records){return {title,records};},destroy(){assert.equal(destroyed,false,'one disposal per view');destroyed=true;counts.rails--;}};},
   createQuestionBanner(records,{idPrefix}){counts.banners++;counts.prefixes.push(idPrefix);return {element:{questions:records},destroy(){counts.banners--;}};}
