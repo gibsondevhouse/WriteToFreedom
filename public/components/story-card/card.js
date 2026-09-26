@@ -9,7 +9,8 @@ const iconPaths={
  story:'M4 4h16v13H10l-5 4v-4H4ZM8 8h8M8 12h5',
  overview:'M4 5h16M4 12h16M4 19h10',
  profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 22v-2a8 8 0 0 1 16 0v2',
- more:'M12 5h.01M12 12h.01M12 19h.01'
+ more:'M12 5h.01M12 12h.01M12 19h.01',
+ delete:'M5 7h14m-9 4v6m4-6v6M9 7V4h6v3m-9 0 1 13h10l1-13'
 };
 const tones=['clay','jade','blue','violet','gold'];
 

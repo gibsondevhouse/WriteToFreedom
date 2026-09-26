@@ -41,7 +41,7 @@ export function workspaceShell(html, path) {
   const current = path === '/' || path === '/index.html' ? '/dashboard/' : path;
   const navigation = sections.map(([group, links]) => `<div class="nav-group"><p class="nav-label">${group}</p>${links.map(([label, href, icon]) => `<a class="nav-link${current.startsWith(href) ? ' active' : ''}" href="${href}" aria-label="${label}" title="${label}"${current.startsWith(href) ? ' aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true">${shellIcon(icon)}</span><span class="nav-text">${label}</span></a>`).join('')}</div>`).join('');
   const shell = `<aside id="workspace-sidebar" class="workspace-sidebar" aria-label="Workspace sidebar">
-    <a class="workspace-brand" href="/" aria-label="Write to Freedom home"><img src="/crest.svg" width="24" height="28" alt=""><span>Write to Freedom</span></a>
+    <a class="workspace-brand" href="/" aria-label="Write to Freedom home"><img src="/crest.svg" width="26" height="26" alt=""><span>Write to Freedom</span></a>
     <nav id="workspace-navigation" aria-label="Novel sections">${navigation}<details class="upcoming"><summary>Upcoming modules</summary><p>Still in development</p><ul><li>Story Beats</li></ul></details></nav>
   </aside><div class="workspace-canvas">
     <header class="workspace-topbar">
@@ -50,7 +50,7 @@ export function workspaceShell(html, path) {
       <search class="workspace-search" aria-label="Search all material"><label class="shell-sr-only" for="novel-search">Search all novels, series, collections, characters, factions, locations, lore, and story arcs</label><span class="search-symbol" aria-hidden="true">${shellIcon('search')}</span><input id="novel-search" type="search" placeholder="Search all material…" aria-controls="search-results" autocomplete="off"><kbd aria-hidden="true">⌘ K</kbd></search>
       <section id="search-results" class="search-results" aria-label="Search results" hidden><p id="search-status" role="status"></p><ul id="search-list"></ul></section>
     </header><div class="workspace-page">`;
-  return html.replace('</head>', `<link rel="stylesheet" href="${assetUrl('/workspace-shell.css')}"><script src="${assetUrl('/workspace-state.js')}"></script><script type="module" src="${assetUrl('/dashboard/workspace.js')}"></script></head>`)
+  return html.replace('</head>', `<link rel="stylesheet" href="${assetUrl('/workspace-shell.css')}"><link rel="stylesheet" href="${assetUrl('/editorial-theme.css')}"><script src="${assetUrl('/workspace-state.js')}"></script><script type="module" src="${assetUrl('/dashboard/workspace.js')}"></script></head>`)
     .replace(/<body([^>]*)>/, (_, attrs) => `<body${attrs} data-app-shell>${shell}`)
     .replace('</body>', '</div></div></body>');
 }

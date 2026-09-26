@@ -1,16 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 260" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-  <title>African-inspired shield crest</title>
-  <desc>An original geometric crest with a sun crown, crossed spears, symmetrical leaves, and a woven diamond shield.</desc>
-  <defs><g id="spear" stroke-width="3"><path d="M58 43 181 233"/><path d="m45 20 7 31 12-8Z" fill="#fff" stroke="none"/><path d="m169 221 11-7M173 227l11-7" stroke-width="2"/></g><g id="bough"><path d="M102 234C44 220 21 164 34 108" stroke-width="2.5"/><g fill="#fff" stroke="none"><path d="M34 143c-19-7-22-22-18-37 15 7 20 21 18 37ZM31 160c-18-2-26-15-26-30 17 4 25 14 26 30ZM36 180c-20 0-31-10-34-24 18 0 30 8 34 24ZM46 199c-21 5-35-2-42-15 18-5 32 0 42 15ZM61 215c-19 9-34 6-44-6 17-8 32-6 44 6ZM80 227c-17 13-31 14-45 5 14-11 29-13 45-5ZM33 148c15-10 18-23 13-37-12 10-17 23-13 37ZM33 168c17-7 23-19 22-32-15 5-23 17-22 32ZM39 187c17-3 26-13 28-27-16 2-25 12-28 27ZM51 204c17 0 27-7 33-20-15-1-27 6-33 20ZM68 219c17 4 29 0 38-12-16-5-28 0-38 12Z"/></g></g></defs>
-  <use href="#spear"/><use href="#spear" transform="translate(240) scale(-1 1)"/>
-  <g stroke-width="3"><path d="M89 49a31 31 0 0 1 62 0"/><path d="M98 49a22 22 0 0 1 44 0"/><path d="M120 4v11M103 8l3 10M87 17l7 8M76 31l10 4M137 8l-3 10M153 17l-7 8M164 31l-10 4"/></g>
-  <use href="#bough"/><use href="#bough" transform="translate(240) scale(-1 1)"/>
-  <path d="M120 47c23 15 49 19 67 20-1 79-18 122-67 160-49-38-66-81-67-160 18-1 44-5 67-20Z" fill="#101820" stroke-width="4"/>
-  <path d="M120 58c19 11 39 16 55 18-2 65-15 107-55 139-40-32-53-74-55-139 16-2 36-7 55-18Z" stroke-width="1.5"/>
-  <path d="M78 86 89 76l11 10 10-10 10 10 10-10 10 10 11-10 11 10M79 93h82M84 168l36 34 36-34M89 168l31 24 31-24" stroke-width="2.5"/>
-  <path d="m120 99 31 33-31 35-31-35Z" stroke-width="3"/>
-  <path d="m120 113 18 19-18 20-18-20Z" fill="#fff" stroke="none"/>
-  <path d="M120 118v28M108 132h24" stroke="#101820" stroke-width="2.5"/>
-  <g fill="#fff" stroke="none"><path d="m77 109 7 8-7 8-4-8Zm86 0-7 8 7 8 4-8Zm-83 27 7 8-5 8-5-8Zm80 0-7 8 5 8 5-8Z"/><circle cx="120" cy="70" r="3"/><path d="m120 233 7 7-7 12-7-12Z"/></g>
-  <path d="M83 243c12-4 25-5 37-5s25 1 37 5" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="wtf-title wtf-desc">
+  <title id="wtf-title">Write to Freedom</title>
+  <desc id="wtf-desc">A brass pen nib on a black tile, drawn in sharp geometric lines.</desc>
+  <defs>
+    <linearGradient id="wtf-brass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4b476"/>
+      <stop offset=".55" stop-color="#b08d57"/>
+      <stop offset="1" stop-color="#8a6b3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
+  <path fill="url(#wtf-brass)" fill-rule="evenodd" d="M32 7c9.4 0 16 7.6 16 19.4 0 6.6-2.3 13-6.6 19.2L32 58l-9.4-12.4C18.3 39.4 16 33 16 26.4 16 14.6 22.6 7 32 7Zm0 15.6a4.2 4.2 0 1 0 0 8.4 4.2 4.2 0 0 0 0-8.4Zm-1.2 9.9h2.4V49.5L32 51.2l-1.2-1.7Z"/>
+  <path fill="none" stroke="#ffffff" stroke-opacity=".28" stroke-width="1.2" stroke-linecap="round" d="M22.5 15.5c2.4-3 5.6-4.6 9.5-4.6"/>
 </svg>

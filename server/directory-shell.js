@@ -34,7 +34,7 @@ ${[...new Set(['/directory/shell.css?v=1',...styles])].map(path=>`<link rel="sty
 <script type="module" src="${localUrl(script)}"></script>
 </head><body class="directory-page">
 <a class="directory-skip" href="#${id}">Skip to ${escape(title.toLowerCase())}</a>
-<header class="directory-header"><nav class="directory-breadcrumb" aria-label="Breadcrumb"><a class="directory-brand" href="/"><img src="/crest.svg" width="32" height="36" alt=""><span>Write to Freedom</span></a><span class="breadcrumb-divider" aria-hidden="true">/</span><h1 id="${id}-title" aria-current="page">${escape(title)}</h1></nav></header>
+<header class="directory-header"><nav class="directory-breadcrumb" aria-label="Breadcrumb"><a class="directory-brand" href="/"><img src="/crest.svg" width="28" height="28" alt=""><span>Write to Freedom</span></a><span class="breadcrumb-divider" aria-hidden="true">/</span><h1 id="${id}-title" aria-current="page">${escape(title)}</h1></nav></header>
 <main id="${id}" class="directory-shell" data-directory-shell data-singular="${escape(singular)}" data-plural="${escape(plural)}" data-directory-state="loading" tabindex="-1" aria-labelledby="${id}-title">
 <div class="directory-heading">${eyebrow?`<p class="directory-eyebrow">${escape(eyebrow)}</p>`:''}${description?`<p class="directory-intro">${escape(description)}</p>`:''}</div>
 <div class="directory-error" data-directory-error role="alert" hidden><p data-directory-error-message></p><button data-directory-retry type="button">Try again</button></div>

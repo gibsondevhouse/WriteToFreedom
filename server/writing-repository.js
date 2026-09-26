@@ -32,6 +32,13 @@ export function writingRepository(binding){
   getChapter:(owner,id)=>get('chapters',owner,id),
   createChapter:(owner,id,document)=>create('chapters',owner,id,document),
   saveChapter:(owner,current,document)=>save('chapters',owner,current,document),
+    async deleteChapter(owner,current){
+     const result=await binding.batch([
+        binding.prepare('DELETE FROM chapters WHERE owner_id = ? AND id = ? AND version = ?').bind(owner,current.id,current.version),
+        binding.prepare('DELETE FROM scenes WHERE owner_id = ? AND chapter_id = ? AND NOT EXISTS (SELECT 1 FROM chapters WHERE owner_id = ? AND id = ?)').bind(owner,current.id,owner,current.id),
+     ]);
+     return Boolean(result[0].meta.changes);
+    },
   async listScenes(owner,chapterId,novelId){
    // Exclude prose at the SQL boundary: switching outline/filter state does not
    // load or transfer every scene's rich-text JSON.

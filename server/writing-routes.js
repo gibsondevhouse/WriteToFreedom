@@ -20,7 +20,7 @@ export async function writingRoute(request,env){
  if(!owner)return json({error:'Sign in to access your writing.'},401);
  if(!match)return json({error:'Writing entry not found.'},404);
  const [,collection,id]=match,scene=collection==='scenes',singular=scene?'scene':'chapter';
- if(!['GET','POST','PUT'].includes(request.method)||id&&request.method==='POST'||!id&&request.method==='PUT')return json({error:'Method not allowed.'},405);
+ if(!['GET','POST','PUT','DELETE'].includes(request.method)||id&&request.method==='POST'||!id&&['PUT','DELETE'].includes(request.method))return json({error:'Method not allowed.'},405);
  if(id&&!uuid.test(id))return json({error:'Writing entry not found.'},404);
  if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase()!=='application/json'))return json({error:'This request could not be verified.'},403);
  try{
@@ -40,6 +40,14 @@ export async function writingRoute(request,env){
    if(chapterId&&scopedNovel&&(await db.getChapter(owner,chapterId))?.novelId!==scopedNovel)return json({error:'This chapter was not found in the selected novel.'},404);
    return json({scenes:await db.listScenes(owner,chapterId,scopedNovel)});
   }
+    if(request.method==='DELETE'){
+     if(scene)return json({error:'Scenes are removed with their chapter.'},405);
+     const raw=await request.text();let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid writing data.'},400);}
+     if(!object(input)||!Number.isSafeInteger(input.version)||input.version<1)return json({error:'Reload this chapter before deleting it.'},400);
+     return await db.deleteChapter(owner,current.version===input.version?current:{...current,version:input.version})
+        ?new Response(null,{status:204,headers:{'cache-control':'no-store'}})
+        :json({error:'This chapter changed in another tab. Reload before deleting it.'},409);
+    }
   const raw=await request.text();
   if(new TextEncoder().encode(raw).byteLength>writingRequestMaxBytes)return json({error:'Keep a writing request within 1 MiB of content plus 32 KiB of metadata.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid writing data.'},400);}

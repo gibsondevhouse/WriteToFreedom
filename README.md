@@ -49,7 +49,7 @@ The implemented application includes:
 
 Story Beats remains upcoming. The API does not expose entity deletion, and there is no offline persistence or automatic merging of conflicting edits.
 
-The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding includes an original African-inspired white SVG crest in `public/crest.svg`.
+The four sample characters are Claude, GPT, DeepSeek, and Gemini. These are fictional characters named after model families; their biographies, relationships, and affiliations are fiction. The repository does not call model APIs or require AI-provider credentials. The shared workspace branding is an original brass pen-nib mark on a black tile in `public/crest.svg`.
 
 ## Local setup
 

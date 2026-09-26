@@ -17,6 +17,7 @@ const storyCardFrame = createStoryCardFrame as unknown as (record: {id: string; 
 
 async function requestJSON(path: string, options: RequestInit = {}): Promise<unknown> {
   const response = await fetch(path, {credentials: 'same-origin', cache: 'no-store', ...options});
+  if (response.status === 204) return null;
   if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Your session may have expired. Copy your unsaved writing before reloading to sign in again.');
   const data: unknown = await response.json();
   if (!response.ok) throw new Error(data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : 'This request could not be completed. Please try again.');
@@ -131,6 +132,20 @@ export function WritingWorkspace({view}: {view: WritingView}) {
   const requestedChapterId=new URL(location.href).searchParams.get('chapter'),contextChapter=chapters.find(chapter=>chapter.id===requestedChapterId)||chapters[0];
   const invalidChapter=Boolean(requestedChapterId&&!catalogLoading&&novelReady&&!catalogError&&!chapters.some(chapter=>chapter.id===requestedChapterId));
   const contextBlocked=novels.length>1&&!novelId,workspaceBusy=catalogLoading||contextBlocked||!novelReady||Boolean(novelError)||invalidChapter;
+  const deleteChapter = useCallback(async (chapter: ChapterRecord) => {
+    if (!confirm(`Delete chapter “${chapter.title}” and all of its scenes?`)) return;
+    try {
+      await requestJSON('/api/chapters/' + encodeURIComponent(chapter.id) + (novelId ? '?novelId=' + encodeURIComponent(novelId) : ''), {method: 'DELETE', headers: {'content-type': 'application/json'}, body: JSON.stringify({version: chapter.version})});
+      setChapters(previous => previous.filter(item => item.id !== chapter.id));
+      setScenes(previous => previous.filter(scene => scene.chapterId !== chapter.id));
+      if (new URL(location.href).searchParams.get('chapter') === chapter.id) {
+        const url = new URL(location.href); url.searchParams.delete('chapter'); history.replaceState(history.state, '', url);
+      }
+      announceWorkspaceChange();
+    } catch (error) {
+      setCatalogError(error instanceof Error ? error.message : 'This chapter could not be deleted.');
+    }
+  }, [novelId]);
   const createComplete = (record: ChapterRecord | SceneRecord) => {
     if ('content' in record) {
       storeDraft(record.id, () => initialDraft(record)); setScenes(previous => [...previous.filter(scene => scene.id !== record.id), summary(record)]);
@@ -158,23 +173,23 @@ export function WritingWorkspace({view}: {view: WritingView}) {
         {Object.entries(drafts).map(([id, draft]) => <ScenePane key={id} draft={draft} chapters={chapters} active={id === selectedId} onChange={changeScene} onSave={saveScene}/>)}
       </section>
       <ReferencePanel open={referencesOpen} novelId={novelId}/>
-    </div> : <ChapterBoard chapters={chapters} scenes={scenes} loading={catalogLoading} createdChapterId={createdChapterId} onEdit={chapter => setComposer({kind: 'chapter', chapter})} onCreateScene={chapterId => setComposer({kind: 'scene', chapterId})} onCreateChapter={() => setComposer({kind: 'chapter'})}/>}
+    </div> : <ChapterBoard chapters={chapters} scenes={scenes} loading={catalogLoading} createdChapterId={createdChapterId} onEdit={chapter => setComposer({kind: 'chapter', chapter})} onCreateScene={chapterId => setComposer({kind: 'scene', chapterId})} onDelete={deleteChapter} onCreateChapter={() => setComposer({kind: 'chapter'})}/>} 
     {composer && <ComposeDialog composer={composer} chapters={chapters} novelId={novelId} onClose={() => setComposer(null)} onComplete={createComplete}/>}
   </main>;
 }
 
-function ChapterBoard({chapters, scenes, loading, createdChapterId, onEdit, onCreateScene, onCreateChapter}: {chapters: ChapterRecord[]; scenes: SceneSummary[]; loading: boolean; createdChapterId: string; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void; onCreateChapter: () => void}) {
+function ChapterBoard({chapters, scenes, loading, createdChapterId, onEdit, onCreateScene, onDelete, onCreateChapter}: {chapters: ChapterRecord[]; scenes: SceneSummary[]; loading: boolean; createdChapterId: string; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void; onDelete: (chapter: ChapterRecord) => void; onCreateChapter: () => void}) {
   const created = chapters.find(chapter => chapter.id === createdChapterId);
   return <section className="writing-chapter-board" aria-label="Chapter plan" aria-busy={loading}>
-    {loading ? <p className="writing-loading" role="status">Loading your chapters…</p> : chapters.length ? <><div className="writing-chapter-board-heading"><p>{chapters.length} {chapters.length === 1 ? 'chapter' : 'chapters'}</p><p>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} organized</p></div>{created && <p className="writing-create-confirmation" role="status"><strong>{created.title}</strong> is ready. Add its first scene when you’re ready to write.</p>}<ol className="writing-chapter-cards">{chapters.map((chapter, index) => <ChapterStoryCard key={chapter.id} chapter={chapter} index={index} sceneCount={scenes.filter(scene => scene.chapterId === chapter.id).length} isCreated={chapter.id === createdChapterId} onEdit={onEdit} onCreateScene={onCreateScene}/>)}</ol></> : <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">Begin the structure</p><h2>Give your manuscript its first chapter.</h2><p>Chapters hold the scenes that carry your story forward. Start with a title, then add scenes when the shape is clear.</p><button type="button" className="writing-button writing-primary" onClick={onCreateChapter}>Create your first chapter</button></div>}
+    {loading ? <p className="writing-loading" role="status">Loading your chapters…</p> : chapters.length ? <><div className="writing-chapter-board-heading"><p>{chapters.length} {chapters.length === 1 ? 'chapter' : 'chapters'}</p><p>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} organized</p></div>{created && <p className="writing-create-confirmation" role="status"><strong>{created.title}</strong> is ready. Add its first scene when you’re ready to write.</p>}<ol className="writing-chapter-cards">{chapters.map((chapter, index) => <ChapterStoryCard key={chapter.id} chapter={chapter} index={index} sceneCount={scenes.filter(scene => scene.chapterId === chapter.id).length} isCreated={chapter.id === createdChapterId} onEdit={onEdit} onCreateScene={onCreateScene} onDelete={onDelete}/>)}</ol></> : <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">Begin the structure</p><h2>Give your manuscript its first chapter.</h2><p>Chapters hold the scenes that carry your story forward. Start with a title, then add scenes when the shape is clear.</p><button type="button" className="writing-button writing-primary" onClick={onCreateChapter}>Create your first chapter</button></div>}
   </section>;
 }
 
 /** Adapts the established Story Card shell while React retains chapter state ownership. */
-function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCreateScene}: {chapter: ChapterRecord; index: number; sceneCount: number; isCreated: boolean; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void}) {
+function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCreateScene, onDelete}: {chapter: ChapterRecord; index: number; sceneCount: number; isCreated: boolean; onEdit: (chapter: ChapterRecord) => void; onCreateScene: (chapterId: string) => void; onDelete: (chapter: ChapterRecord) => void}) {
   const host = useRef<HTMLLIElement>(null);
-  const latest = useRef({chapter, onEdit, onCreateScene});
-  latest.current = {chapter, onEdit, onCreateScene};
+  const latest = useRef({chapter, onEdit, onCreateScene, onDelete});
+  latest.current = {chapter, onEdit, onCreateScene, onDelete};
   useLayoutEffect(() => {
     const ordinal = String(index + 1).padStart(2, '0');
     const sceneLabel = `${sceneCount} ${sceneCount === 1 ? 'scene' : 'scenes'}`;
@@ -213,6 +228,7 @@ function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCrea
       context: [contextPicker, contextCopy],
       actions: [
         storyCardAction({onClick: () => latest.current.onEdit(latest.current.chapter), label: `Edit chapter: ${chapter.title}`, title: 'Edit chapter', icon: 'overview', dialog: true}),
+        storyCardAction({onClick: () => latest.current.onDelete(latest.current.chapter), label: `Delete chapter: ${chapter.title}`, title: 'Delete chapter', icon: 'delete'}),
         storyCardAction({onClick: () => latest.current.onCreateScene(latest.current.chapter.id), label: `Add scene to ${chapter.title}`, title: 'Add scene', icon: 'story', dialog: true}),
         storyCardAction({href: destination, label: `Open scenes for ${chapter.title}`, title: 'Open scenes', icon: 'notes'}),
       ],
