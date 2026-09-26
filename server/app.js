@@ -7,6 +7,7 @@ import {directoryPages} from './directory-pages.js';
 import {renderDirectoryPage} from './directory-shell.js';
 import {loreRoute} from './lore-routes.js';
 import {writingRoute} from './writing-routes.js';
+import {novelRoute} from './novel-routes.js';
 import {renderWritingWorkspace} from './render-writing.js';
 import {storyArcRoute} from './story-arc-routes.js';
 import {locationProfileRoute} from './location-profile-routes.js';
@@ -102,6 +103,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
   return new Response(request.method==='HEAD'?null:renderWritingWorkspace(path==='/chapters/'?'chapters':'scenes'),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
  }
+ if(/^\/api\/(novels|series|novel-associations)(?:\/|$)/.test(path))return novelRoute(request,env);
  if(/^\/api\/(chapters|scenes)(?:\/|$)/.test(path))return writingRoute(request,env);
  // Dashboard definitions all share one complete main-area shell.
  const dashboard=dashboardPages.get(path);

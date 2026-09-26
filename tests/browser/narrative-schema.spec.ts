@@ -176,9 +176,10 @@ test('legacy calendar keyboard cancel and apply retain the normal date-field foc
 });
 
 test('chapter edits, scene metadata and every supported prose format survive the writing UI',async({page,request})=>{
- const first=await create(request,'chapters',{title:'Original chapter '+randomUUID(),summary:'Original summary'}),second=await create(request,'chapters',{title:'Destination chapter '+randomUUID()});
+ const novel=await create(request,'novels',{title:'Narrative regression '+randomUUID()});
+ const first=await create(request,'chapters',{novelId:novel.id,title:'Original chapter '+randomUUID(),summary:'Original summary'}),second=await create(request,'chapters',{novelId:novel.id,title:'Destination chapter '+randomUUID()});
  const scene=await create(request,'scenes',{chapterId:first.id,title:'Original scene',status:'draft',contentSchemaVersion:1,content:{type:'doc',content:[{type:'paragraph'}]}});
- await page.goto('/chapters/');
+ await page.goto('/chapters/?novel='+novel.id);
  await page.getByRole('button',{name:'Edit chapter: '+first.title,exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Edit chapter',exact:true}),chapterTitle='Revised chapter '+randomUUID(),chapterSummary='  A revised chapter plan.\nWith deliberate whitespace.\n  ';
  await dialog.getByLabel('Chapter title',{exact:true}).fill(chapterTitle);await dialog.getByLabel('Chapter summary',{exact:true}).fill(chapterSummary);

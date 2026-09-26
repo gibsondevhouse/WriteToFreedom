@@ -10,7 +10,7 @@ export interface WritingNode {
 }
 export interface WritingContent {type: 'doc'; content: WritingNode[]}
 export type SceneStatus = 'draft' | 'revising' | 'complete';
-export interface ChapterRecord {id: string; schemaVersion: 1; version: number; title: string; summary: string; createdAt: string; updatedAt: string}
+export interface ChapterRecord {id: string; schemaVersion: 1; version: number; title: string; summary: string; novelId?: string; createdAt: string; updatedAt: string}
 export interface SceneSummary extends ChapterRecord {chapterId: string; status: SceneStatus; contentSchemaVersion: 1}
 export interface SceneRecord extends SceneSummary {content: WritingContent}
 export type SaveScenePayload = Pick<SceneRecord, 'title' | 'summary' | 'chapterId' | 'status' | 'contentSchemaVersion' | 'content' | 'schemaVersion' | 'version'>;
@@ -40,7 +40,7 @@ export function readChapterRecord(value: unknown): ChapterRecord {
   if (!Number.isSafeInteger(data.version) || Number(data.version) < 1) throw new Error('Reload this item before saving.');
   const title = text(data.title), summary = text(data.summary);
   if (!title.trim() || title.length > 160 || summary.length > 10000) throw new Error('The writing response contains unreadable metadata.');
-  return {id: identifier(data.id), schemaVersion: 1, version: Number(data.version), title, summary, createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt)};
+  return {id: identifier(data.id), schemaVersion: 1, version: Number(data.version), title, summary, ...(data.novelId ? {novelId: identifier(data.novelId)} : {}), createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt)};
 }
 export function readSceneSummary(value: unknown): SceneSummary {
   const data = record(value);

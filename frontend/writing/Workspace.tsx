@@ -35,6 +35,7 @@ function Icon({name}: {name: 'outline' | 'reference' | 'plus' | 'edit'}) {
 /** Scene drafts and explicit writes belong here; each mounted editor owns its history. */
 export function WritingWorkspace({view}: {view: WritingView}) {
   const sceneView = view === 'scenes';
+  const [novels, setNovels] = useState<{id: string; title: string}[]>([]), [novelId, setNovelId] = useState(() => new URL(location.href).searchParams.get('novel') || ''), [novelReady, setNovelReady] = useState(false), [novelError, setNovelError] = useState('');
   const [chapters, setChapters] = useState<ChapterRecord[]>([]), [scenes, setScenes] = useState<SceneSummary[]>([]), [drafts, setDrafts] = useState<Drafts>({}), draftsRef = useRef<Drafts>({});
   const [selectedId, setSelectedId] = useState(() => sceneView ? new URL(location.href).searchParams.get('scene') || '' : ''), [catalogLoading, setCatalogLoading] = useState(true), [catalogError, setCatalogError] = useState(''), [catalogAttempt, setCatalogAttempt] = useState(0);
   const [sceneLoading, setSceneLoading] = useState(''), [loadError, setLoadError] = useState(''), [loadAttempt, setLoadAttempt] = useState(0), [composer, setComposer] = useState<Composer | null>(null);
@@ -50,30 +51,60 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     storeDraft(id, previous => ({...previous!, record: {...previous!.record, ...change}, dirty: true, revision: previous!.revision + 1}));
   }, [storeDraft]);
   const chooseScene = useCallback((id: string) => {
-    if (!sceneView) {const url = new URL('/scenes/', location.href); url.searchParams.set('scene', id); location.assign(url.href); return;}
+    if (!sceneView) {const url = new URL('/scenes/', location.href); if(novelId)url.searchParams.set('novel',novelId);url.searchParams.set('scene', id); location.assign(url.href); return;}
     setSelectedId(id); setLoadError('');
     const url = new URL(location.href); url.searchParams.set('scene', id); history.replaceState(history.state, '', url);
-  }, [sceneView]);
+  }, [sceneView,novelId]);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false; saves.current.forEach(controller => controller.abort());};}, []);
   useEffect(() => {
+    const controller=new AbortController();
+    (async()=>{
+      try{
+        const response=await requestJSON('/api/novels',{signal:controller.signal});
+        const records=Array.isArray(response)?response:collection(response,'novels');
+        const owned=records.filter((item):item is {id:string;title:string}=>Boolean(item&&typeof item==='object'&&typeof (item as {id?:unknown}).id==='string'&&typeof (item as {title?:unknown}).title==='string'));
+        if(controller.signal.aborted)return;
+        setNovels(owned);
+        let selected=novelId;
+        if(selected&&!owned.some(item=>item.id===selected))throw new Error('This novel was not found. Choose one of your novels.');
+        if(!selected&&owned.length===1)selected=owned[0].id;
+        if(!selected&&owned.length>1){
+          const chapter=new URL(location.href).searchParams.get('chapter');
+          const scene=new URL(location.href).searchParams.get('scene');
+          if(chapter||scene){
+            const chapterRecord=chapter?await requestJSON('/api/chapters/'+encodeURIComponent(chapter),{signal:controller.signal}):await requestJSON('/api/scenes/'+encodeURIComponent(scene!),{signal:controller.signal}).then(value=>requestJSON('/api/chapters/'+encodeURIComponent((value as {chapterId:string}).chapterId),{signal:controller.signal}));
+            selected=(chapterRecord as {novelId?:string}).novelId||'';
+          }
+        }
+        if(controller.signal.aborted)return;
+        if(selected){setNovelId(selected);const url=new URL(location.href);url.searchParams.set('novel',selected);history.replaceState(history.state,'',url);}
+      }catch(error){if(!controller.signal.aborted)setNovelError(error instanceof Error?error.message:'Your novels could not be loaded.');}
+      finally{if(!controller.signal.aborted)setNovelReady(true);}
+    })();
+    return()=>controller.abort();
+  },[]);
+  useEffect(() => {
+    if(!novelReady||novelError||novels.length>1&&!novelId){setCatalogLoading(false);return;}
     const controller = new AbortController(); setCatalogLoading(true); setCatalogError('');
-    Promise.all([requestJSON('/api/chapters', {signal: controller.signal}), requestJSON('/api/scenes', {signal: controller.signal})]).then(([chapterData, sceneData]) => {
+    const query=novelId?'?novelId='+encodeURIComponent(novelId):'';
+    Promise.all([requestJSON('/api/chapters'+query, {signal: controller.signal}), requestJSON('/api/scenes'+query, {signal: controller.signal})]).then(([chapterData, sceneData]) => {
       if (controller.signal.aborted) return;
       const nextChapters = collection(chapterData, 'chapters').map(readChapterRecord), nextScenes = collection(sceneData, 'scenes').map(readSceneSummary);
-      setChapters(nextChapters); setScenes(nextScenes); setSelectedId(current => sceneView ? current || nextScenes[0]?.id || '' : '');
+      const requestedChapter=new URL(location.href).searchParams.get('chapter');
+      setChapters(nextChapters); setScenes(nextScenes); setSelectedId(current => sceneView ? current || (requestedChapter ? nextScenes.find(item=>item.chapterId===requestedChapter)?.id : nextScenes[0]?.id) || '' : '');
     }).catch(error => {if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'Your chapters and scenes could not be loaded.');}).finally(() => {if (!controller.signal.aborted) setCatalogLoading(false);});
     return () => controller.abort();
-  }, [catalogAttempt, sceneView]);
+  }, [catalogAttempt, sceneView,novelReady,novelId,novelError,novels.length]);
   useEffect(() => {
-    if (!sceneView || !selectedId || draftsRef.current[selectedId]) {setSceneLoading(''); setLoadError(''); return;}
+    if (!novelReady || novels.length>1&&!novelId || !sceneView || !selectedId || draftsRef.current[selectedId]) {setSceneLoading(''); setLoadError(''); return;}
     const controller = new AbortController(); setSceneLoading(selectedId); setLoadError('');
-    requestJSON('/api/scenes/' + encodeURIComponent(selectedId), {signal: controller.signal}).then(value => {
+    requestJSON('/api/scenes/' + encodeURIComponent(selectedId)+(novelId?'?novelId='+encodeURIComponent(novelId):''), {signal: controller.signal}).then(value => {
       if (controller.signal.aborted) return;
       const record = readSceneRecord(value); if (record.id !== selectedId) throw new Error('The requested scene could not be verified.');
       storeDraft(selectedId, () => initialDraft(record));
     }).catch(error => {if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'This scene could not be opened.');}).finally(() => {if (!controller.signal.aborted) setSceneLoading('');});
     return () => controller.abort();
-  }, [sceneView, selectedId, loadAttempt, storeDraft]);
+  }, [sceneView, selectedId, loadAttempt, storeDraft,novelId,novelReady,novels.length]);
   const saveScene = useCallback(async (id: string) => {
     const draft = draftsRef.current[id]; if (!draft || draft.saving || saves.current.has(id)) return;
     let payload; try {payload = serializeScene(draft.record);} catch (error) {storeDraft(id, previous => ({...previous!, error: error instanceof Error ? error.message : 'Check this scene before saving.'})); return;}
@@ -97,6 +128,9 @@ export function WritingWorkspace({view}: {view: WritingView}) {
   }, [saveScene]);
   const outlineScenes = useMemo(() => scenes.map(scene => drafts[scene.id] ? summary(drafts[scene.id].record) : scene), [scenes, drafts]);
   const selected = drafts[selectedId], dirtyCount = Object.values(drafts).filter(draft => draft.dirty).length;
+  const requestedChapterId=new URL(location.href).searchParams.get('chapter'),contextChapter=chapters.find(chapter=>chapter.id===requestedChapterId)||chapters[0];
+  const invalidChapter=Boolean(requestedChapterId&&!catalogLoading&&novelReady&&!catalogError&&!chapters.some(chapter=>chapter.id===requestedChapterId));
+  const contextBlocked=novels.length>1&&!novelId,workspaceBusy=catalogLoading||contextBlocked||!novelReady||Boolean(novelError)||invalidChapter;
   const createComplete = (record: ChapterRecord | SceneRecord) => {
     if ('content' in record) {
       storeDraft(record.id, () => initialDraft(record)); setScenes(previous => [...previous.filter(scene => scene.id !== record.id), summary(record)]);
@@ -109,20 +143,23 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     setComposer(null); announceWorkspaceChange();
   };
   return <main className="writing-workspace" id="writing-workspace">
-    <header className="writing-heading"><div><p className="writing-eyebrow">{sceneView ? 'Your manuscript' : 'Manuscript structure'}</p><h1>{sceneView ? 'Scenes' : 'Chapters'}</h1><p className="writing-description">{sceneView ? 'Write the moments that bring your story to life.' : 'Shape the larger movements of your manuscript before you draft.'}</p></div><div className="writing-create-actions">{sceneView ? <><button type="button" className="writing-button" disabled={catalogLoading} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button writing-primary" disabled={!chapters.length || catalogLoading} onClick={() => setComposer({kind: 'scene', chapterId: selected?.record.chapterId || chapters[0]?.id || ''})}><Icon name="plus"/>New scene</button></> : <><button type="button" className="writing-button writing-primary" disabled={catalogLoading} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button" disabled={!chapters.length || catalogLoading} onClick={() => setComposer({kind: 'scene', chapterId: chapters[0]?.id || ''})}><Icon name="plus"/>New scene</button></>}</div></header>
+    <header className="writing-heading"><div><p className="writing-eyebrow">{sceneView ? 'Your manuscript' : 'Manuscript structure'}</p><h1>{sceneView ? 'Scenes' : 'Chapters'}</h1><p className="writing-description">{sceneView ? 'Write the moments that bring your story to life.' : 'Shape the larger movements of your manuscript before you draft.'}</p>{novels.length>0&&<label className="writing-novel-picker">Novel <select aria-label="Current novel" value={novelId} onChange={event=>{const url=new URL(location.href);url.searchParams.set('novel',event.target.value);url.searchParams.delete('chapter');url.searchParams.delete('scene');location.assign(url.href);}}><option value="" disabled>Choose a novel</option>{novels.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}{novels.length===0&&novelReady&&<p className="writing-muted"><a href="/novels/">Create a novel</a> to organize this manuscript.</p>}</div><div className="writing-create-actions">{sceneView ? <><button type="button" className="writing-button" disabled={workspaceBusy} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button writing-primary" disabled={!chapters.length || workspaceBusy} onClick={() => setComposer({kind: 'scene', chapterId: selected?.record.chapterId || contextChapter?.id || ''})}><Icon name="plus"/>New scene</button></> : <><button type="button" className="writing-button writing-primary" disabled={workspaceBusy} onClick={() => setComposer({kind: 'chapter'})}><Icon name="plus"/>New chapter</button><button type="button" className="writing-button" disabled={!chapters.length || workspaceBusy} onClick={() => setComposer({kind: 'scene', chapterId: contextChapter?.id || ''})}><Icon name="plus"/>New scene</button></>}</div></header>
+    {novelError&&<div className="writing-banner" role="alert"><p>{novelError}</p><a href="/novels/">Open my novels</a></div>}
+    {contextBlocked&&<div className="writing-banner" role="status"><p>Choose a novel to open its chapters and scenes.</p></div>}
+    {invalidChapter&&!contextBlocked&&<div className="writing-banner" role="alert"><p>This chapter was not found in the selected novel.</p></div>}
     {sceneView && <div className="writing-viewbar"><div className="writing-panel-actions"><button type="button" className="writing-panel-toggle" aria-expanded={outlineOpen} aria-controls="writing-outline" onMouseDown={event => event.preventDefault()} onClick={() => setOutlineOpen(open => !open)}><Icon name="outline"/>{outlineOpen ? 'Hide outline' : 'Show outline'}</button><button type="button" className="writing-panel-toggle" aria-expanded={referencesOpen} aria-controls="writing-references" onMouseDown={event => event.preventDefault()} onClick={() => setReferencesOpen(open => !open)}><Icon name="reference"/>{referencesOpen ? 'Hide references' : 'Show references'}</button></div><span className="writing-draft-note">{dirtyCount ? `${dirtyCount} scene${dirtyCount === 1 ? '' : 's'} with unsaved changes` : 'Save when you’re ready'}</span></div>}
     {catalogError && <div className="writing-banner" role="alert"><p>{catalogError}</p><button type="button" className="writing-button" onClick={() => setCatalogAttempt(attempt => attempt + 1)}>Retry loading workspace</button></div>}
     {sceneView ? <div className={'writing-layout' + (outlineOpen ? ' with-outline' : '') + (referencesOpen ? ' with-references' : '')}>
       <aside id="writing-outline" className="writing-outline" aria-label="Manuscript outline" hidden={!outlineOpen}><div className="writing-panel-heading"><h2>Outline</h2><span>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}</span></div>{catalogLoading ? <p role="status" className="writing-muted">Loading your manuscript…</p> : chapters.length ? chapters.map((chapter, index) => <ChapterOutline key={chapter.id} chapter={chapter} index={index} scenes={outlineScenes.filter(scene => scene.chapterId === chapter.id)} drafts={drafts} selectedId={selectedId} onSelect={chooseScene} onEdit={() => setComposer({kind: 'chapter', chapter})} onCreate={() => setComposer({kind: 'scene', chapterId: chapter.id})}/>) : <p className="writing-muted">Your chapters and scenes will appear here.</p>}</aside>
       <section className="writing-center" aria-label="Scene workspace" aria-busy={sceneLoading === selectedId && Boolean(selectedId)}>
-        {!selectedId && <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">The next page is yours</p><h2>{chapters.length ? 'Give your chapter its first scene.' : 'Every story begins somewhere.'}</h2><p>{chapters.length ? 'Create a scene, then make room for the words. Your outline and world notes will stay close by.' : 'Start with a chapter. Add scenes as your story grows, and save each one at your own pace.'}</p><button type="button" className="writing-button writing-primary" disabled={catalogLoading} onClick={() => setComposer(chapters.length ? {kind: 'scene', chapterId: chapters[0].id} : {kind: 'chapter'})}>{chapters.length ? 'Create your first scene' : 'Create your first chapter'}</button></div>}
+        {!selectedId && <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">The next page is yours</p><h2>{chapters.length ? 'Give your chapter its first scene.' : 'Every story begins somewhere.'}</h2><p>{chapters.length ? 'Create a scene, then make room for the words. Your outline and world notes will stay close by.' : 'Start with a chapter. Add scenes as your story grows, and save each one at your own pace.'}</p><button type="button" className="writing-button writing-primary" disabled={workspaceBusy} onClick={() => setComposer(chapters.length ? {kind: 'scene', chapterId: contextChapter.id} : {kind: 'chapter'})}>{chapters.length ? 'Create your first scene' : 'Create your first chapter'}</button></div>}
         {sceneLoading === selectedId && !selected && <div className="writing-loading" role="status">Opening scene…</div>}
         {loadError && !selected && <div className="writing-banner" role="alert"><p>{loadError}</p><button type="button" className="writing-button" onClick={() => setLoadAttempt(attempt => attempt + 1)}>Retry opening scene</button></div>}
         {Object.entries(drafts).map(([id, draft]) => <ScenePane key={id} draft={draft} chapters={chapters} active={id === selectedId} onChange={changeScene} onSave={saveScene}/>)}
       </section>
-      <ReferencePanel open={referencesOpen}/>
+      <ReferencePanel open={referencesOpen} novelId={novelId}/>
     </div> : <ChapterBoard chapters={chapters} scenes={scenes} loading={catalogLoading} createdChapterId={createdChapterId} onEdit={chapter => setComposer({kind: 'chapter', chapter})} onCreateScene={chapterId => setComposer({kind: 'scene', chapterId})} onCreateChapter={() => setComposer({kind: 'chapter'})}/>}
-    {composer && <ComposeDialog composer={composer} chapters={chapters} onClose={() => setComposer(null)} onComplete={createComplete}/>}
+    {composer && <ComposeDialog composer={composer} chapters={chapters} novelId={novelId} onClose={() => setComposer(null)} onComplete={createComplete}/>}
   </main>;
 }
 
@@ -141,7 +178,7 @@ function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCrea
   useLayoutEffect(() => {
     const ordinal = String(index + 1).padStart(2, '0');
     const sceneLabel = `${sceneCount} ${sceneCount === 1 ? 'scene' : 'scenes'}`;
-    const destination = '/scenes/';
+    const destination = '/scenes/?'+new URLSearchParams({...(chapter.novelId?{novel:chapter.novelId}:{}),chapter:chapter.id}).toString();
     const record = {id: chapter.id, name: chapter.title, href: destination};
     const badge = document.createElement('span');
     badge.className = 'character-power';
@@ -205,7 +242,7 @@ const ScenePane = memo(function ScenePane({draft, chapters, active, onChange, on
   </form><WritingEditor sceneId={scene.id} initialContent={draft.initialContent} editable={!draft.saving} active={active} onUpdate={onContent}/></div>;
 });
 
-function ComposeDialog({composer, chapters, onClose, onComplete}: {composer: Composer; chapters: ChapterRecord[]; onClose: () => void; onComplete: (record: ChapterRecord | SceneRecord) => void}) {
+function ComposeDialog({composer, chapters, novelId, onClose, onComplete}: {composer: Composer; chapters: ChapterRecord[]; novelId: string; onClose: () => void; onComplete: (record: ChapterRecord | SceneRecord) => void}) {
   const isChapter = composer.kind === 'chapter', existing = composer.kind === 'chapter' ? composer.chapter : undefined, label = existing ? 'Edit chapter' : isChapter ? 'New chapter' : 'New scene';
   const [title, setTitle] = useState(existing?.title || ''), [summaryText, setSummaryText] = useState(existing?.summary || ''), [chapterId, setChapterId] = useState(composer.kind === 'scene' ? composer.chapterId : ''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const dialog = useRef<HTMLDialogElement>(null), titleInput = useRef<HTMLInputElement>(null), request = useRef<AbortController | null>(null), inFlight = useRef(false), alive = useRef(true), id = useRef(existing?.id || crypto.randomUUID()), recovered = useRef<ChapterRecord | SceneRecord | null>(null);
@@ -228,7 +265,7 @@ function ComposeDialog({composer, chapters, onClose, onComplete}: {composer: Com
       let record: ChapterRecord | SceneRecord;
       if (known) record = await updateKnown(known);
       else {
-        const body = isChapter ? {id: id.current, title, summary: summaryText} : {id: id.current, chapterId, title, summary: summaryText, status: 'draft', contentSchemaVersion: 1, content: emptyWritingContent()};
+        const body = isChapter ? {id: id.current, title, summary: summaryText,...(novelId?{novelId}:{})} : {id: id.current, chapterId, title, summary: summaryText, status: 'draft', contentSchemaVersion: 1, content: emptyWritingContent()};
         record = parse(await requestJSON(endpoint, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body), signal: controller.signal}));
         if (record.id !== id.current) throw new Error('The saved entry could not be verified.');
         // An earlier POST can have committed even when its response was lost.
@@ -245,12 +282,14 @@ function ComposeDialog({composer, chapters, onClose, onComplete}: {composer: Com
 }
 
 type Reference = {id: string; name: string; category: string; summary: string; href: string};
-function ReferencePanel({open}: {open: boolean}) {
+function ReferencePanel({open,novelId}: {open: boolean;novelId: string}) {
   const [items, setItems] = useState<Reference[]>([]), [query, setQuery] = useState(''), [error, setError] = useState(''), [loading, setLoading] = useState(false), [loaded, setLoaded] = useState(false), [attempt, setAttempt] = useState(0);
+  const [wholeLibrary,setWholeLibrary]=useState(false);
+  useEffect(()=>{const refresh=()=>setLoaded(false);window.addEventListener('workspace:changed',refresh);return()=>window.removeEventListener('workspace:changed',refresh);},[]);
   useEffect(() => {
     if (!open || loaded) return;
     const controller = new AbortController(); setLoading(true); setError('');
-    requestJSON('/api/dashboard', {signal: controller.signal}).then(data => {
+    requestJSON('/api/dashboard'+(novelId&&!wholeLibrary?'?novelId='+encodeURIComponent(novelId):''), {signal: controller.signal}).then(data => {
       if (!data || typeof data !== 'object') throw new Error('Your world references could not be read.');
       const next: Reference[] = [];
       for (const [key, category] of [['characters', 'Characters'], ['factions', 'Factions'], ['locations', 'Places'], ['lore', 'Lore'], ['storyArcs', 'Story arcs']]) {
@@ -260,7 +299,7 @@ function ReferencePanel({open}: {open: boolean}) {
       if (!controller.signal.aborted) {setItems(next); setLoaded(true);}
     }).catch(error => {if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'References could not be loaded.');}).finally(() => {if (!controller.signal.aborted) setLoading(false);});
     return () => controller.abort();
-  }, [open, loaded, attempt]);
+  }, [open, loaded, attempt,novelId,wholeLibrary]);
   const filtered = useMemo(() => {const needle = query.toLocaleLowerCase().trim(); return items.filter(item => [item.name, item.category, item.summary].join(' ').toLocaleLowerCase().includes(needle));}, [items, query]);
-  return <aside id="writing-references" className="writing-references" aria-label="World references" hidden={!open}><div className="writing-panel-heading"><h2>At your side</h2><Icon name="reference"/></div><p className="writing-muted">Your world, within reach. Entries open in a new tab.</p><label className="writing-reference-search"><span className="writing-sr-only">Search references</span><input type="search" aria-label="Search references" placeholder="Find a character, place, note…" value={query} onChange={event => setQuery(event.target.value)}/></label>{loading && <p role="status" className="writing-muted">Loading your world…</p>}{error && <div role="alert"><p className="writing-inline-error">{error}</p><button type="button" className="writing-button" onClick={() => setAttempt(value => value + 1)}>Retry references</button></div>}{loaded && !filtered.length && <p className="writing-muted">{query ? 'No matching references.' : 'The world you build will appear here.'}</p>}<ul className="writing-reference-list">{filtered.slice(0, 60).map(item => <li key={item.id}><a href={item.href} target="_blank" rel="noopener noreferrer"><span className="writing-reference-category">{item.category}</span><strong>{item.name}<span aria-hidden="true"> ↗</span></strong>{item.summary && <span className="writing-reference-summary">{item.summary}</span>}<span className="writing-sr-only"> (opens in a new tab)</span></a></li>)}</ul>{filtered.length > 60 && <p className="writing-muted">Showing 60 entries. Search to narrow the list.</p>}</aside>;
+  return <aside id="writing-references" className="writing-references" aria-label="World references" hidden={!open}><div className="writing-panel-heading"><h2>At your side</h2><Icon name="reference"/></div><p className="writing-muted">{novelId&&!wholeLibrary?'Material linked to this novel.':'Your whole library.'} Entries open in a new tab.</p>{novelId&&<button type="button" className="writing-button" onClick={()=>{setWholeLibrary(value=>!value);setLoaded(false);}}>{wholeLibrary?'Show this novel’s material':'Browse the whole library'}</button>}<label className="writing-reference-search"><span className="writing-sr-only">Search references</span><input type="search" aria-label="Search references" placeholder="Find a character, place, note…" value={query} onChange={event => setQuery(event.target.value)}/></label>{loading && <p role="status" className="writing-muted">Loading your world…</p>}{error && <div role="alert"><p className="writing-inline-error">{error}</p><button type="button" className="writing-button" onClick={() => setAttempt(value => value + 1)}>Retry references</button></div>}{loaded && !filtered.length && <p className="writing-muted">{query ? 'No matching references.' : 'The world you build will appear here.'}</p>}<ul className="writing-reference-list">{filtered.slice(0, 60).map(item => <li key={item.id}><a href={item.href} target="_blank" rel="noopener noreferrer"><span className="writing-reference-category">{item.category}</span><strong>{item.name}<span aria-hidden="true"> ↗</span></strong>{item.summary && <span className="writing-reference-summary">{item.summary}</span>}<span className="writing-sr-only"> (opens in a new tab)</span></a></li>)}</ul>{filtered.length > 60 && <p className="writing-muted">Showing 60 entries. Search to narrow the list.</p>}</aside>;
 }

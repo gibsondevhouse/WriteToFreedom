@@ -6,6 +6,11 @@ import {test,expect,type APIRequestContext,type Locator,type Page} from '@playwr
 const origin='http://127.0.0.1:'+(process.env.WTF_BROWSER_TEST_PORT||'4175');
 interface RichNode{type:string;text?:string;attrs?:Record<string,unknown>;marks?:Array<{type:string;attrs?:Record<string,unknown>}>;content?:RichNode[]}
 interface Chapter{id:string;title:string;summary:string;version:number}
+let testNovelId='';
+test.beforeEach(async({request})=>{
+ const response=await request.post('/api/novels',{headers:{origin},data:{id:randomUUID(),title:'Writing regression '+randomUUID()}});
+ expect(response.status(),await response.text()).toBe(201);testNovelId=(await response.json()).id;
+});
 interface Scene{id:string;chapterId:string;title:string;summary:string;status:string;contentSchemaVersion:number;content:RichNode;version:number}
 const documentFrom=(...paragraphs:string[]):RichNode=>({type:'doc',content:paragraphs.map(text=>({type:'paragraph',...(text?{content:[{type:'text',text}]}:{})}))});
 const textFrom=(node:RichNode):string=>node.text??(node.content||[]).map(textFrom).join(node.type==='doc'?'\n':'');
@@ -15,7 +20,7 @@ const focusedWritingRoutes=[
  {path:'/scenes/',heading:'Scenes',primaryAction:'New scene'},
 ] as const;
 async function createChapter(request:APIRequestContext,title='Browser chapter '+randomUUID()):Promise<Chapter>{
- const response=await request.post('/api/chapters',{headers:{origin},data:{id:randomUUID(),title,summary:'A browser verification chapter.'}});
+ const response=await request.post('/api/chapters',{headers:{origin},data:{id:randomUUID(),novelId:testNovelId,title,summary:'A browser verification chapter.'}});
  expect(response.status(),await response.text()).toBe(201);
  return response.json();
 }
@@ -48,7 +53,7 @@ async function selectedText(control:Locator){return control.evaluate(element=>el
 
 test('chapters and scenes open focused writing routes with their own primary actions',async({page})=>{
  for(const route of focusedWritingRoutes){
-  expect((await page.goto(route.path))?.status()).toBe(200);
+  expect((await page.goto(route.path+'?novel='+testNovelId))?.status()).toBe(200);
   await expect(page.getByRole('heading',{name:route.heading,exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:route.primaryAction,exact:true}).first()).toBeVisible();
  }
@@ -56,8 +61,8 @@ test('chapters and scenes open focused writing routes with their own primary act
 
 test('the local development host accepts a localhost same-origin chapter creation',async({page})=>{
  const localhostOrigin=origin.replace('127.0.0.1','localhost');
- await page.goto(localhostOrigin+'/chapters/');
- const chapter={id:randomUUID(),title:'Same-origin chapter '+randomUUID(),summary:'Created through the browser on the local development host.'};
+ await page.goto(localhostOrigin+'/chapters/?novel='+testNovelId);
+ const chapter={id:randomUUID(),novelId:testNovelId,title:'Same-origin chapter '+randomUUID(),summary:'Created through the browser on the local development host.'};
  const mutation=page.waitForRequest(candidate=>candidate.url()===localhostOrigin+'/api/chapters'&&candidate.method()==='POST');
  const result=await page.evaluate(async body=>{
   const response=await fetch('/api/chapters',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
@@ -75,7 +80,7 @@ test('the local development host accepts a localhost same-origin chapter creatio
 });
 
 test('creates a chapter and a rich-text scene through the writing workspace',async({page,request})=>{
- await page.goto('/chapters/');
+ await page.goto('/chapters/?novel='+testNovelId);
  await expect(page.getByRole('heading',{name:'Chapters',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'New chapter',exact:true}).first().click();
  const chapterDialog=page.getByRole('dialog',{name:'New chapter',exact:true});
@@ -122,7 +127,7 @@ test('creates a chapter and a rich-text scene through the writing workspace',asy
 
 test('a lost create response and edited retry preserve the newer scene form without duplicates',async({page,request})=>{
  const chapter=await createChapter(request);
- await page.goto('/scenes/');
+ await page.goto('/scenes/?novel='+testNovelId);
  await page.getByRole('button',{name:'New scene',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'New scene',exact:true});
  const firstTitle='Initial request '+randomUUID(),latestTitle='Revised request '+randomUUID();
