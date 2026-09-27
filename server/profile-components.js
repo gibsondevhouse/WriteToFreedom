@@ -52,7 +52,7 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
    if(val&&!choices.some(([value])=>value===val))choices.push([val,val]);
    control=`<select ${attrs}><option value="">Not yet chosen</option>${choices.map(([v,l])=>`<option value="${escape(v)}"${v===val?' selected':''}>${escape(l)}</option>`).join('')}</select>`;
    if(links[key])control+=`<a class="person-link" data-for="${key}" href="${links[key]}${escape(val)}/"${!val?' hidden':''}>Open profile →</a>`;
-  }else if(type==='textarea')control=`<textarea ${attrs} rows="2" maxlength="10000" placeholder="${escape(placeholder||'Add '+label.toLowerCase()+'…')}">${escape(val)}</textarea>`;
+  }else if(type==='textarea')control=`<textarea ${attrs} rows="2" maxlength="${maxLengths[key]??10000}" placeholder="${escape(placeholder||'Add '+label.toLowerCase()+'…')}">${escape(val)}</textarea>`;
   else control=`<input ${attrs} type="${type==='url'?'url':'text'}"${type==='url'?' pattern="https://.*" title="Use an HTTPS image URL"':''} autocomplete="off" maxlength="${maxLengths[key]??(key==='name'?160:type==='url'?2048:10000)}" value="${escape(val)}" placeholder="${type==='url'?'https://…':'Add '+escape(label.toLowerCase())+'…'}">`;
   return renderFieldWrapper(record,key,label,type,control);
  };

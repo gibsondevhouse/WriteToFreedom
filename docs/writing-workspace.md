@@ -2,9 +2,11 @@
 
 `/chapters/` and `/scenes/` share the React writing data layer, but serve different tasks. **Chapters** is a chapter-planning view: it lists visible chapter cards, shows their scene counts, and confirms a newly created chapter in the main page. **Scenes** is the rich-text writing view: it opens scene drafts, the outline, formatting controls, and references. Chapters organize independently saved scenes. Each scene contains a title, summary, drafting status, chapter assignment and rich-text document. Existing Lore notes and positional character-note anchors keep their current storage and editors.
 
+Each chapter has a canonical profile at `/chapters/:id/`. Chapter card titles, library entries, collections, and a novel's manuscript list open this profile. It follows the shared article layout with a wrapping editable title, summary, parent novel, chapter number and scene count. Scenes are written directly on the profile, in catalog order. Each editor starts with the reusable 16:9 scene card: the parent novel's book cover shares the card with the editable scene title and summary. Missing or unavailable artwork uses a book-cover placeholder, and long summaries scroll within their allocated space. **Add scene** opens a dialog and adds the new scene to this same page. Each scene has its own metadata, formatting controls, explicit save and conflict state. There is no separate Manuscript section or copied chapter prose: these editors use the original scene documents and APIs.
+
 ## Ownership and editing
 
-`frontend/writing/Workspace.tsx` owns the route-specific chapter plan or scene workspace, per-scene drafts, loading, chapter metadata, reference panel and explicit saves. Creating a scene from the Chapters view opens that scene in the Scenes view. The outer workspace navigation still belongs to the existing shell. Moving between application sections uses ordinary full-page navigation.
+`frontend/writing/Workspace.tsx` owns the route-specific chapter plan or scene workspace, per-scene drafts, loading, chapter metadata, reference panel and explicit saves. Creating a scene from the Chapters directory opens that scene in the Scenes view. `frontend/writing/ChapterScenes.tsx` owns the chapter profile's inline scene drafts and creation; it reuses the same `WritingEditor` and document contract. Scene events and save shortcuts are contained so they do not submit or dirty the profile metadata form. The outer workspace navigation still belongs to the existing shell. Moving between application sections uses ordinary full-page navigation.
 
 `frontend/writing/Editor.tsx` owns each scene's Tiptap instance, selection and undo history. Visited scene editors remain mounted while hidden, so switching between scenes preserves unsaved writing and history within the document. Parent updates and successful saves do not call `setContent` or recreate the editor. Tiptap transaction rendering is disabled for the outer React editor; toolbar and word-count subscriptions update separately. This follows [Tiptap's integration performance guidance](https://tiptap.dev/docs/guides/performance).
 
@@ -16,6 +18,8 @@ The reference panel starts with material linked to the selected novel and offers
 
 `?novel=<UUID>` selects a manuscript. Chapter and scene catalogs use `?novelId=<UUID>` and the server checks ownership. Legacy `?chapter=` and `?scene=` links resolve the parent novel. With multiple novels, chapter creation requires an explicit choice. Chapter cards select the correct novel and chapter, including empty chapters. Ordinary scene moves stay within one novel; chapter transfer is a separate future operation. Changing context uses full-page navigation and the existing dirty-draft warning. See [novels and collections](novels-and-collections.md).
 
+Chapter profile routes require ownership of both the chapter and its parent novel. An optional `?novel=` must match that parent. Profile title and summary saves use the same versioned chapter API as the planning view; conflicts retain the local draft. The server fallback escapes text and renders only validated rich-text elements and formatting, with no raw stored HTML. Inline scenes refresh on shared workspace changes, focus and visibility, preserving dirty drafts and their editor history. If a scene is removed elsewhere, its clean editor disappears; unsaved writing remains copyable in a read-only editor with saving disabled.
+
 ## Persistence contract
 
 Migration `0009_concerned_war_machine.sql` adds `chapters` and `scenes` without changing existing records. Both tables store owner-scoped, versioned documents with creation/update timestamps. Scenes reference a chapter. Runtime checks require that chapter to belong to the same owner.
@@ -26,6 +30,7 @@ Migration `0009_concerned_war_machine.sql` adds `chapters` and `scenes` without 
 | `POST /api/chapters` | `{id, novelId, title, summary}` → created chapter; legacy omission is allowed when the owner has at most one novel |
 | `GET /api/chapters/:id` | One owner-scoped chapter |
 | `PUT /api/chapters/:id` | `{version, title, summary}` → saved chapter with incremented version |
+| `DELETE /api/chapters/:id` | `{version}` → 204; atomically removes scenes before their chapter, or 409 if stale or collected |
 | `GET /api/scenes` | `{scenes: SceneSummary[]}`; prose is excluded at the SQL query boundary |
 | `GET /api/scenes?chapterId=:id` | Scene summaries for an owned chapter |
 | `POST /api/scenes` | `{id, chapterId, title, summary, status, contentSchemaVersion: 1, content}` → created scene |
@@ -60,10 +65,12 @@ Choose **Save scene** or use Ctrl/Cmd+S. Only the active scene is saved. Editing
 
 A version conflict does not overwrite the other tab or silently adopt its version. Copy unsaved writing before reloading to resolve it. Navigation warns when drafts remain unsaved. Draft retention is limited to the current browser document; there is no autosave, durable offline draft store or automatic conflict merge.
 
+Chapter and scene catalogs refresh after saved workspace changes in any same-origin tab, when the page regains focus or visibility, and when browser history restores it from the back/forward cache. Each catalog load uses a unique `_refresh` query value to bypass embedded browsers that reuse fetch responses despite `no-store`. Pending older catalog requests are aborted before refreshing. Deleted scenes disappear from the outline and clean editors close; an unsaved draft of a deleted scene stays available to copy with saving disabled and a deletion warning. Such drafts remain accessible through the outline's Unsaved drafts section.
+
 ## Verification and scope
 
 Run `npm run typecheck`, `npm test`, and `npm run test:browser`. The browser suite exercises the compiled Worker with temporary SQLite data. Writing coverage includes creation, save/reopen, formatted JSON round trips, paste, undo/redo, reference/outline changes, draft-preserving scene switches, failure/conflict retention and mobile layout. The performance case compares a short scene with a 10,000-word scene and records input/formatting/panel timings in its test attachment; these are local end-to-end measurements, not guarantees for every device.
 
 The implementation run passed 158 Node tests and 22 Chromium tests. In the local 10,000-word case, ready time was 72 ms, typing p95 was 15.2 ms, formatting was 52 ms and panel toggles were 44–53 ms. Measurements include Playwright round trips and a next-animation-frame boundary; browser caching and machine load affect them. The regression limits are 5 seconds to ready, 250 ms typing p95 and 750 ms for formatting/panel actions. The test also verifies that all 10,001 words after editing persist after saving.
 
-The outline currently follows creation order; scene chapter assignments can be changed and saved. Explicit reordering, deletion, full-manuscript export, collaborative editing and a separate Story Beats module remain future product work. Existing story-arc key-scene descriptions retain their current free-text references.
+The outline currently follows creation order; scene chapter assignments can be changed and saved. Chapters can be deleted with all their scenes after confirmation; collected chapters or scenes must be unlinked first. Explicit reordering, individual scene deletion, full-manuscript export, collaborative editing and a separate Story Beats module remain future product work. Existing story-arc key-scene descriptions retain their current free-text references.

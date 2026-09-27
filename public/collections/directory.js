@@ -46,9 +46,10 @@ function entryCard(record){
  if(record.kind==='note')return noteCard({...record,contextual:true});
  if(['novel','series','collection'].includes(record.kind))return bookCoverCard(record,{menuItems:[{label:record.kind==='collection'?'Open collection':'Open profile',href:record.href},...(record.kind==='novel'?[{label:'Write scenes',href:'/scenes/?novel='+encodeURIComponent(record.id)}]:[])]});
  if(['chapter','scene'].includes(record.kind)){
+  const chapter=record.kind==='chapter',writingHref=chapter?'/scenes/?'+new URLSearchParams({...(record.novelId?{novel:record.novelId}:{}),chapter:record.id}):record.href;
   const context=node('a','affiliation-copy');context.href=record.href;
-  context.append(node('span','affiliation-kind','Manuscript'),node('strong','',record.summary||'Open the writing workspace.'));
-  return createStoryCardFrame(record,{headingLevel:2,eyebrow:record.label||kindLabel[record.kind],profileLabel:'Open '+record.name+' in the writing workspace',context:[context],actions:[createStoryCardAction({href:record.href,label:'Write scenes for '+record.name,title:'Write scenes',icon:'story',text:'Write scenes'})],menuItems:[{label:'Open writing workspace',href:record.href}],cardClass:'collection-profile-card'});
+  context.append(node('span','affiliation-kind','Manuscript'),node('strong','',record.summary||(chapter?'Open the chapter profile.':'Open the writing workspace.')));
+  return createStoryCardFrame(record,{headingLevel:2,eyebrow:record.label||kindLabel[record.kind],profileLabel:chapter?'Open chapter profile: '+record.name:'Open '+record.name+' in the writing workspace',context:[context],actions:[createStoryCardAction({href:writingHref,label:'Write scenes for '+record.name,title:'Write scenes',icon:'story',text:'Write scenes'})],menuItems:[{label:chapter?'Open chapter profile':'Open writing workspace',href:record.href}],cardClass:'collection-profile-card'});
  }
  return createProfileStoryCard(record,{headingLevel:2,label:record.label||kindLabel[record.kind],contextText:record.summary||'Open this entry.',sections:[],cardClass:'collection-profile-card'});
 }

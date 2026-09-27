@@ -1,0 +1,79 @@
+.chapter-profile .breadcrumb{flex-wrap:wrap}
+.chapter-profile .breadcrumb [aria-current]{min-width:0;flex:1 1 160px;overflow-wrap:anywhere}
+.chapter-profile .chapter-parent-novel{display:block;margin:10px 0;color:var(--brass-bright,#cfb48b);overflow-wrap:anywhere}
+.chapter-profile .chapter-facts{display:grid;gap:8px;margin:16px 0;color:var(--text-soft,#c7c4bd);font:13px/1.5 var(--sans,Arial,sans-serif)}
+.chapter-profile .chapter-facts dt{color:var(--text-muted,#918b80);font-size:12px}
+.chapter-profile .chapter-facts dd{margin:2px 0 10px}
+.chapter-profile .infobox [data-profile-field=title]{align-items:start}
+.chapter-profile .infobox #field-title{font:13px/1.6 var(--sans,Arial,sans-serif);min-height:34px;resize:none;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;padding:5px 6px}
+.chapter-profile .infobox [data-profile-field=title]>label{font:12px/1.6 var(--sans,Arial,sans-serif);margin:0;padding-top:6px}
+.chapter-profile #chapter-scenes-editor{min-width:0}
+.chapter-profile .writing-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.chapter-profile .chapter-inline-scene{display:block;min-width:0;margin:0 0 36px;padding:0 0 26px;border-bottom:1px solid var(--line,#36332d)}
+.chapter-profile .chapter-inline-scene>h3{font:400 24px/1.4 var(--serif,Georgia,serif);margin:18px 0 8px;overflow-wrap:anywhere}
+.chapter-profile .chapter-scene-card{position:relative;display:grid;grid-template-columns:minmax(0,36%) minmax(0,1fr);gap:22px;aspect-ratio:16/9;width:100%;box-sizing:border-box;overflow:hidden;border:1px solid var(--line,#36332d);border-radius:5px;background:linear-gradient(130deg,#1b1a15,#11120f 70%);padding:22px;color:var(--text,#e3ddd0);margin:0 0 18px}
+.chapter-profile .chapter-scene-cover-well{display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;border-right:1px solid #ad906022;padding-right:18px}
+.chapter-profile .chapter-scene-book-cover{position:relative;aspect-ratio:2/3;height:100%;max-width:100%;overflow:hidden;border:1px solid #ad906055;border-radius:2px 4px 4px 2px;background:#222119;box-shadow:5px 6px 16px #0006}
+.chapter-profile .chapter-scene-cover-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px 12px;text-align:center;background:linear-gradient(130deg,#373326,#191b15);box-shadow:inset 5px 0 0 #0003;color:var(--brass-bright,#cfb48b);overflow:hidden}
+.chapter-profile .chapter-scene-cover-placeholder::after{content:'';position:absolute;inset:10px;border:1px solid #ad906044;pointer-events:none}
+.chapter-profile .chapter-scene-cover-monogram{font:400 clamp(24px,4vw,52px)/1 var(--serif,Georgia,serif);opacity:.4}
+.chapter-profile .chapter-scene-cover-placeholder :is(strong,.chapter-scene-cover-title){position:relative;font:400 16px/1.4 var(--serif,Georgia,serif);overflow-wrap:anywhere;max-height:50%;overflow:auto}
+.chapter-profile .chapter-scene-cover-placeholder small{font:9px/1.5 var(--sans,Arial,sans-serif);letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted,#918b80)}
+.chapter-profile .chapter-scene-book-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#151611}
+.chapter-profile .chapter-scene-card-copy{display:flex;flex-direction:column;min-width:0;min-height:0;gap:12px}
+.chapter-profile .chapter-scene-card-copy .chapter-inline-title{min-height:0;max-height:42%;overflow:auto;flex:none}
+.chapter-profile .chapter-scene-card-copy :is(.chapter-scene-title,.chapter-scene-card-heading){font:400 22px/1.3 var(--serif,Georgia,serif);min-height:0;margin:0;padding:0;border:0;letter-spacing:-.2px;overflow-wrap:anywhere}
+.chapter-profile .chapter-scene-card-summary-field{display:flex;flex-direction:column;gap:5px;flex:1;min-height:0;min-width:0;margin:0}
+.chapter-profile .chapter-scene-card-summary-field>span{font:10px/1.5 var(--sans,Arial,sans-serif);color:var(--text-muted,#918b80);letter-spacing:.04em}
+.chapter-profile .chapter-scene-card-summary{display:block;box-sizing:border-box;width:100%;flex:1;min-height:0;min-width:0;resize:none;overflow:auto;scrollbar-width:thin;margin:0;padding:4px 0;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text-soft,#c7c4bd);font:13px/1.7 var(--sans,Arial,sans-serif);white-space:pre-wrap;overflow-wrap:anywhere}
+.chapter-profile textarea.chapter-scene-card-summary:hover{border-color:var(--line,#36332d)}
+.chapter-profile .chapter-scene-card-copy>.section-note{overflow:auto;margin:0;font:13px/1.7 var(--sans,Arial,sans-serif)}
+.chapter-profile .chapter-scenes-empty>.section-note{margin:14px 0 20px}
+.chapter-profile .chapter-scene-topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:4px 0 14px}
+.chapter-profile .chapter-scene-save-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font:11px/1.5 var(--sans,Arial,sans-serif);color:var(--text-muted,#918b80)}
+.chapter-profile .chapter-inline-title{display:block}
+.chapter-profile .chapter-inline-title>span{display:block;font:11px/1.5 var(--sans,Arial,sans-serif);color:var(--text-muted,#918b80)}
+.chapter-profile .chapter-scene-title{display:block;width:100%;box-sizing:border-box;min-width:0;min-height:44px;resize:none;overflow:hidden;border:1px solid transparent;background:transparent;border-radius:3px;padding:4px 0;font:400 25px/1.4 var(--serif,Georgia,serif);color:var(--text,#e3ddd0);white-space:pre-wrap;overflow-wrap:anywhere}
+.chapter-profile .chapter-scene-title:hover{border-color:var(--line,#36332d)}
+.chapter-profile .chapter-scene-meta{display:flex;align-items:start;gap:18px;flex-wrap:wrap;margin:12px 0 20px;font:12px/1.6 var(--sans,Arial,sans-serif);color:var(--text-muted,#918b80)}
+.chapter-profile .chapter-scene-meta>label{display:flex;align-items:center;gap:8px}
+.chapter-profile .chapter-scene-meta select{max-width:100%;border:1px solid var(--line,#36332d);border-radius:3px;background:var(--ink-2,#141413);padding:5px 8px;font:inherit;color:var(--text-soft,#c7c4bd)}
+.chapter-profile .chapter-scene-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:16px 0;font:13px/1.5 var(--sans,Arial,sans-serif)}
+.chapter-profile :is(#chapter-scenes-editor,.chapter-scene-dialog) .writing-button,.chapter-profile .chapter-scene-actions>button,.chapter-profile .chapter-scene-save-actions>button{border:1px solid var(--line-strong,#5d5446);border-radius:3px;background:var(--ink-2,#141413);padding:8px 12px;color:var(--text,#e3ddd0);font:12px/1.5 var(--sans,Arial,sans-serif)}
+.chapter-profile :is(#chapter-scenes-editor,.chapter-scene-dialog) .writing-primary,.chapter-profile .chapter-scene-save-actions>button{background:var(--brass,#ad9060);border-color:var(--brass,#ad9060);color:#0a0a09}
+.chapter-profile .chapter-scene-error,.chapter-profile .chapter-scene-dialog .writing-inline-error{border:1px solid #8a5755;border-radius:3px;padding:12px;color:#efbbb6;font:12px/1.6 var(--sans,Arial,sans-serif)}
+.chapter-profile #chapter-scenes-editor .writing-editor{border-top:1px solid var(--line,#36332d);min-width:0}
+.chapter-profile #chapter-scenes-editor .writing-toolbar{position:sticky;top:var(--profile-header-height,54px);z-index:1;display:flex;flex-wrap:wrap;align-items:center;gap:3px;padding:8px 0;background:var(--ink,#0a0a09);border-bottom:1px solid var(--line,#36332d)}
+.chapter-profile #chapter-scenes-editor .writing-toolbar-group{display:flex;align-items:center;gap:2px;padding-right:5px;margin-right:3px;border-right:1px solid var(--line,#36332d)}
+.chapter-profile #chapter-scenes-editor .writing-toolbar-group:last-child{border:0;margin:0;padding:0}
+.chapter-profile #chapter-scenes-editor .writing-toolbar button{display:inline-flex;align-items:center;justify-content:center;min-width:30px;min-height:30px;padding:5px 6px;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text-soft,#c7c4bd);font:12px/1.3 var(--sans,Arial,sans-serif)}
+.chapter-profile #chapter-scenes-editor .writing-toolbar button[aria-pressed=true]{background:#ad906022;border-color:#ad906055;color:var(--brass-bright,#cfb48b)}
+.chapter-profile #chapter-scenes-editor .writing-toolbar button:hover:not(:disabled){background:var(--ink-2,#141413)}
+.chapter-profile #chapter-scenes-editor .writing-toolbar button:disabled{opacity:.3}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose){max-width:70ch;min-height:220px;margin:auto;padding:22px 0 32px;color:var(--text,#e3ddd0);font:18px/1.85 var(--serif,Georgia,serif);overflow-wrap:anywhere;white-space:pre-wrap;caret-color:var(--brass-bright,#cfb48b)}
+.chapter-profile #chapter-scenes-editor .writing-prose:focus{outline:none;background:transparent!important}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) p{margin:0 0 1em;min-height:1em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) :is(h1,h2,h3,h4,h5,h6){border:0;font-family:var(--serif,Georgia,serif);font-weight:400;line-height:1.4;margin:1.4em 0 .6em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) :is(h1,h4){font-size:1.45em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) :is(h2,h5){font-size:1.25em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) :is(h3,h6){font-size:1.1em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) blockquote{margin:1.2em 0;padding-left:1.2em;border-left:2px solid var(--brass,#ad9060);color:var(--text-soft,#c7c4bd)}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) :is(ul,ol){padding-left:1.6em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) li>p{margin-bottom:.4em}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) hr{width:5em;border:0;border-top:1px solid var(--line-strong,#5d5446);margin:2em auto}
+.chapter-profile :is(.chapter-scene-prose,.writing-prose) code{font:.85em/1.6 monospace;background:var(--ink-2,#141413);padding:.1em .25em;border-radius:3px}
+.chapter-profile #chapter-scenes-editor .writing-editor-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1px solid var(--line,#36332d);padding:12px 0;color:var(--text-muted,#918b80);font:10px/1.6 var(--sans,Arial,sans-serif)}
+.chapter-profile #chapter-scenes-editor .writing-editor-footer>span:first-child{white-space:nowrap}
+.chapter-profile #chapter-scenes-editor .writing-editor-footer>span:last-child{text-align:right}
+.chapter-profile .chapter-scene-dialog{width:min(500px,calc(100vw - 32px));box-sizing:border-box;max-height:calc(100dvh - 32px);overflow:auto;background:var(--ink-2,#141413);border:1px solid var(--line-strong,#5d5446);border-radius:5px;color:var(--text,#e3ddd0);padding:24px}
+.chapter-profile .chapter-scene-dialog::backdrop{background:#000b}
+.chapter-profile .chapter-scene-dialog .writing-dialog-heading{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:20px}
+.chapter-profile .chapter-scene-dialog h2{font:400 27px/1.4 var(--serif,Georgia,serif);margin:0}
+.chapter-profile .chapter-scene-dialog .writing-eyebrow{font:10px/1.6 var(--sans,Arial,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#918b80);margin:0 0 6px}
+.chapter-profile .chapter-scene-dialog .writing-icon-button{background:none;border:0;color:var(--text-soft,#c7c4bd);font-size:25px}
+.chapter-profile .chapter-scene-dialog fieldset{border:0;padding:0;margin:0;min-width:0}
+.chapter-profile .chapter-scene-dialog label{display:block;font:12px/1.5 var(--sans,Arial,sans-serif);color:var(--text-muted,#918b80);margin-bottom:18px}
+.chapter-profile .chapter-scene-dialog :is(input,textarea){display:block;box-sizing:border-box;width:100%;margin-top:7px;border:1px solid var(--line-strong,#5d5446);border-radius:3px;background:var(--ink,#0a0a09);color:var(--text,#e3ddd0);padding:10px;font:14px/1.6 var(--sans,Arial,sans-serif)}
+.chapter-profile .chapter-scene-dialog textarea{resize:vertical;min-height:75px}
+.chapter-profile .chapter-scene-dialog .writing-dialog-actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line,#36332d);margin-top:20px;padding-top:18px}
+@media(max-width:650px){.chapter-profile :is(.chapter-scene-prose,.writing-prose){font-size:17px}.chapter-profile .chapter-scene-topline{align-items:start;flex-wrap:wrap}.chapter-profile #chapter-scenes-editor .writing-toolbar button{min-height:32px}.chapter-profile #chapter-scenes-editor .writing-editor-footer{align-items:start}.chapter-profile .chapter-scene-card{grid-template-columns:minmax(0,32%) minmax(0,1fr);gap:12px;padding:12px}.chapter-profile .chapter-scene-cover-well{padding-right:10px}.chapter-profile .chapter-scene-cover-placeholder{padding:10px 8px;gap:8px}.chapter-profile .chapter-scene-cover-placeholder::after{inset:6px}.chapter-profile .chapter-scene-cover-placeholder :is(strong,.chapter-scene-cover-title){font-size:11px}.chapter-profile .chapter-scene-cover-placeholder small{font-size:7px}.chapter-profile .chapter-scene-card-copy{gap:7px}.chapter-profile .chapter-scene-card-copy :is(.chapter-scene-title,.chapter-scene-card-heading){font-size:18px}.chapter-profile .chapter-scene-card-summary{font-size:12px;line-height:1.6}}

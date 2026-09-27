@@ -144,7 +144,11 @@ adaptNavigation();
 async function showNovelContext(){
  const context=document.querySelector('.workspace-context');if(!context)return;
  const url=new URL(location.href),profile=url.pathname.match(/^\/novels\/([0-9a-f-]{36})(?:\/|$)/i);
- const novelId=profile?.[1]||url.searchParams.get('novel');
+ let chapterNovel='';
+ if(document.body.classList.contains('chapter-profile')){
+  try{chapterNovel=JSON.parse(document.querySelector('#profile-data').textContent).novelId||'';}catch{}
+ }
+ const novelId=profile?.[1]||url.searchParams.get('novel')||chapterNovel;
  if(!novelId||!/^[0-9a-f-]{36}$/i.test(novelId))return;
  const library=document.createElement('a'),current=document.createElement('a'),separator=document.createElement('span');
  library.href='/novels/';library.textContent='My library';library.dataset.libraryLink='';

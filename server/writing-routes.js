@@ -102,5 +102,8 @@ export async function writingRoute(request,env){
   }catch(error){return json({error:error.message},400);}
   const saved=id?await (scene?db.saveScene(owner,current,document):db.saveChapter(owner,current,document)):await (scene?db.createScene(owner,input.id,document):db.createChapter(owner,input.id,document));
   return saved?json(saved,id?200:201):json({error:id?`This ${singular} changed before it could be saved. Your draft is still here. Copy your changes, then reload before saving.`:'This writing entry ID is unavailable. Try creating a new entry.'},409);
- }catch(error){console.error('Writing request failed',error.message);return json({error:'Your writing could not be loaded or saved. Please try again.'},503);}
+ }catch(error){
+  if(request.method==='DELETE'&&/(?:^|:\s*)(?:chapters|scenes): collection memberships still reference this entity(?:: SQLITE_CONSTRAINT(?:_TRIGGER)?)?$/.test(error.message))return json({error:'This chapter or one of its scenes belongs to a collection. Remove those collection memberships before deleting the chapter.'},409);
+  console.error('Writing request failed',error.message);return json({error:'Your writing could not be loaded or saved. Please try again.'},503);
+ }
 }

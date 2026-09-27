@@ -47,7 +47,7 @@ test('novel articles preserve the shared form and link only their chapters to th
  assert.equal((html.match(/name="title"/g)||[]).length,1);
  assert.match(html,/data-profile-field="synopsis" hidden/);assert.match(html,/Saved hidden synopsis/);
  assert.ok(html.includes('/scenes/?novel='+oneId+'&chapter='+one.id));
- assert.ok(html.includes('/chapters/?novel='+oneId+'&chapter='+one.id));
+ assert.ok(html.includes('/chapters/'+one.id+'/?novel='+oneId));
  assert.doesNotMatch(html,/Unrelated chapter/);
  assert.equal((await request('/novels/'+oneId+'/','GET','other')).status,404);
  assert.equal((await request('/novels/'+oneId+'/','GET',null)).status,401);

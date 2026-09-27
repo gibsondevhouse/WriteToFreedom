@@ -12,6 +12,6 @@ export default defineConfig({
     manifest: true,
     target: 'es2022',
     modulePreload: {polyfill: false},
-    rolldownOptions: {input: ['frontend/lore-profile.tsx', 'frontend/writing-workspace.tsx']},
+    rolldownOptions: {input: ['frontend/lore-profile.tsx', 'frontend/writing-workspace.tsx', 'frontend/chapter-profile.tsx']},
   },
 });

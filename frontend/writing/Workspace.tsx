@@ -1,10 +1,10 @@
 import {memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import {WritingEditor} from './Editor';
 import {emptyWritingContent, readChapterRecord, readSceneRecord, readSceneSummary, serializeChapter, serializeScene, type ChapterRecord, type SceneRecord, type SceneStatus, type SceneSummary, type WritingContent} from './contracts';
-import {announceWorkspaceChange} from '../../public/profiles/workspace-events.js';
+import {announceWorkspaceChange, observeWorkspaceChanges} from '../../public/profiles/workspace-events.js';
 import {createStoryCardAction, createStoryCardFrame} from '../../public/components/story-card/card.js';
 
-type SceneDraft = {record: SceneRecord; initialContent: WritingContent; dirty: boolean; saving: boolean; error: string; revision: number};
+type SceneDraft = {record: SceneRecord; initialContent: WritingContent; dirty: boolean; saving: boolean; error: string; revision: number; unavailable?: boolean};
 type Drafts = Record<string, SceneDraft>;
 type SceneChange = Partial<Pick<SceneRecord, 'title' | 'summary' | 'status' | 'chapterId' | 'content'>>;
 type Composer = {kind: 'chapter'; chapter?: ChapterRecord} | {kind: 'scene'; chapterId: string};
@@ -41,13 +41,18 @@ export function WritingWorkspace({view}: {view: WritingView}) {
   const [selectedId, setSelectedId] = useState(() => sceneView ? new URL(location.href).searchParams.get('scene') || '' : ''), [catalogLoading, setCatalogLoading] = useState(true), [catalogError, setCatalogError] = useState(''), [catalogAttempt, setCatalogAttempt] = useState(0);
   const [sceneLoading, setSceneLoading] = useState(''), [loadError, setLoadError] = useState(''), [loadAttempt, setLoadAttempt] = useState(0), [composer, setComposer] = useState<Composer | null>(null);
   const [outlineOpen, setOutlineOpen] = useState(() => matchMedia('(min-width: 950px)').matches), [referencesOpen, setReferencesOpen] = useState(false);
-  const [createdChapterId, setCreatedChapterId] = useState('');
-  const mounted = useRef(true), saves = useRef(new Map<string, AbortController>());
+  const [createdChapterId, setCreatedChapterId] = useState(''), composeHandled = useRef(false);
+  const mounted = useRef(true), saves = useRef(new Map<string, AbortController>()), catalogRequest = useRef<AbortController | null>(null), sceneRequest = useRef<{id: string; controller: AbortController} | null>(null);
+  const refreshCatalog = useCallback(() => {
+    // Invalidate immediately so an older response cannot restore deleted cards.
+    catalogRequest.current?.abort();
+    setCatalogAttempt(attempt => attempt + 1);
+  }, []);
   const storeDraft = useCallback((id: string, update: (previous: SceneDraft | undefined) => SceneDraft) => {
     const next = {...draftsRef.current, [id]: update(draftsRef.current[id])}; draftsRef.current = next; setDrafts(next);
   }, []);
   const changeScene = useCallback((id: string, change: SceneChange) => {
-    const current = draftsRef.current[id]; if (!current || current.saving) return;
+    const current = draftsRef.current[id]; if (!current || current.saving || current.unavailable) return;
     if (Object.entries(change).every(([key, value]) => current.record[key as keyof SceneRecord] === value)) return;
     storeDraft(id, previous => ({...previous!, record: {...previous!.record, ...change}, dirty: true, revision: previous!.revision + 1}));
   }, [storeDraft]);
@@ -57,6 +62,19 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     const url = new URL(location.href); url.searchParams.set('scene', id); history.replaceState(history.state, '', url);
   }, [sceneView,novelId]);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false; saves.current.forEach(controller => controller.abort());};}, []);
+  useEffect(() => {
+    const stop = observeWorkspaceChanges(refreshCatalog);
+    const restored = (event: PageTransitionEvent) => {if (event.persisted) refreshCatalog();};
+    const visible = () => {if (!document.hidden) refreshCatalog();};
+    window.addEventListener('pageshow', restored);
+    window.addEventListener('focus', refreshCatalog);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      stop(); window.removeEventListener('pageshow', restored);
+      window.removeEventListener('focus', refreshCatalog);
+      document.removeEventListener('visibilitychange', visible);
+    };
+  }, [refreshCatalog]);
   useEffect(() => {
     const controller=new AbortController();
     (async()=>{
@@ -86,19 +104,43 @@ export function WritingWorkspace({view}: {view: WritingView}) {
   },[]);
   useEffect(() => {
     if(!novelReady||novelError||novels.length>1&&!novelId){setCatalogLoading(false);return;}
-    const controller = new AbortController(); setCatalogLoading(true); setCatalogError('');
-    const query=novelId?'?novelId='+encodeURIComponent(novelId):'';
+    const controller = new AbortController(); catalogRequest.current = controller; setCatalogLoading(true); setCatalogError('');
+    // Some embedded browsers reuse fetch responses despite no-store. A fresh
+    // catalog URL makes every reconciliation reach the saved workspace.
+    const query='?'+new URLSearchParams({...(novelId ? {novelId} : {}), _refresh: crypto.randomUUID()}).toString();
     Promise.all([requestJSON('/api/chapters'+query, {signal: controller.signal}), requestJSON('/api/scenes'+query, {signal: controller.signal})]).then(([chapterData, sceneData]) => {
       if (controller.signal.aborted) return;
       const nextChapters = collection(chapterData, 'chapters').map(readChapterRecord), nextScenes = collection(sceneData, 'scenes').map(readSceneSummary);
-      const requestedChapter=new URL(location.href).searchParams.get('chapter');
-      setChapters(nextChapters); setScenes(nextScenes); setSelectedId(current => sceneView ? current || (requestedChapter ? nextScenes.find(item=>item.chapterId===requestedChapter)?.id : nextScenes[0]?.id) || '' : '');
+      const remaining = new Set(nextScenes.map(scene => scene.id)), nextDrafts: Drafts = {};
+      if (catalogAttempt > 0 && sceneRequest.current && !remaining.has(sceneRequest.current.id)) sceneRequest.current.controller.abort();
+      for (const [id, draft] of Object.entries(draftsRef.current)) {
+        if (remaining.has(id)) nextDrafts[id] = draft;
+        else {
+          saves.current.get(id)?.abort(); saves.current.delete(id);
+          if (draft.dirty) nextDrafts[id] = {...draft, saving: false, unavailable: true, error: 'This scene was deleted in another tab. Your unsaved draft is still here. Copy its text before leaving this page.'};
+        }
+      }
+      draftsRef.current = nextDrafts; setDrafts(nextDrafts);
+      const url = new URL(location.href), requestedChapter = url.searchParams.get('chapter');
+      if (catalogAttempt > 0) {
+        if (requestedChapter && !nextChapters.some(chapter => chapter.id === requestedChapter)) url.searchParams.delete('chapter');
+        const requestedScene = url.searchParams.get('scene');
+        if (requestedScene && !remaining.has(requestedScene) && !nextDrafts[requestedScene]) url.searchParams.delete('scene');
+        history.replaceState(history.state, '', url);
+      }
+      setChapters(nextChapters); setScenes(nextScenes);
+      setSelectedId(current => {
+        if (!sceneView) return '';
+        if (current && (remaining.has(current) || nextDrafts[current] || catalogAttempt === 0)) return current;
+        return (url.searchParams.get('chapter') ? nextScenes.find(item => item.chapterId === url.searchParams.get('chapter'))?.id : nextScenes[0]?.id) || '';
+      });
     }).catch(error => {if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'Your chapters and scenes could not be loaded.');}).finally(() => {if (!controller.signal.aborted) setCatalogLoading(false);});
     return () => controller.abort();
   }, [catalogAttempt, sceneView,novelReady,novelId,novelError,novels.length]);
   useEffect(() => {
     if (!novelReady || novels.length>1&&!novelId || !sceneView || !selectedId || draftsRef.current[selectedId]) {setSceneLoading(''); setLoadError(''); return;}
     const controller = new AbortController(); setSceneLoading(selectedId); setLoadError('');
+    sceneRequest.current = {id: selectedId, controller};
     requestJSON('/api/scenes/' + encodeURIComponent(selectedId)+(novelId?'?novelId='+encodeURIComponent(novelId):''), {signal: controller.signal}).then(value => {
       if (controller.signal.aborted) return;
       const record = readSceneRecord(value); if (record.id !== selectedId) throw new Error('The requested scene could not be verified.');
@@ -107,7 +149,7 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     return () => controller.abort();
   }, [sceneView, selectedId, loadAttempt, storeDraft,novelId,novelReady,novels.length]);
   const saveScene = useCallback(async (id: string) => {
-    const draft = draftsRef.current[id]; if (!draft || draft.saving || saves.current.has(id)) return;
+    const draft = draftsRef.current[id]; if (!draft || draft.saving || draft.unavailable || saves.current.has(id)) return;
     let payload; try {payload = serializeScene(draft.record);} catch (error) {storeDraft(id, previous => ({...previous!, error: error instanceof Error ? error.message : 'Check this scene before saving.'})); return;}
     const controller = new AbortController(), revision = draft.revision; saves.current.set(id, controller);
     storeDraft(id, previous => ({...previous!, saving: true, error: ''}));
@@ -128,10 +170,18 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     return () => {window.removeEventListener('beforeunload', unload); document.removeEventListener('keydown', shortcut);};
   }, [saveScene]);
   const outlineScenes = useMemo(() => scenes.map(scene => drafts[scene.id] ? summary(drafts[scene.id].record) : scene), [scenes, drafts]);
+  const removedDrafts = Object.entries(drafts).filter(([, draft]) => draft.unavailable);
   const selected = drafts[selectedId], dirtyCount = Object.values(drafts).filter(draft => draft.dirty).length;
   const requestedChapterId=new URL(location.href).searchParams.get('chapter'),contextChapter=chapters.find(chapter=>chapter.id===requestedChapterId)||chapters[0];
   const invalidChapter=Boolean(requestedChapterId&&!catalogLoading&&novelReady&&!catalogError&&!chapters.some(chapter=>chapter.id===requestedChapterId));
   const contextBlocked=novels.length>1&&!novelId,workspaceBusy=catalogLoading||contextBlocked||!novelReady||Boolean(novelError)||invalidChapter;
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (!sceneView || workspaceBusy || !contextChapter || composeHandled.current || url.searchParams.get('compose') !== 'scene') return;
+    composeHandled.current = true;
+    setComposer({kind: 'scene', chapterId: contextChapter.id});
+    url.searchParams.delete('compose'); history.replaceState(history.state, '', url);
+  }, [sceneView, workspaceBusy, contextChapter]);
   const deleteChapter = useCallback(async (chapter: ChapterRecord) => {
     if (!confirm(`Delete chapter “${chapter.title}” and all of its scenes?`)) return;
     try {
@@ -165,10 +215,10 @@ export function WritingWorkspace({view}: {view: WritingView}) {
     {sceneView && <div className="writing-viewbar"><div className="writing-panel-actions"><button type="button" className="writing-panel-toggle" aria-expanded={outlineOpen} aria-controls="writing-outline" onMouseDown={event => event.preventDefault()} onClick={() => setOutlineOpen(open => !open)}><Icon name="outline"/>{outlineOpen ? 'Hide outline' : 'Show outline'}</button><button type="button" className="writing-panel-toggle" aria-expanded={referencesOpen} aria-controls="writing-references" onMouseDown={event => event.preventDefault()} onClick={() => setReferencesOpen(open => !open)}><Icon name="reference"/>{referencesOpen ? 'Hide references' : 'Show references'}</button></div><span className="writing-draft-note">{dirtyCount ? `${dirtyCount} scene${dirtyCount === 1 ? '' : 's'} with unsaved changes` : 'Save when you’re ready'}</span></div>}
     {catalogError && <div className="writing-banner" role="alert"><p>{catalogError}</p><button type="button" className="writing-button" onClick={() => setCatalogAttempt(attempt => attempt + 1)}>Retry loading workspace</button></div>}
     {sceneView ? <div className={'writing-layout' + (outlineOpen ? ' with-outline' : '') + (referencesOpen ? ' with-references' : '')}>
-      <aside id="writing-outline" className="writing-outline" aria-label="Manuscript outline" hidden={!outlineOpen}><div className="writing-panel-heading"><h2>Outline</h2><span>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}</span></div>{catalogLoading ? <p role="status" className="writing-muted">Loading your manuscript…</p> : chapters.length ? chapters.map((chapter, index) => <ChapterOutline key={chapter.id} chapter={chapter} index={index} scenes={outlineScenes.filter(scene => scene.chapterId === chapter.id)} drafts={drafts} selectedId={selectedId} onSelect={chooseScene} onEdit={() => setComposer({kind: 'chapter', chapter})} onCreate={() => setComposer({kind: 'scene', chapterId: chapter.id})}/>) : <p className="writing-muted">Your chapters and scenes will appear here.</p>}</aside>
+      <aside id="writing-outline" className="writing-outline" aria-label="Manuscript outline" hidden={!outlineOpen}><div className="writing-panel-heading"><h2>Outline</h2><span>{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}</span></div>{catalogLoading ? <p role="status" className="writing-muted">Loading your manuscript…</p> : chapters.length ? chapters.map((chapter, index) => <ChapterOutline key={chapter.id} chapter={chapter} index={index} scenes={outlineScenes.filter(scene => scene.chapterId === chapter.id)} drafts={drafts} selectedId={selectedId} onSelect={chooseScene} onEdit={() => setComposer({kind: 'chapter', chapter})} onCreate={() => setComposer({kind: 'scene', chapterId: chapter.id})}/>) : <p className="writing-muted">Your chapters and scenes will appear here.</p>}{removedDrafts.length > 0 && <section aria-label="Unsaved drafts from deleted scenes"><h2>Unsaved drafts</h2><p className="writing-muted">These scenes were deleted. Copy the drafts you want to keep before leaving.</p>{removedDrafts.map(([id, draft]) => <button key={id} type="button" className="writing-scene-link" aria-label={'Open unsaved draft: ' + draft.record.title} onClick={() => chooseScene(id)}>{draft.record.title}</button>)}</section>}</aside>
       <section className="writing-center" aria-label="Scene workspace" aria-busy={sceneLoading === selectedId && Boolean(selectedId)}>
         {!selectedId && <div className="writing-empty"><div className="writing-empty-symbol" aria-hidden="true">✦</div><p className="writing-eyebrow">The next page is yours</p><h2>{chapters.length ? 'Give your chapter its first scene.' : 'Every story begins somewhere.'}</h2><p>{chapters.length ? 'Create a scene, then make room for the words. Your outline and world notes will stay close by.' : 'Start with a chapter. Add scenes as your story grows, and save each one at your own pace.'}</p><button type="button" className="writing-button writing-primary" disabled={workspaceBusy} onClick={() => setComposer(chapters.length ? {kind: 'scene', chapterId: contextChapter.id} : {kind: 'chapter'})}>{chapters.length ? 'Create your first scene' : 'Create your first chapter'}</button></div>}
-        {sceneLoading === selectedId && !selected && <div className="writing-loading" role="status">Opening scene…</div>}
+        {sceneLoading === selectedId && Boolean(selectedId) && !selected && <div className="writing-loading" role="status">Opening scene…</div>}
         {loadError && !selected && <div className="writing-banner" role="alert"><p>{loadError}</p><button type="button" className="writing-button" onClick={() => setLoadAttempt(attempt => attempt + 1)}>Retry opening scene</button></div>}
         {Object.entries(drafts).map(([id, draft]) => <ScenePane key={id} draft={draft} chapters={chapters} active={id === selectedId} onChange={changeScene} onSave={saveScene}/>)}
       </section>
@@ -194,7 +244,8 @@ function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCrea
     const ordinal = String(index + 1).padStart(2, '0');
     const sceneLabel = `${sceneCount} ${sceneCount === 1 ? 'scene' : 'scenes'}`;
     const destination = '/scenes/?'+new URLSearchParams({...(chapter.novelId?{novel:chapter.novelId}:{}),chapter:chapter.id}).toString();
-    const record = {id: chapter.id, name: chapter.title, href: destination};
+    const profile = '/chapters/'+encodeURIComponent(chapter.id)+'/'+(chapter.novelId?'?novel='+encodeURIComponent(chapter.novelId):'');
+    const record = {id: chapter.id, name: chapter.title, href: profile};
     const badge = document.createElement('span');
     badge.className = 'character-power';
     const badgeText = document.createElement('strong');
@@ -211,8 +262,8 @@ function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCrea
     contextPicker.append(avatar);
     const contextCopy = document.createElement('a');
     contextCopy.className = 'affiliation-copy';
-    contextCopy.href = destination;
-    contextCopy.setAttribute('aria-label', `Open scenes for ${chapter.title}`);
+    contextCopy.href = profile;
+    contextCopy.setAttribute('aria-label', `Open chapter profile: ${chapter.title}`);
     const contextKind = document.createElement('span');
     contextKind.className = 'affiliation-kind';
     contextKind.textContent = sceneLabel;
@@ -224,7 +275,7 @@ function ChapterStoryCard({chapter, index, sceneCount, isCreated, onEdit, onCrea
       headingLevel: 2,
       eyebrow: `Chapter ${ordinal}`,
       badge,
-      profileLabel: `Open scenes for ${chapter.title}`,
+      profileLabel: `Open chapter profile: ${chapter.title}`,
       context: [contextPicker, contextCopy],
       actions: [
         storyCardAction({onClick: () => latest.current.onEdit(latest.current.chapter), label: `Edit chapter: ${chapter.title}`, title: 'Edit chapter', icon: 'overview', dialog: true}),
@@ -249,13 +300,14 @@ function ChapterOutline({chapter, index, scenes, drafts, selectedId, onSelect, o
 
 const ScenePane = memo(function ScenePane({draft, chapters, active, onChange, onSave}: {draft: SceneDraft; chapters: ChapterRecord[]; active: boolean; onChange: (id: string, change: SceneChange) => void; onSave: (id: string) => Promise<void>}) {
   const scene = draft.record, onContent = useCallback((content: WritingContent) => onChange(scene.id, {content}), [scene.id, onChange]), form = useRef<HTMLFormElement>(null);
+  const blocked = draft.saving || draft.unavailable;
   const save = (event: FormEvent) => {event.preventDefault(); if (!form.current?.reportValidity()) return; void onSave(scene.id);};
   return <div className="writing-scene-pane" hidden={!active} aria-label={scene.title || 'Untitled scene'}><form ref={form} className="writing-scene-form" onSubmit={save}>
-    <div className="writing-scene-topline"><label className="writing-scene-chapter-label"><span className="writing-sr-only">Scene chapter</span><select aria-label="Scene chapter" value={scene.chapterId} disabled={draft.saving} onChange={event => onChange(scene.id, {chapterId: event.target.value})}>{chapters.map(chapter => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label><div className="writing-save-actions"><span id={active ? 'scene-save-status' : undefined} role="status" className={draft.error ? 'writing-save-error' : ''}>{draft.saving ? 'Saving…' : draft.error ? 'Not saved — your writing is still here' : draft.dirty ? 'Unsaved changes' : 'Saved'}</span><button type="submit" className="writing-button writing-primary" disabled={draft.saving}>{draft.saving ? 'Saving…' : 'Save scene'}</button></div></div>
-    <label className="writing-title-label"><span className="writing-sr-only">Scene title</span><input aria-label="Scene title" className="writing-scene-title" name="title" required maxLength={160} placeholder="Untitled scene" autoComplete="off" value={scene.title} disabled={draft.saving} onChange={event => onChange(scene.id, {title: event.target.value})}/></label>
-    <div className="writing-scene-meta"><label>Scene status<select aria-label="Scene status" value={scene.status} disabled={draft.saving} onChange={event => onChange(scene.id, {status: event.target.value as SceneStatus})}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></label><details className="writing-summary"><summary>Scene summary</summary><label className="writing-sr-only" htmlFor={'scene-summary-' + scene.id}>Scene summary</label><textarea id={'scene-summary-' + scene.id} aria-label="Scene summary" value={scene.summary} maxLength={10000} rows={3} placeholder="What changes in this scene?" disabled={draft.saving} onChange={event => onChange(scene.id, {summary: event.target.value})}/></details></div>
+    <div className="writing-scene-topline"><label className="writing-scene-chapter-label"><span className="writing-sr-only">Scene chapter</span><select aria-label="Scene chapter" value={scene.chapterId} disabled={blocked} onChange={event => onChange(scene.id, {chapterId: event.target.value})}>{chapters.map(chapter => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label><div className="writing-save-actions"><span id={active ? 'scene-save-status' : undefined} role="status" className={draft.error ? 'writing-save-error' : ''}>{draft.saving ? 'Saving…' : draft.unavailable ? 'Deleted — unsaved draft retained' : draft.error ? 'Not saved — your writing is still here' : draft.dirty ? 'Unsaved changes' : 'Saved'}</span><button type="submit" className="writing-button writing-primary" disabled={blocked}>{draft.saving ? 'Saving…' : 'Save scene'}</button></div></div>
+    <label className="writing-title-label"><span className="writing-sr-only">Scene title</span><input aria-label="Scene title" className="writing-scene-title" name="title" required maxLength={160} placeholder="Untitled scene" autoComplete="off" value={scene.title} disabled={draft.saving} readOnly={draft.unavailable} onChange={event => onChange(scene.id, {title: event.target.value})}/></label>
+    <div className="writing-scene-meta"><label>Scene status<select aria-label="Scene status" value={scene.status} disabled={blocked} onChange={event => onChange(scene.id, {status: event.target.value as SceneStatus})}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></label><details className="writing-summary"><summary>Scene summary</summary><label className="writing-sr-only" htmlFor={'scene-summary-' + scene.id}>Scene summary</label><textarea id={'scene-summary-' + scene.id} aria-label="Scene summary" value={scene.summary} maxLength={10000} rows={3} placeholder="What changes in this scene?" disabled={draft.saving} readOnly={draft.unavailable} onChange={event => onChange(scene.id, {summary: event.target.value})}/></details></div>
     {draft.error && <p id={active ? 'scene-error' : undefined} className="writing-inline-error" role="alert">{draft.error}</p>}
-  </form><WritingEditor sceneId={scene.id} initialContent={draft.initialContent} editable={!draft.saving} active={active} onUpdate={onContent}/></div>;
+  </form><WritingEditor sceneId={scene.id} initialContent={draft.initialContent} editable={!blocked} active={active} onUpdate={onContent}/></div>;
 });
 
 function ComposeDialog({composer, chapters, novelId, onClose, onComplete}: {composer: Composer; chapters: ChapterRecord[]; novelId: string; onClose: () => void; onComplete: (record: ChapterRecord | SceneRecord) => void}) {

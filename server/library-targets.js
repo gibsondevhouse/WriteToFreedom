@@ -34,7 +34,7 @@ export async function libraryEntries(binding,owner){
   ...cast.flatMap(character=>(character.notes||[]).map(note=>({kind:'note',id:note.id,characterId:character.id,name:note.title||'Note on '+character.name,label:'Character note',href:'/characters/'+encodeURIComponent(character.id)+'/#note-'+encodeURIComponent(note.id),summary:note.text||'',image:'',parent:character.name}))),
   ...novels.map(item=>card('novel',item,'/novels/'+encodeURIComponent(item.id)+'/','Novel',{seriesId:item.seriesId||'',status:item.status})),
   ...series.map(item=>card('series',item,'/series/'+encodeURIComponent(item.id)+'/','Series')),
-  ...chapters.map(item=>card('chapter',item,'/scenes/?'+new URLSearchParams({novel:item.novelId||'',chapter:item.id}),'Chapter',{novelId:item.novelId})),
+  ...chapters.map(item=>card('chapter',item,'/chapters/'+encodeURIComponent(item.id)+'/?'+new URLSearchParams({novel:item.novelId||''}),'Chapter',{novelId:item.novelId})),
   ...scenes.map(item=>card('scene',item,'/scenes/?'+new URLSearchParams({novel:chapterMap.get(item.chapterId)?.novelId||'',chapter:item.chapterId,scene:item.id}),'Scene',{novelId:chapterMap.get(item.chapterId)?.novelId}))
  ];
 }

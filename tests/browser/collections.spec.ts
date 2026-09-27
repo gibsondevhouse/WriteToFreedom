@@ -120,7 +120,8 @@ test('mixed cards and lists resolve canonical articles, embedded notes and exact
   for(const href of hrefs){
    expect(href.split('#').length).toBeLessThanOrEqual(2);
    const url=new URL(href,origin),canonical=new URL(entry.href,origin);
-   if(['chapter','scene','note','series'].includes(entry.kind))expect(href).toBe(entry.href);
+   if(entry.kind==='chapter')expect([entry.href,'/scenes/?'+new URLSearchParams({novel:entry.novelId,chapter:entry.id})]).toContain(href);
+   else if(['scene','note','series'].includes(entry.kind))expect(href).toBe(entry.href);
    else if(entry.kind==='novel')expect([entry.href,'/scenes/?novel='+entry.id]).toContain(href);
    else expect(url.pathname).toBe(canonical.pathname);
    const route=url.pathname+url.search;if(!destinations.has(route))destinations.set(route,[]);

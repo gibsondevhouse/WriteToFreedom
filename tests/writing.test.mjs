@@ -23,8 +23,80 @@ function setup(t){
  const get=async(path,owner='author')=>{const response=await request(path,'GET',undefined,owner);assert.equal(response.status,200,await response.clone().text());return response.json();};
  const chapter=async(extra={},owner='author')=>{const response=await request('/api/chapters','POST',{id:crypto.randomUUID(),title:'First chapter',summary:'',...extra},owner);assert.equal(response.status,201,await response.clone().text());return response.json();};
  const scene=async(chapterId,extra={},owner='author')=>{const response=await request('/api/scenes','POST',{id:crypto.randomUUID(),chapterId,title:'First scene',summary:'',status:'draft',contentSchemaVersion:1,content:emptyWritingContent(),...extra},owner);assert.equal(response.status,201,await response.clone().text());return response.json();};
- return {request,get,chapter,scene,sqlite};
+ return {request,get,chapter,scene,sqlite,env};
 }
+
+test('deleting a chapter removes its scenes atomically and preserves other manuscripts',async t=>{
+ const {request,get,chapter,scene,sqlite}=setup(t);
+ sqlite.exec('PRAGMA foreign_keys = ON');
+ const parent=await chapter(),empty=await chapter(),other=await chapter(),foreign=await chapter({},'other');
+ const entries=[await scene(parent.id),await scene(parent.id,{content:document('Second scene prose')})];
+ const kept=await scene(other.id,{content:document('Other chapter prose')}),privateScene=await scene(foreign.id,{},'other');
+ const novelId=crypto.randomUUID(),now=new Date().toISOString();
+ sqlite.prepare('INSERT INTO novels (id,owner_id,document,created_at,updated_at) VALUES (?,?,?,?,?)').run(novelId,'author','{"title":"Another novel"}',now,now);
+ const otherNovel=await chapter({novelId}),otherNovelScene=await scene(otherNovel.id,{content:document('Other novel prose')});
+ const preserved=await Promise.all([get('/api/scenes/'+kept.id),get('/api/scenes/'+privateScene.id,'other'),get('/api/scenes/'+otherNovelScene.id)]);
+ const response=await request('/api/chapters/'+parent.id+'?novelId='+parent.novelId,'DELETE',{version:parent.version});
+ assert.equal(response.status,204,await response.clone().text());assert.equal(await response.text(),'');
+ assert.equal((await request('/api/chapters/'+parent.id)).status,404);
+ for(const entry of entries)assert.equal((await request('/api/scenes/'+entry.id)).status,404);
+ assert.deepEqual(await Promise.all([get('/api/scenes/'+kept.id),get('/api/scenes/'+privateScene.id,'other'),get('/api/scenes/'+otherNovelScene.id)]),preserved);
+ assert.deepEqual((await get('/api/chapters?novelId='+parent.novelId)).chapters.map(c=>c.id).sort(),[empty.id,other.id].sort());
+ assert.equal((await request('/api/chapters/'+empty.id,'DELETE',{version:empty.version})).status,204);
+ assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
+});
+
+test('invalid, stale, foreign and incorrectly scoped chapter deletions preserve all writing',async t=>{
+ const {request,get,chapter,scene}=setup(t),parent=await chapter(),entry=await scene(parent.id,{content:document('Preserved prose')}),foreign=await chapter({},'other');
+ assert.equal((await request('/api/chapters/'+parent.id,'PUT',{version:1,title:'Newer chapter'})).status,200);
+ const before=await get('/api/chapters/'+parent.id),prose=await get('/api/scenes/'+entry.id),path='/api/chapters/'+parent.id;
+ for(const body of [{},{version:0},{version:1.5},{version:Number.MAX_SAFE_INTEGER+1}])assert.equal((await request(path,'DELETE',body)).status,400);
+ assert.equal((await request(path,'DELETE',{version:1})).status,409);
+ assert.equal((await request(path,'DELETE',{version:2},'other')).status,404);
+ assert.equal((await request(path,'DELETE',{version:2},null)).status,401);
+ assert.equal((await request(path,'DELETE',{version:2},'author',{origin:'https://evil.example'})).status,403);
+ assert.equal((await request(path+'?novelId='+foreign.novelId,'DELETE',{version:2})).status,404);
+ assert.equal((await request('/api/scenes/'+entry.id,'DELETE',{version:1})).status,405);
+ assert.deepEqual(await get(path),before);assert.deepEqual(await get('/api/scenes/'+entry.id),prose);
+});
+
+test('a chapter update after the delete read preserves its scenes and returns a conflict',async t=>{
+ const {request,get,chapter,scene,sqlite,env}=setup(t),parent=await chapter(),entry=await scene(parent.id,{content:document('Keep concurrent prose')}),base=env.DB;
+ const prose=await get('/api/scenes/'+entry.id);let interleaved=false;
+ env.DB={...base,batch(statements){
+  interleaved=true;
+  sqlite.prepare('UPDATE chapters SET document = ?, version = version + 1 WHERE id = ?').run('{"title":"Concurrent chapter","summary":""}',parent.id);
+  return base.batch(statements);
+ }};
+ assert.equal((await request('/api/chapters/'+parent.id,'DELETE',{version:1})).status,409);assert.ok(interleaved);
+ assert.equal((await get('/api/chapters/'+parent.id)).title,'Concurrent chapter');
+ assert.deepEqual(await get('/api/scenes/'+entry.id),prose);
+});
+
+test('collected chapters and scenes block deletion with an actionable conflict and roll back prose',async t=>{
+ const {request,get,chapter,scene,sqlite}=setup(t);
+ for(const kind of ['chapter','scene']){
+  const parent=await chapter(),first=await scene(parent.id),second=await scene(parent.id,{content:document('Collected prose')}),collectionId=crypto.randomUUID(),now=new Date().toISOString();
+  sqlite.prepare('INSERT INTO collections (id,owner_id,kind,document,created_at,updated_at) VALUES (?,?,?,?,?,?)').run(collectionId,'author','manual','{"name":"Reading list"}',now,now);
+  sqlite.prepare('INSERT INTO collection_members (owner_id,collection_id,target_kind,target_id,target_parent_id,created_at) VALUES (?,?,?,?,?,?)').run('author',collectionId,kind,kind==='chapter'?parent.id:second.id,'',now);
+  const path='/api/chapters/'+parent.id,scenePaths=['/api/scenes/'+first.id,'/api/scenes/'+second.id];
+  const before=await Promise.all([get(path),...scenePaths.map(path=>get(path))]);
+  const response=await request(path,'DELETE',{version:parent.version});
+  assert.equal(response.status,409,await response.clone().text());assert.match((await response.json()).error,/Remove those collection memberships/);
+  assert.deepEqual(await Promise.all([get(path),...scenePaths.map(path=>get(path))]),before);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM collection_members WHERE collection_id = ?').get(collectionId).n,1);
+  sqlite.prepare('DELETE FROM collection_members WHERE collection_id = ?').run(collectionId);
+  assert.equal((await request(path,'DELETE',{version:parent.version})).status,204);
+ }
+});
+
+test('storage failures during chapter deletion roll back every removed scene',async t=>{
+ const {request,get,chapter,scene,sqlite}=setup(t),parent=await chapter(),entry=await scene(parent.id,{content:document('Keep failed deletion prose')});
+ const path='/api/chapters/'+parent.id,before=await Promise.all([get(path),get('/api/scenes/'+entry.id)]);
+ sqlite.exec("CREATE TRIGGER fail_chapter_delete BEFORE DELETE ON chapters BEGIN SELECT RAISE(ABORT, 'Injected deletion failure'); END");
+ assert.equal((await request(path,'DELETE',{version:parent.version})).status,503);
+ assert.deepEqual(await Promise.all([get(path),get('/api/scenes/'+entry.id)]),before);
+});
 
 test('chapters and scenes round-trip structured writing with deterministic content-free catalogs',async t=>{
  const {request,get,chapter,scene,sqlite}=setup(t),first=await chapter({title:'  The   beginning  ',summary:'Opening chapter'}),second=await chapter({title:'Afterward'});

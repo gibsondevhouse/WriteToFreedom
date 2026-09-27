@@ -50,6 +50,14 @@ async function saveScene(page:Page,id:string,shortcut=false):Promise<Scene>{
  return result.json();
 }
 async function selectedText(control:Locator){return control.evaluate(element=>element.ownerDocument.getSelection()?.toString()||'');}
+async function deleteChapterCard(page:Page,chapter:Chapter){
+ const response=page.waitForResponse(candidate=>candidate.url()===origin+'/api/chapters/'+chapter.id+'?novelId='+testNovelId&&candidate.request().method()==='DELETE');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'Delete chapter: '+chapter.title,exact:true}).click();
+ const result=await response;
+ expect(result.status()).toBe(204);
+ await expect(page.getByRole('heading',{name:chapter.title,exact:true})).toHaveCount(0);
+}
 
 test('chapters and scenes open focused writing routes with their own primary actions',async({page})=>{
  for(const route of focusedWritingRoutes){
@@ -123,6 +131,125 @@ test('creates a chapter and a rich-text scene through the writing workspace',asy
  expect(await readScene(request,scene.id)).toMatchObject({chapterId:chapter.id,title:sceneTitle,contentSchemaVersion:1,version:2});
  await page.reload();
  await expect(editor(page)).toHaveText('The door opened without a sound.');
+});
+
+test('chapter card deletion confirms and removes its scenes while preserving the remaining manuscript',async({page,request})=>{
+ const removed=await createChapter(request,'Delete chapter '+randomUUID()),retained=await createChapter(request,'Keep chapter '+randomUUID());
+ const first=await createScene(request,removed,{content:documentFrom('First deleted scene.')}),second=await createScene(request,removed,{content:documentFrom('Second deleted scene.')}),survivor=await createScene(request,retained,{content:documentFrom('Keep this manuscript text.')});
+ await page.goto('/chapters/?novel='+testNovelId);
+ const removedCard=page.locator('article.writing-chapter-story-card').filter({has:page.getByRole('heading',{name:removed.title,exact:true})});
+ const retainedCard=page.locator('article.writing-chapter-story-card').filter({has:page.getByRole('heading',{name:retained.title,exact:true})});
+ await expect(removedCard).toContainText('2 scenes');
+ await expect(retainedCard).toContainText('1 scene');
+ const response=page.waitForResponse(candidate=>candidate.url()===origin+'/api/chapters/'+removed.id+'?novelId='+testNovelId&&candidate.request().method()==='DELETE');
+ const confirmation=page.waitForEvent('dialog');
+ const clicking=removedCard.getByRole('button',{name:'Delete chapter: '+removed.title,exact:true}).click();
+ const dialog=await confirmation;
+ expect(dialog.type()).toBe('confirm');
+ expect(dialog.message()).toBe(`Delete chapter “${removed.title}” and all of its scenes?`);
+ await dialog.accept();
+ await clicking;
+ const deleted=await response;
+ expect(deleted.status()).toBe(204);
+ expect(deleted.request().postDataJSON()).toEqual({version:removed.version});
+ await expect(removedCard).toHaveCount(0);
+ await expect(retainedCard).toBeVisible();
+ await expect(retainedCard).toContainText('1 scene');
+ expect((await request.get('/api/chapters/'+removed.id+'?novelId='+testNovelId)).status()).toBe(404);
+ for(const scene of [first,second])expect((await request.get('/api/scenes/'+scene.id+'?novelId='+testNovelId)).status()).toBe(404);
+ const chapterCatalog=await (await request.get('/api/chapters?novelId='+testNovelId)).json();
+ expect(chapterCatalog.chapters).toEqual([expect.objectContaining({id:retained.id,title:retained.title})]);
+ const sceneCatalog=await (await request.get('/api/scenes?novelId='+testNovelId)).json();
+ expect(sceneCatalog.scenes).toEqual([expect.objectContaining({id:survivor.id,chapterId:retained.id})]);
+ expect(await readScene(request,survivor.id)).toEqual(survivor);
+ await page.reload();
+ await expect(removedCard).toHaveCount(0);
+ await expect(retainedCard).toContainText('1 scene');
+});
+
+test('an open scene tab refreshes when every chapter is deleted in another tab',async({page,request,context})=>{
+ const first=await createChapter(request),second=await createChapter(request);
+ const selected=await createScene(request,first),other=await createScene(request,second);
+ await page.goto('/scenes/?novel='+testNovelId+'&scene='+selected.id);
+ await expect(editor(page)).toHaveText(textFrom(selected.content));
+ await expect(page.getByRole('button',{name:'Open scene: '+other.title,exact:true})).toBeVisible();
+ const chaptersPage=await context.newPage();
+ await chaptersPage.goto('/chapters/?novel='+testNovelId);
+ for(const chapter of [first,second])await deleteChapterCard(chaptersPage,chapter);
+ await expect(page.getByRole('button',{name:/^Open scene: /})).toHaveCount(0);
+ await expect(editor(page)).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Every story begins somewhere.',exact:true})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'Opening scene…'})).toHaveCount(0);
+ expect(new URL(page.url()).searchParams.has('scene')).toBe(false);
+});
+
+test('external chapter deletion keeps a dirty scene draft available to copy and disables saving',async({page,request,context})=>{
+ const chapter=await createChapter(request),scene=await createScene(request,chapter);
+ await page.goto('/scenes/?novel='+testNovelId+'&scene='+scene.id);
+ await expect(editor(page)).toHaveText(textFrom(scene.content));
+ const draft='Keep my unsaved words after the chapter is removed.';
+ await editor(page).fill(draft);
+ await expect(page.getByRole('button',{name:'Save scene',exact:true})).toBeEnabled();
+ const chaptersPage=await context.newPage();
+ await chaptersPage.goto('/chapters/?novel='+testNovelId);
+ await deleteChapterCard(chaptersPage,chapter);
+ await expect(page.getByRole('alert').filter({hasText:/deleted|removed/i})).toContainText(/copy/i);
+ await expect(editor(page)).toHaveText(draft);
+ await expect(editor(page)).toHaveAttribute('contenteditable','false');
+ await expect(page.getByRole('button',{name:'Save scene',exact:true})).toBeDisabled();
+ await editor(page).evaluate(element=>{
+  const range=document.createRange();range.selectNodeContents(element);
+  const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);
+ });
+ expect(await selectedText(editor(page))).toBe(draft);
+ expect((await request.get('/api/scenes/'+scene.id)).status()).toBe(404);
+});
+
+test('a chapters page restored from browser history refreshes its saved catalog',async({page,request})=>{
+ const removed=await createChapter(request),retained=await createChapter(request);
+ await createScene(request,removed);
+ await page.goto('/chapters/?novel='+testNovelId);
+ await expect(page.getByRole('heading',{name:removed.title,exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:retained.title,exact:true})).toBeVisible();
+ const deleted=await request.delete('/api/chapters/'+removed.id+'?novelId='+testNovelId,{headers:{origin},data:{version:removed.version}});
+ expect(deleted.status(),await deleted.text()).toBe(204);
+ await expect(page.getByRole('heading',{name:removed.title,exact:true})).toBeVisible();
+ const refreshed=page.waitForResponse(candidate=>new URL(candidate.url()).pathname==='/api/chapters'&&new URL(candidate.url()).searchParams.get('novelId')===testNovelId&&candidate.request().method()==='GET');
+ await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+ expect((await refreshed).status()).toBe(200);
+ await expect(page.getByRole('heading',{name:removed.title,exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:retained.title,exact:true})).toBeVisible();
+});
+
+test('workspace refresh bypasses a browser cache that reuses catalog responses by URL',async({page,request})=>{
+ const removed=await createChapter(request),retained=await createChapter(request);
+ const cachedCatalogs=new Map<string,string>();
+ await page.route('**/api/chapters?*',async route=>{
+  const url=route.request().url();
+  if(route.request().method()!=='GET'||new URL(url).pathname!=='/api/chapters'){await route.continue();return;}
+  let body=cachedCatalogs.get(url);
+  if(body===undefined){
+   const response=await route.fetch();
+   expect(response.status()).toBe(200);
+   body=await response.text();cachedCatalogs.set(url,body);
+  }
+  // Reproduce a host cache that ignores no-store and keys only on the full URL.
+  await route.fulfill({status:200,contentType:'application/json',headers:{'cache-control':'no-store'},body});
+ });
+ await page.goto('/chapters/?novel='+testNovelId);
+ await expect(page.getByRole('heading',{name:removed.title,exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:retained.title,exact:true})).toBeVisible();
+ const previousURLs=new Set(cachedCatalogs.keys());
+ expect(previousURLs.size).toBeGreaterThan(0);
+ const deleted=await request.delete('/api/chapters/'+removed.id+'?novelId='+testNovelId,{headers:{origin},data:{version:removed.version}});
+ expect(deleted.status()).toBe(204);
+ const refreshed=page.waitForResponse(candidate=>candidate.request().method()==='GET'&&new URL(candidate.url()).pathname==='/api/chapters');
+ await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+ const response=await refreshed;
+ expect(response.status()).toBe(200);
+ expect(previousURLs.has(response.url())).toBe(false);
+ await expect(page.getByRole('heading',{name:removed.title,exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:retained.title,exact:true})).toBeVisible();
 });
 
 test('a lost create response and edited retry preserve the newer scene form without duplicates',async({page,request})=>{

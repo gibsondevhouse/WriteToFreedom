@@ -67,7 +67,8 @@ function chapterList(novel,chapters,scenes){
  return `<ol class="novel-chapters">${chapters.map(chapter=>{
   const params=`novel=${encodeURIComponent(novel.id)}&chapter=${encodeURIComponent(chapter.id)}`;
   const count=byChapter.get(chapter.id)||0;
-  return `<li><div><strong>${escape(chapter.title||'Untitled chapter')}</strong><p>${sentence(chapter.summary)||'Add a chapter summary in the writing workspace.'}</p><small>${count} scene${count===1?'':'s'}</small></div><div class="novel-chapter-actions"><a href="/chapters/?${params}">Edit chapter</a><a href="/scenes/?${params}">Write scenes →</a></div></li>`;
+  const profile='/chapters/'+encodeURIComponent(chapter.id)+'/?novel='+encodeURIComponent(novel.id);
+  return `<li><div><strong><a href="${profile}">${escape(chapter.title||'Untitled chapter')}</a></strong><p>${sentence(chapter.summary)||'Add a chapter summary in its profile.'}</p><small>${count} scene${count===1?'':'s'}</small></div><div class="novel-chapter-actions"><a href="${profile}">Open chapter</a><a href="/scenes/?${params}">Write scenes →</a></div></li>`;
  }).join('')}</ol>`;
 }
 function seriesOptions(series){return [['','Standalone novel'],...series.map(item=>[item.id,item.title||'Untitled series'])];}
