@@ -10,11 +10,12 @@ export interface WritingNode {
 }
 export interface WritingContent {type: 'doc'; content: WritingNode[]}
 export type SceneStatus = 'draft' | 'revising' | 'complete';
-export interface ChapterRecord {id: string; schemaVersion: 1; version: number; title: string; summary: string; novelId?: string; createdAt: string; updatedAt: string}
+export type ChapterStatus = SceneStatus;
+export interface ChapterRecord {id: string; schemaVersion: 1; version: number; title: string; summary: string; novelId?: string; status?: ChapterStatus; chapterNumber?: number; connectedArcIds?: string[]; createdAt: string; updatedAt: string}
 export interface SceneSummary extends ChapterRecord {chapterId: string; status: SceneStatus; contentSchemaVersion: 1}
 export interface SceneRecord extends SceneSummary {content: WritingContent}
 export type SaveScenePayload = Pick<SceneRecord, 'title' | 'summary' | 'chapterId' | 'status' | 'contentSchemaVersion' | 'content' | 'schemaVersion' | 'version'>;
-export type SaveChapterPayload = Pick<ChapterRecord, 'title' | 'summary' | 'schemaVersion' | 'version'>;
+export type SaveChapterPayload = Pick<ChapterRecord, 'title' | 'summary' | 'schemaVersion' | 'version' | 'status' | 'chapterNumber' | 'connectedArcIds'>;
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('The writing response could not be read. Try loading it again.');
@@ -34,13 +35,31 @@ function timestamp(value: unknown): string {
   if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== date) throw new Error('The writing response contains an unreadable timestamp.');
   return date;
 }
+function chapterMetadata(data: Record<string, unknown>): Pick<ChapterRecord, 'status' | 'chapterNumber' | 'connectedArcIds'> {
+  const metadata: Pick<ChapterRecord, 'status' | 'chapterNumber' | 'connectedArcIds'> = {};
+  if (data.status !== undefined) {
+    if (typeof data.status !== 'string' || !['draft', 'revising', 'complete'].includes(data.status)) throw new Error('Choose Draft, Revising, or Complete as the chapter status.');
+    metadata.status = data.status as ChapterStatus;
+  }
+  if (data.chapterNumber !== undefined) {
+    if (!Number.isSafeInteger(data.chapterNumber) || Number(data.chapterNumber) < 1 || Number(data.chapterNumber) > 9999) throw new Error('Enter a chapter number from 1 to 9,999.');
+    metadata.chapterNumber = Number(data.chapterNumber);
+  }
+  if (data.connectedArcIds !== undefined) {
+    if (!Array.isArray(data.connectedArcIds) || data.connectedArcIds.length > 50) throw new Error('Choose up to 50 different story arcs.');
+    const ids = data.connectedArcIds.map(identifier);
+    if (new Set(ids).size !== ids.length) throw new Error('Choose up to 50 different story arcs.');
+    metadata.connectedArcIds = ids;
+  }
+  return metadata;
+}
 export function readChapterRecord(value: unknown): ChapterRecord {
   const data = record(value);
   if (data.schemaVersion !== 1) throw new Error('This writing entry uses an unsupported data format. Your saved writing has not been changed.');
   if (!Number.isSafeInteger(data.version) || Number(data.version) < 1) throw new Error('Reload this item before saving.');
   const title = text(data.title), summary = text(data.summary);
   if (!title.trim() || title.length > 160 || summary.length > 10000) throw new Error('The writing response contains unreadable metadata.');
-  return {id: identifier(data.id), schemaVersion: 1, version: Number(data.version), title, summary, ...(data.novelId ? {novelId: identifier(data.novelId)} : {}), createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt)};
+  return {id: identifier(data.id), schemaVersion: 1, version: Number(data.version), title, summary, ...(data.novelId ? {novelId: identifier(data.novelId)} : {}), ...chapterMetadata(data), createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt)};
 }
 export function readSceneSummary(value: unknown): SceneSummary {
   const data = record(value);
@@ -51,6 +70,19 @@ export function readSceneSummary(value: unknown): SceneSummary {
 export function readSceneRecord(value: unknown): SceneRecord {
   return {...readSceneSummary(value), content: validateWritingContent(record(value).content) as WritingContent};
 }
+export function summarizeScene(scene: SceneRecord): SceneSummary {
+  const {content, ...summary} = scene;
+  return summary;
+}
+export function groupScenesByChapter<TScene extends SceneSummary>(scenes: readonly TScene[]): Map<string, TScene[]> {
+  const groups = new Map<string, TScene[]>();
+  for (const scene of scenes) {
+    const chapterId = scene.chapterId, group = groups.get(chapterId);
+    if (group) group.push(scene);
+    else groups.set(chapterId, [scene]);
+  }
+  return groups;
+}
 export function emptyWritingContent(): WritingContent {return blankContent() as WritingContent;}
 
 /** Keep catalog/display metadata outside the writable document contract. */
@@ -58,7 +90,7 @@ export function serializeChapter(chapter: ChapterRecord): SaveChapterPayload {
   if (chapter.schemaVersion !== 1 || !Number.isSafeInteger(chapter.version) || chapter.version < 1 || chapter.version === Number.MAX_SAFE_INTEGER) throw new Error('Reload this item before saving.');
   if (!chapter.title.trim() || chapter.title.length > 160) throw new Error('Enter a chapter title of 1–160 characters.');
   if (chapter.summary.length > 10000) throw new Error('Keep the chapter summary under 10,000 characters.');
-  return {title: chapter.title, summary: chapter.summary, schemaVersion: 1, version: chapter.version};
+  return {title: chapter.title, summary: chapter.summary, schemaVersion: 1, version: chapter.version, ...chapterMetadata({...chapter})};
 }
 export function serializeScene(scene: SceneRecord): SaveScenePayload {
   if (scene.schemaVersion !== 1 || !Number.isSafeInteger(scene.version) || scene.version < 1 || scene.version === Number.MAX_SAFE_INTEGER) throw new Error('Reload this item before saving.');

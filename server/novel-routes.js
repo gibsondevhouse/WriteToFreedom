@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {repository} from './db.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
@@ -11,7 +12,6 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const targetKinds=new Set(['character','faction','location','lore','story_arc']);
 const relationKinds=new Set(['appears_in','referenced_by','linked']);
 const statuses=new Set(['drafting','revising','complete','archived']);
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const noContent=()=>new Response(null,{status:204,headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const field=(input,current,key,fallback)=>Object.hasOwn(input,key)?input[key]:current?.[key]??fallback;
@@ -78,7 +78,7 @@ export async function novelRoute(request,env){
  if(id&&!uuid.test(id)||associationId&&!uuid.test(associationId))return json({error:'Novel, series, or association not found.'},404);
  const allowed=targetList?['GET']:subresource==='associations'&&novel?associationId?['PUT','DELETE']:['GET','POST']:subresource==='order'&&!novel&&!associationId?['PUT']:subresource?[]:id?['GET','PUT']:['GET','POST'];
  if(!allowed.includes(request.method))return json({error:'Method not allowed.'},405);
- if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase()!=='application/json'))return json({error:'This request could not be verified.'},403);
+ if(request.method!=='GET'&&!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
  try{
   const db=repository(env.DB);
   if(targetList){

@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {parentChoices} from '../public/locations/data.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
@@ -8,7 +9,6 @@ import {countryHideableFields,countryFields,countryImageFields,validImageUrl} fr
 import {characterCast} from './sample-characters.js';
 import {renderCountry} from './render-country.js';
 import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
  * Serve existing country profiles at /locations/countries/id/ (GET/HEAD HTML)
  * and /api/countries/id (GET/PUT JSON). Both forms use path segment 3 as ID.
@@ -30,7 +30,7 @@ export async function countryRoute(request,env){
   if(profile){if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);return new Response(request.method==='HEAD'?null:renderCountry(current,locations,cast,await db.listLore(owner)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});}
   if(request.method==='GET')return json(current);
   if(request.method!=='PUT')return json({error:'Method not allowed.'},405);
-  if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'Country profile is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid country data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input)||!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<0)return json({error:'Reload this country before saving.'},400);

@@ -1,3 +1,4 @@
+import {json} from './http.js';
 import {loreCard} from './lore.js';
 import {locationProfileGroups} from '../public/locations/template.js';
 import {locationPaths} from '../public/locations/data.js';
@@ -12,7 +13,6 @@ import {ancestors,typeLabels} from '../public/locations/data.js';
 import {collectTimeline} from '../public/timeline/model.js';
 import {choicesFor} from '../public/profiles/choice-selections.js';
 
-const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const paths={...locationPaths,lore:'/lore/',character:'/characters/',faction:'/factions/',storyArc:'/story-arcs/'};
 const names={lore:'Lore',character:'Character',faction:'Faction',storyArc:'Story Arc',...typeLabels};
 function profileCard(record,kind){return {id:record.id,name:record.name?.trim()||'Untitled '+kind,kind,label:names[kind],href:paths[kind]+encodeURIComponent(record.id)+'/',summary:record.summary||'',title:record.title||record.motto||''};}

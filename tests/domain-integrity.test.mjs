@@ -10,11 +10,33 @@ function setup(t){
  const sqlite=new DatabaseSync(':memory:');t.after(()=>sqlite.close());
  for(const file of readdirSync('drizzle').filter(name=>name.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));
  const worker=createWorker({}),env={DB:d1Adapter(sqlite)},origin='https://novel.example';
- const request=(path,method='GET',body)=>worker.fetch(new Request(origin+path,{method,headers:{origin,'content-type':'application/json','oai-authenticated-user-id':'author'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
+ const request=(path,method='GET',body,headers={})=>worker.fetch(new Request(origin+path,{method,headers:{origin,'content-type':'application/json','oai-authenticated-user-id':'author',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
  const get=async path=>{const response=await request(path);assert.equal(response.status,200,await response.clone().text());return response.json();};
  const create=async(path,body)=>{const response=await request(path,'POST',body);assert.equal(response.status,201,await response.clone().text());return response.json();};
  return {sqlite,request,get,create};
 }
+
+test('JSON mutation envelopes are consistent across entity routes',async t=>{
+ const {request,get}=setup(t);
+ const mutations=[
+  ['/api/characters','POST',{id:crypto.randomUUID()}],
+  ['/api/factions','POST',{id:crypto.randomUUID(),blank:true}],
+  ['/api/locations','POST',{id:crypto.randomUUID(),name:'A country',type:'country'}],
+  ['/api/lore','POST',{id:crypto.randomUUID(),type:'note',name:'A note'}],
+  ['/api/story-arcs','POST',{id:crypto.randomUUID()}],
+  ['/api/novels','POST',{id:crypto.randomUUID(),title:'A novel'}],
+  ['/api/series','POST',{id:crypto.randomUUID(),title:'A series'}],
+  ['/api/collections','POST',{id:crypto.randomUUID(),kind:'manual',name:'A collection'}],
+  ['/api/chapters','POST',{id:crypto.randomUUID(),title:'A chapter'}],
+ ];
+ for(const path of ['/api/countries/sample-kingdom','/api/cities/sample-capital','/api/locations/sample-royal-archive'])mutations.push([path,'PUT',await get(path)]);
+ for(const [path,method,body] of mutations){
+  for(const headers of [{origin:'https://other.example'},{origin:''},{'content-type':'text/plain'},{'content-type':'application/json-invalid'},{'content-type':''}])assert.equal((await request(path,method,body,headers)).status,403,path+': '+JSON.stringify(headers));
+  const response=await request(path,method,body,{'content-type':'Application/JSON; charset=utf-8'});
+  assert.equal(response.status,method==='POST'?201:200,path+': '+await response.clone().text());
+  assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+ }
+});
 
 test('story arc scenes keep their identities through edits, reordering, and partial saves',async t=>{
  const {request,get,create}=setup(t),scene=title=>({title,chapter:'Chapter 1',beat:'exposition',summary:'A beginning.'});

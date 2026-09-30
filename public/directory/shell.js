@@ -1,8 +1,9 @@
 import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 export async function fetchDirectory(url,{signal,errorMessage='Your entries could not be loaded.'}={}){
- const response=await fetch(scopedCatalogUrl(url),{credentials:'same-origin',cache:'no-store',signal});
- if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
- const data=await response.json();if(!response.ok)throw new Error(data.error||errorMessage);showCatalogScope(data.scope);return data;
+ const data=await requestJSON(scopedCatalogUrl(url),{signal},{errorMessage,sessionMessage:'Your session may have expired. Reload to sign in again.'});
+ showCatalogScope(data.scope);return data;
 }
 
 /** Owns directory controls, reads and replaceable items. Adapters own domain data and writes. */
@@ -82,10 +83,14 @@ export function initDirectoryShell({
  listen(search,'input',render);listen(sort,'change',render);listen(view,'change',render);
  listen(direction,'click',()=>{reversed=!reversed;direction.setAttribute('aria-pressed',String(reversed));const label=reversed?'Restore forward list order':'Reverse list order';direction.setAttribute('aria-label',label);direction.title=label;render();});
  listen(clear,'click',()=>resetSearch());listen(reset,'click',()=>resetSearch(true));listen(retry,'click',refresh);
- listen(window,'pageshow',event=>{if(event.persisted)refresh();});
+ let hasShownPage=false;
+ listen(window,'pageshow',event=>{if(hasShownPage||event.persisted)refresh();hasShownPage=true;});
  listen(window,'pagehide',event=>{if(!event.persisted)destroy();});
+ listen(window,'focus',refresh);
+ listen(document,'visibilitychange',()=>{if(!document.hidden)refresh();});
+ const stopWatching=observeWorkspaceChanges(refresh);
  function destroy(){
-  if(destroyed)return;destroyed=true;queued=false;abort.abort();listeners.forEach(remove=>remove());itemCleanup.forEach(dispose=>dispose());itemCleanup=[];results.setAttribute('aria-busy','false');
+  if(destroyed)return;destroyed=true;queued=false;abort.abort();stopWatching();listeners.forEach(remove=>remove());itemCleanup.forEach(dispose=>dispose());itemCleanup=[];results.setAttribute('aria-busy','false');
  }
  if(autoload)refresh();
  return {root,refresh,render,showError,clearError,destroy,get records(){return records;},get state(){return state();}};

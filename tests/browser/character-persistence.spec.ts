@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {Buffer} from 'node:buffer';
 import {DatabaseSync} from 'node:sqlite';
 import {join} from 'node:path';
 import {test,expect,type APIRequestContext,type Page} from '@playwright/test';
@@ -53,7 +54,11 @@ test('every character template input survives editing, save, reload and a second
   }else if(type==='select'){
    value=(humanChoices as Record<string,string[]>)[key]?.[0]||(key==='alignment'?alignments[0]:storyRoles[0]);await input.selectOption(value);
   }else{
-   if(type==='url')value='https://example.com/portrait.png';
+   if(type==='url'){
+    value='https://example.com/portrait.png';
+    const link=page.locator('[data-profile-field="portraitUrl"]').getByRole('button',{name:/link/i});
+    if(await link.count())await link.click();
+   }
    else if(type==='number')value=key==='age'?'0':'172.25';
    else if(type==='input')value=value.replace('\n',' ');
    await input.fill(value);
@@ -81,6 +86,62 @@ test('every character template input survives editing, save, reload and a second
  await save(page,record.id);saved=await readCharacter(request,record.id);
  for(const [key,value] of Object.entries(expected))expect(saved[key],key+' second save').toBe(value);
  expect(errors).toEqual([]);
+});
+
+test('portrait source icons keep link editing and uploaded images usable without AI generation',async({page,request})=>{
+ test.setTimeout(60_000);
+ const record=await createCharacter(request);
+ await page.goto('/characters/'+record.id+'/');
+ const portrait=page.locator('[data-profile-field="portraitUrl"]');
+ const link=portrait.getByRole('button',{name:'Add portrait from link'});
+ const image=portrait.getByRole('button',{name:'Upload portrait image'});
+ const ai=portrait.getByRole('button',{name:'Generate portrait with AI (coming soon)'});
+ await expect(link).toBeVisible();await expect(image).toBeVisible();await expect(ai).toBeVisible();
+ await expect(ai).toBeDisabled();
+ const bounds=await Promise.all([link,image,ai].map(button=>button.boundingBox()));
+ expect(bounds.every(Boolean)).toBe(true);
+ const boxes=bounds.filter((box):box is NonNullable<typeof box>=>box!==null);
+ expect(Math.max(...boxes.map(box=>box.y))-Math.min(...boxes.map(box=>box.y))).toBeLessThan(2);
+ expect(Math.max(...boxes.map(box=>box.width))).toBeLessThanOrEqual(40);
+ expect(Math.max(...boxes.map(box=>box.x+box.width))-Math.min(...boxes.map(box=>box.x))).toBeLessThanOrEqual(120);
+
+ await link.focus();await expect(link).toBeFocused();await link.press('Enter');
+ const url=page.locator('#field-portraitUrl');
+ await expect(url).toBeVisible();
+ await url.fill('https://example.com/linked-portrait.png');
+ expect(await save(page,record.id)).toMatchObject({portraitUrl:'https://example.com/linked-portrait.png'});
+ await page.reload();
+ await expect(url).toHaveValue('https://example.com/linked-portrait.png');
+
+ const uploadResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/characters/'+record.id+'/portraits'&&response.request().method()==='POST');
+ const fileChooser=page.waitForEvent('filechooser');
+ await image.click();
+ const chooser=await fileChooser;
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+ await chooser.setFiles({name:'portrait.png',mimeType:'image/png',buffer:png});
+ const uploaded=await uploadResponse;
+ expect(uploaded.ok(),await uploaded.text()).toBe(true);
+ await expect(url).not.toHaveValue('https://example.com/linked-portrait.png');
+ const uploadedUrl=await url.inputValue();
+ expect(uploadedUrl).toBeTruthy();
+ const imageResponse=await request.get(new URL(uploadedUrl,origin).toString());
+ expect(imageResponse.status()).toBe(200);
+ expect(imageResponse.headers()['content-type']).toContain('image/png');
+ expect(await save(page,record.id)).toMatchObject({portraitUrl:uploadedUrl});
+ await page.reload();
+ await expect(url).toHaveValue(uploadedUrl);
+ await page.goto('/characters/');
+ const card=page.locator('[data-character-id="'+record.id+'"]');
+ await card.getByRole('button',{name:'More about '+record.name,exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ const aboutPhoto=dialog.locator('.character-about-photo');
+ await expect(aboutPhoto).toBeVisible();
+ await expect(aboutPhoto).toHaveAttribute('src',uploadedUrl);
+ await expect(aboutPhoto).toHaveJSProperty('naturalWidth',1);
+ await dialog.getByLabel('Moral alignment',{exact:true}).selectOption('Good');
+ await dialog.getByRole('button',{name:'Save details',exact:true}).click();
+ await expect(dialog.locator('.character-detail-notice')).toHaveText('Saved');
+ expect(await readCharacter(request,record.id)).toMatchObject({portraitUrl:uploadedUrl,alignment:'Good'});
 });
 
 test('authored note text, inline reference labels, linked draft notes and moved markers survive reload',async({page,request})=>{

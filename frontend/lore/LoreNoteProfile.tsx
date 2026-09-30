@@ -1,5 +1,6 @@
 import {useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode} from 'react';
 import {announceWorkspaceChange} from '../../public/profiles/workspace-events.js';
+import {requestJSON} from '../../public/profiles/request.js';
 import {StoryDate} from './StoryDate';
 import {draftFromRecord, noteTemplate, ratingFields, readNoteRecord, referenceKey, serializeNote, validImageUrl, type ConnectionDraft, type FieldDefinition, type LoreNoteDraft, type NoteTarget, type ProfileData, type SectionDefinition, type TextField} from './contracts';
 
@@ -37,10 +38,7 @@ export function LoreNoteProfile({record, targets, incoming}: ProfileData) {
     const selection = textInput ? {start: textInput.selectionStart, end: textInput.selectionEnd, direction: textInput.selectionDirection} : null;
     const controller = new AbortController(); request.current = controller; inFlight.current = true; setSaving(true); setError(''); setFailed(false);
     try {
-      const response = await fetch('/api/lore/' + encodeURIComponent(record.id), {method: 'PUT', credentials: 'same-origin', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload), signal: controller.signal});
-      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Your session may have expired. Copy your changes before reloading to sign in again.');
-      const data: unknown = await response.json();
-      if (!response.ok) throw new Error(data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : 'Could not save. Please try again.');
+      const data: unknown = await requestJSON('/api/lore/' + encodeURIComponent(record.id), {method: 'PUT', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload), signal: controller.signal}, {errorMessage: 'Could not save. Please try again.'});
       const saved = readNoteRecord(data);
       if (saved.id !== record.id || saved.version !== version.current + 1) throw new Error('The save response could not be verified. Your changes are still here. Reload before saving again.');
       if (!mounted.current) return;

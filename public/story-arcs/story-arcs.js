@@ -1,6 +1,7 @@
 import {scopedCatalogUrl,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=__WTF_ASSET_REVISION__';
 import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const directory=initDirectoryShell({
  async load(options){return (await fetchDirectory('/api/story-arcs',options)).storyArcs;},
@@ -20,7 +21,7 @@ const directory=initDirectoryShell({
 const button=document.querySelector('#new-story-arc');let creating=false,pendingId;
 button.addEventListener('click',async()=>{
  if(creating)return;creating=true;button.disabled=true;button.textContent='Creating…';directory.clearError();pendingId??=crypto.randomUUID();
- try{const response=await fetch(scopedCatalogUrl('/api/story-arcs'),{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');const arc=await response.json();if(!response.ok)throw new Error(arc.error||'Unable to create your story arc.');location.assign(novelContextHref('/story-arcs/'+encodeURIComponent(arc.id)+'/'));}
+ try{const arc=await requestJSON(scopedCatalogUrl('/api/story-arcs'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})},{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Unable to create your story arc.'});location.assign(novelContextHref('/story-arcs/'+encodeURIComponent(arc.id)+'/'));}
  catch(error){directory.showError(error);creating=false;button.disabled=false;button.textContent='+ New story arc';}
 });
 window.addEventListener('pageshow',event=>{if(event.persisted){creating=false;pendingId=undefined;button.disabled=false;button.textContent='+ New story arc';}});

@@ -29,6 +29,7 @@ test('association edits and conflict recovery retain the main article draft and 
  const unlinking=page.waitForResponse(response=>response.url()===origin+'/api/novels/'+one.id+'/associations/'+first.id&&response.request().method()==='DELETE');
  await page.getByRole('button',{name:'Unlink novel',exact:true}).click();expect((await unlinking).status()).toBe(409);
  await expect(page.locator('#novel-appearance-dialog')).toBeVisible();await expect(page.locator('#appearance-prose')).toHaveValue('My retained conflict draft');
+ await expect(page.getByRole('button',{name:'Review saved version and keep my draft',exact:true})).toBeVisible();
  const stillLinked=await (await request.get('/api/novels/'+one.id+'/associations')).json();expect(stillLinked.find((item:{id:string})=>item.id===first.id).prose).toBe('Another tab saved details');
  await page.getByRole('button',{name:'Review saved version and keep my draft',exact:true}).click();
  await expect(page.locator('#appearance-saved-text')).toContainText('Another tab saved details');await expect(page.locator('#appearance-prose')).toHaveValue('My retained conflict draft');

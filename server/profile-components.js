@@ -62,9 +62,9 @@ export function createFieldRenderer(record,{options=()=>null,required=[],links={
  * IDs join heading controls, region IDs, and deep links. menuFields determines
  * visibility toggles; allowNotes adds only a trigger for the character adapter.
  */
-export function renderSection(section,content,record,{fullWidth=false,menuFields=section.fields,allowNotes=false}={}){
+export function renderSection(section,content,record,{fullWidth=false,menuFields=section.fields,allowNotes=false,header=true}={}){
  const menu=menuFields.length?`<details class="field-menu"><summary aria-label="Choose visible fields for ${escape(section.title)}" title="Choose visible fields"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg></summary><div class="field-menu-panel">${menuFields.map(([key,label])=>`<label><input type="checkbox" data-visibility="${key}"${record.hiddenFields?.includes(key)?'':' checked'}> ${escape(label)}</label>`).join('')}<div class="visibility-actions"><button type="button" data-visibility-all="show">Show all</button><button type="button" data-visibility-all="hide">Hide all</button></div>${allowNotes?'<button type="button" class="create-profile-note" data-create-note>Create a note</button>':''}</div></details>`:'';
- return `<section id="${section.id}" class="profile-section${fullWidth?' full-width':''}"><div class="section-header"><h2>${headingButton(section.title,section.id+'-body')}</h2>${menu}</div><div id="${section.id}-body" class="collapsible-region">${content}</div></section>`;
+ return `<section id="${section.id}" class="profile-section${fullWidth?' full-width':''}">${header?`<div class="section-header"><h2>${headingButton(section.title,section.id+'-body')}</h2>${menu}</div>`:''}<div id="${section.id}-body" class="collapsible-region">${content}</div></section>`;
 }
 /** Render the client mount for rating groups assigned to one article section. */
 export function renderRatingsHost(groups,sectionId){
@@ -76,6 +76,24 @@ export function renderRatingsHost(groups,sectionId){
 export function renderInfoGroup(title,id,content){return `<div class="card-group"><h3>${headingButton(title,id)}</h3><div id="${id}" class="collapsible-region">${content}</div></div>`;}
 /** Render the name/focus hook consumed by controls.js; official uses its own heading ID. */
 export function renderProfileName(record,type,{official=false}={}){return `<h1 class="profile-name"><button type="button" id="edit-name" title="Edit ${type} name"><span ${official?'id="official-heading"':'data-display-name'}>${escape((official&&record.officialName)||record.name||'Untitled '+type)}</span></button></h1>`;}
+/** Wrap trusted overview content with the canonical article card presentation. */
+export function renderProfileHero(content,{label='Overview'}={}){return `<div class="profile-overview-card" role="group" aria-label="${escape(label)}">${content}</div>`;}
+/**
+ * The character article template, adapted by supplying entity-specific fields.
+ * Owns identity ordering, groups, section disclosure and canonical card styling;
+ * supplied epithet, portrait and field content are trusted renderer fragments.
+ * Entity adapters retain their own field schemas, initial state and persistence.
+ */
+export function renderArticleProfile({identity,sections,leadingSections=[],...page}){
+ const {record,type,epithet='',portrait='',groups=[],hints=[]}=identity;
+ const infobox=renderProfileName(record,type)+
+  (epithet?`<div class="epithet-field">${epithet}</div>`:'')+portrait+
+  groups.map(group=>renderInfoGroup(group.title,group.id,group.content)).join('')+
+  hints.map(hint=>`<small class="name-hint">${escape(hint)}</small>`).join('');
+ const renderSections=entries=>entries.map(({section,content,options})=>renderSection(section,content,record,options)).join('');
+ const content=renderSections(sections),leadingContent=renderSections(leadingSections);
+ return renderProfilePage({...page,leadingContent,record:page.record||record,type:page.type||type,infobox,content,styles:['/profiles/article.css',...(page.styles||[])],template:'article'});
+}
 /**
  * Assemble one complete profile document from trusted infobox/content fragments.
  * Owns stable form/save/field/JSON hooks and shared asset includes, not workspace
@@ -86,7 +104,7 @@ export function renderProfileName(record,type,{official=false}={}){return `<h1 c
  * optional styles, initial state, and infobox class. Paths/classes are trusted.
  * @returns {string} Full HTML for the outer Worker to decorate with workspaceShell.
  */
-export function renderProfilePage({record,type,collection,collectionUrl,infobox,content,script,styles=[],initial=record,boxClass=''}){
+export function renderProfilePage({record,type,collection,collectionUrl,infobox,content,script,styles=[],initial=record,boxClass='',template='',leadingContent=''}){
  const displayType=type.replaceAll('-',' '),name=escape(record.name?.trim()||'Untitled '+displayType),label=displayType[0].toUpperCase()+displayType.slice(1);
- return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${name} — Write to Freedom</title><link rel="icon" href="/crest.svg">${['/profiles/profile.css','/profiles/editor.css','/profiles/date-picker.css',...styles].map(path=>`<link rel="stylesheet" href="${path}?v=${profileRevision}">`).join('')}<script type="module" src="${script}?v=${profileRevision}"></script></head><body class="entity-profile ${type}-profile"><div class="page-layout"><main id="profile"><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${collectionUrl}">${collection}</a> / <span aria-current="page" data-display-name>${name}</span></nav><form id="profile-form" data-id="${escape(record.id)}" data-version="${record.version}"><div class="article-bar"><span class="current-view">${label} profile</span><div class="save-actions"><span id="save-status" role="status">Saved</span><button id="save-character" type="submit">Save changes</button></div></div><p class="byline">Click any field to edit your ${displayType}.</p><p id="editor-error" role="alert" hidden></p><noscript>Enable JavaScript to edit and save this profile.</noscript><fieldset id="editor-fields"><legend class="sr-only">${label} profile</legend><article><aside class="infobox ${boxClass}" id="identity" tabindex="0" aria-label="${label} information">${infobox}</aside><div class="profile-content">${content}<footer class="profile-footer"><a href="${collectionUrl}">← Back to ${collection.toLowerCase()}</a><a href="#profile">Back to top ↑</a></footer></div></article></fieldset></form></main></div><script id="profile-data" type="application/json">${jsonData(initial)}</script></body></html>`;
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>${name} — Write to Freedom</title><link rel="icon" href="/crest.svg">${['/profiles/profile.css','/profiles/editor.css','/profiles/date-picker.css',...styles].map(path=>`<link rel="stylesheet" href="${path}?v=${profileRevision}">`).join('')}<script type="module" src="${script}?v=${profileRevision}"></script></head><body class="entity-profile ${type}-profile"${template?' data-profile-template="'+escape(template)+'"':''}${leadingContent?' data-profile-layout="overview-first"':''}><div class="page-layout"><main id="profile"><nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${collectionUrl}">${collection}</a> / <span aria-current="page" data-display-name>${name}</span></nav><form id="profile-form" data-id="${escape(record.id)}" data-version="${record.version}"><div class="article-bar"><span class="current-view">${label} profile</span><div class="save-actions"><span id="save-status" role="status">Saved</span><button id="save-character" type="submit">Save changes</button></div></div><p class="byline">Click any field to edit your ${displayType}.</p><p id="editor-error" role="alert" hidden></p><noscript>Enable JavaScript to edit and save this profile.</noscript><fieldset id="editor-fields"><legend class="sr-only">${label} profile</legend><article>${leadingContent?`<div class="profile-leading">${leadingContent}</div>`:''}<aside class="infobox ${boxClass}" id="identity" tabindex="0" aria-label="${label} information">${infobox}</aside><div class="profile-content">${content}<footer class="profile-footer"><a href="${collectionUrl}">← Back to ${collection.toLowerCase()}</a><a href="#profile">Back to top ↑</a></footer></div></article></fieldset></form></main></div><script id="profile-data" type="application/json">${jsonData(initial)}</script></body></html>`;
 }

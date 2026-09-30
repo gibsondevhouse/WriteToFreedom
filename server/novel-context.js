@@ -1,7 +1,7 @@
+import {json} from './http.js';
 import {repository} from './db.js';
 import {libraryEntries} from './library-targets.js';
 const catalogs={'/api/characters':['characters','character'],'/api/factions':['factions','faction'],'/api/locations':['locations','location'],'/api/lore':['entries','lore'],'/api/story-arcs':['storyArcs','story_arc']};
-const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const kind=type=>type==='storyArc'?'story_arc':['character','faction','lore'].includes(type)?type:'location';
 export async function validateNovelContext(request,env){

@@ -9,3 +9,181 @@
 .writing-novel-picker{display:flex;align-items:center;gap:10px;margin-top:14px;color:var(--writing-muted)}.writing-novel-picker select{font:inherit;color:inherit;background:#1b2838;border:1px solid #46566b;border-radius:6px;padding:8px;max-width:100%}
 
 .writing-heading>div:first-child{min-width:0;max-width:100%}.writing-novel-picker{max-width:100%}.writing-novel-picker select{min-width:0;flex:1;width:0}
+
+/* Scenes: keep the controls near the page while the writing canvas stays quiet. */
+#writing-workspace.writing-workspace-scenes{
+  --writing-line:#ffffff13;
+  --writing-viewbar-height:50px;
+}
+#writing-workspace.writing-workspace-scenes .writing-viewbar{
+  position:sticky;
+  top:var(--shell-header-height,66px);
+  z-index:19;
+  height:var(--writing-viewbar-height);
+  min-height:var(--writing-viewbar-height);
+  padding:7px 3px;
+  border-color:#ffffff15;
+  background:rgba(15,21,29,.86);
+  backdrop-filter:blur(16px);
+}
+#writing-workspace.writing-workspace-scenes .writing-outline,
+#writing-workspace.writing-workspace-scenes .writing-references{
+  top:calc(var(--shell-header-height,66px) + var(--writing-viewbar-height));
+  max-height:calc(100dvh - var(--shell-header-height,66px) - var(--writing-viewbar-height));
+  border-color:#ffffff13;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-link.is-selected{
+  background:rgba(255,255,255,.045);
+  border-color:transparent;
+  border-left:2px solid rgba(196,163,106,.58);
+  color:#f0f1f2;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-link{padding:7px 8px}
+#writing-workspace.writing-workspace-scenes .writing-scene-link:focus-visible{
+  outline:2px solid #cdb386;
+  outline-offset:2px;
+}
+#writing-workspace.writing-workspace-scenes .writing-chapter-toggle{
+  transition:color 130ms ease;
+}
+#writing-workspace.writing-workspace-scenes .writing-chapter-toggle:hover{color:#f0f1f2}
+#writing-workspace.writing-workspace-scenes .writing-chapter-chevron{
+  display:inline-block;
+  flex:none;
+  transition:transform 130ms ease;
+}
+#writing-workspace.writing-workspace-scenes .writing-chapter-toggle[aria-expanded="false"] .writing-chapter-chevron{
+  transform:rotate(-90deg);
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-pane{padding-top:19px}
+#writing-workspace.writing-workspace-scenes .writing-scene-heading{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+  gap:16px;
+  margin-bottom:4px;
+}
+#writing-workspace.writing-workspace-scenes .writing-title-label{min-width:0}
+#writing-workspace.writing-workspace-scenes .writing-scene-title{
+  min-width:0;
+  padding-bottom:5px;
+  text-overflow:ellipsis;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-heading .writing-save-actions{
+  min-width:0;
+  max-width:none;
+  align-self:center;
+  flex-wrap:nowrap;
+}
+#writing-workspace.writing-workspace-scenes .writing-save-actions [role=status]{
+  min-width:0;
+  max-width:210px;
+  overflow-wrap:anywhere;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-meta{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px 15px;
+  min-height:35px;
+  margin:5px 0 9px;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-meta>label{
+  display:inline-flex;
+  align-items:center;
+  flex:0 1 auto;
+  gap:6px;
+  min-width:0;
+  white-space:nowrap;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-chapter-label{max-width:42%}
+#writing-workspace.writing-workspace-scenes .writing-scene-meta select{
+  min-width:0;
+  max-width:210px;
+  min-height:27px;
+  padding:4px 7px;
+  text-overflow:ellipsis;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-chapter-label select{max-width:100%}
+#writing-workspace.writing-workspace-scenes .writing-summary{
+  flex:0 1 auto;
+  min-width:0;
+  padding:0;
+}
+#writing-workspace.writing-workspace-scenes .writing-summary[open]{flex:1 0 100%;order:3}
+#writing-workspace.writing-workspace-scenes .writing-summary textarea{
+  display:block;
+  width:100%;
+  min-height:100px;
+  margin-top:8px;
+}
+#writing-workspace.writing-workspace-scenes .writing-editor{
+  width:min(100%,680px);
+  margin-inline:auto;
+  border-top-color:#ffffff13;
+}
+#writing-workspace.writing-workspace-scenes .writing-toolbar{
+  position:sticky;
+  top:calc(var(--shell-header-height,66px) + var(--writing-viewbar-height));
+  z-index:18;
+  gap:2px;
+  min-height:42px;
+  padding:5px 0;
+  border-bottom-color:#ffffff18;
+  background:rgba(15,21,29,.89);
+  backdrop-filter:blur(16px);
+}
+#writing-workspace.writing-workspace-scenes .writing-toolbar-group{border-right-color:#ffffff18}
+#writing-workspace.writing-workspace-scenes .writing-prose{
+  max-width:none;
+  padding-top:20px;
+  scroll-margin-top:calc(var(--shell-header-height,66px) + var(--writing-viewbar-height) + 54px);
+}
+#writing-workspace.writing-workspace-scenes .writing-editor-footer{
+  border-top:0;
+  padding-top:20px;
+  color:#81909d;
+}
+#writing-workspace.writing-workspace-scenes .writing-create-actions .writing-button,
+#writing-workspace.writing-workspace-scenes .writing-empty .writing-button,
+#writing-workspace.writing-workspace-scenes .writing-scene-form .writing-save-actions .writing-button.writing-primary{
+  background:rgba(255,255,255,.035);
+  border-color:#ffffff23;
+  color:#cbd3da;
+  box-shadow:none;
+}
+#writing-workspace.writing-workspace-scenes .writing-create-actions .writing-button:hover:not(:disabled),
+#writing-workspace.writing-workspace-scenes .writing-empty .writing-button:hover:not(:disabled),
+#writing-workspace.writing-workspace-scenes .writing-scene-form .writing-save-actions .writing-button.writing-primary:hover:not(:disabled){
+  background:rgba(255,255,255,.085);
+  border-color:#ffffff38;
+  color:#f0f2f4;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-form[data-dirty="true"] .writing-save-actions .writing-button.writing-primary{
+  background:var(--brass,#b08d57);
+  border-color:var(--brass,#b08d57);
+  color:#101010;
+}
+#writing-workspace.writing-workspace-scenes .writing-scene-form[data-dirty="true"] .writing-save-actions .writing-button.writing-primary:hover:not(:disabled){
+  background:var(--brass-bright,#d0ae75);
+  border-color:var(--brass-bright,#d0ae75);
+  color:#0a0a0a;
+}
+#writing-workspace.writing-workspace-scenes :is(.writing-button,.writing-panel-toggle,.writing-scene-link,.writing-icon-button,.writing-add-scene,.writing-toolbar button){
+  transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease,box-shadow 130ms ease,opacity 130ms ease;
+}
+@media(max-width:750px){
+  #writing-workspace.writing-workspace-scenes .writing-viewbar{height:auto;min-height:50px;padding-block:9px}
+  #writing-workspace.writing-workspace-scenes .writing-outline,
+  #writing-workspace.writing-workspace-scenes .writing-references{top:auto;max-height:420px}
+  #writing-workspace.writing-workspace-scenes .writing-scene-heading{grid-template-columns:minmax(0,1fr);gap:9px}
+  #writing-workspace.writing-workspace-scenes .writing-scene-heading .writing-save-actions{justify-content:flex-start;max-width:100%;flex-wrap:wrap}
+  #writing-workspace.writing-workspace-scenes .writing-scene-chapter-label{max-width:55%}
+  #writing-workspace.writing-workspace-scenes .writing-scene-meta{gap:7px 11px;margin-bottom:7px}
+  #writing-workspace.writing-workspace-scenes .writing-editor{width:100%}
+  #writing-workspace.writing-workspace-scenes .writing-toolbar{position:static;top:auto}
+  #writing-workspace.writing-workspace-scenes .writing-prose{padding-top:17px;scroll-margin-top:160px}
+}
+@media(prefers-reduced-motion:reduce){
+  #writing-workspace.writing-workspace-scenes :is(.writing-button,.writing-panel-toggle,.writing-scene-link,.writing-icon-button,.writing-add-scene,.writing-toolbar button,.writing-chapter-toggle,.writing-chapter-chevron){transition:none}
+}

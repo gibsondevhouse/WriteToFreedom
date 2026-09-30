@@ -1,6 +1,7 @@
 import {memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent} from 'react';
 import {createPortal} from 'react-dom';
 import {WritingEditor} from './Editor';
+import {requestWritingJSON as requestJSON} from './request';
 import {SceneCard, type SceneBook} from './SceneCard';
 import {emptyWritingContent, readSceneRecord, readSceneSummary, serializeScene, type ChapterRecord, type SceneRecord, type SceneStatus, type WritingContent} from './contracts';
 import {announceWorkspaceChange, observeWorkspaceChanges} from '../../public/profiles/workspace-events.js';
@@ -9,14 +10,6 @@ type Draft = {record: SceneRecord; initialContent: WritingContent; dirty: boolea
 type Change = Partial<Pick<SceneRecord, 'title' | 'summary' | 'status' | 'content'>>;
 const newDraft = (record: SceneRecord, generation = 0): Draft => ({record, initialContent: record.content, dirty: false, saving: false, error: '', revision: 0, generation});
 const statusLabels: Record<SceneStatus, string> = {draft: 'Draft', revising: 'Revising', complete: 'Complete'};
-async function requestJSON(path: string, options: RequestInit = {}): Promise<unknown> {
-  const response = await fetch(path, {credentials: 'same-origin', cache: 'no-store', ...options});
-  if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Your session may have expired. Copy your unsaved writing before reloading to sign in again.');
-  const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(typeof data?.error === 'string' ? data.error : 'This request could not be completed. Please try again.'), {status: response.status});
-  return data;
-}
-
 /** Each scene keeps its own mounted editor and explicit optimistic save. */
 export function ChapterScenes({chapter, initialScenes, book, host}: {chapter: ChapterRecord; initialScenes: SceneRecord[]; book: SceneBook; host: HTMLElement}) {
   const [drafts, setDrafts] = useState(() => initialScenes.map(scene => newDraft(scene))), draftsRef = useRef(drafts);
@@ -32,10 +25,12 @@ export function ChapterScenes({chapter, initialScenes, book, host}: {chapter: Ch
   }, [host]);
   const store = useCallback((update: (previous: Draft[]) => Draft[]) => {const next = update(draftsRef.current); draftsRef.current = next; setDrafts(next);}, []);
   const announce = useCallback(() => {ownChange.current = true; announceWorkspaceChange(); ownChange.current = false;}, []);
-  const change = useCallback((id: string, fields: Change) => store(previous => previous.map(draft => draft.record.id === id && !draft.saving && !draft.unavailable ? {...draft, record: {...draft.record, ...fields}, dirty: true, revision: draft.revision + 1, error: ''} : draft)), [store]);
+  // Keep accepting edits while a request is in flight. The save response only
+  // clears dirty state when no newer local revision has been made.
+  const change = useCallback((id: string, fields: Change) => store(previous => previous.map(draft => draft.record.id === id && !draft.unavailable ? {...draft, record: {...draft.record, ...fields}, dirty: true, revision: draft.revision + 1, error: ''} : draft)), [store]);
   const save = useCallback(async (id: string) => {
     const draft = draftsRef.current.find(item => item.record.id === id);
-    if (!draft || draft.saving || draft.unavailable || saves.current.has(id) || host.closest('fieldset')?.disabled) return;
+    if (!draft || !draft.dirty || draft.saving || draft.unavailable || saves.current.has(id) || host.closest('fieldset')?.disabled) return;
     let payload;
     try {payload = serializeScene(draft.record);} catch (error) {store(previous => previous.map(item => item.record.id === id ? {...item, error: error instanceof Error ? error.message : 'Check this scene before saving.'} : item)); return;}
     const controller = new AbortController(); saves.current.set(id, controller);
@@ -111,6 +106,14 @@ export function ChapterScenes({chapter, initialScenes, book, host}: {chapter: Ch
     return () => window.removeEventListener('beforeunload', unload);
   }, [host]);
   useEffect(() => {const count = document.getElementById('chapter-scene-count'); if (count) count.textContent = String(drafts.filter(draft => !draft.unavailable).length);}, [drafts]);
+  useEffect(() => {
+    const button = document.getElementById('chapter-new-scene');
+    if (!(button instanceof HTMLButtonElement)) return;
+    const openComposer = () => {if (!host.closest('fieldset')?.disabled) setComposer(true);};
+    button.disabled = parentDisabled || Boolean(host.closest('fieldset')?.disabled);
+    button.addEventListener('click', openComposer);
+    return () => {button.removeEventListener('click', openComposer); button.disabled = true;};
+  }, [host, parentDisabled]);
   function shortcut(event: KeyboardEvent<HTMLDivElement>) {
     if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
     event.preventDefault(); event.stopPropagation();
@@ -121,21 +124,22 @@ export function ChapterScenes({chapter, initialScenes, book, host}: {chapter: Ch
     {refreshError && <p className="chapter-scene-error" role="alert">{refreshError}</p>}
     {drafts.map(draft => <InlineScene key={draft.record.id + ':' + draft.generation} draft={draft} book={book} parentDisabled={parentDisabled} onChange={change} onSave={save}/>)}
     {!drafts.length && <div className="chapter-scenes-empty"><SceneCard book={book} onCreate={() => setComposer(true)} disabled={parentDisabled}/></div>}
-    {drafts.length > 0 && <div className="chapter-scene-actions"><button type="button" className="writing-button" disabled={parentDisabled} onClick={() => setComposer(true)}>Add scene</button></div>}
     {composer && <SceneComposer chapter={chapter} onDirty={setComposerDirty} onClose={() => {setComposer(false); setComposerDirty(false);}} onComplete={record => {refreshRequest.current?.abort(); store(previous => previous.some(draft => draft.record.id === record.id) ? previous : [...previous, newDraft(record)]); setComposer(false); setComposerDirty(false); announce(); requestAnimationFrame(() => host.querySelector<HTMLElement>('[data-scene-id="' + record.id + '"] textarea')?.focus());}}/>}
   </div>;
 }
 
 const InlineScene = memo(function InlineScene({draft, book, parentDisabled, onChange, onSave}: {draft: Draft; book: SceneBook; parentDisabled: boolean; onChange: (id: string, fields: Change) => void; onSave: (id: string) => Promise<void>}) {
-  const scene = draft.record, blocked = draft.saving || draft.unavailable || parentDisabled;
+  const scene = draft.record, blocked = draft.unavailable || parentDisabled;
+  const editorId = 'chapter-scene-editor-' + scene.id;
   const onContent = useCallback((content: WritingContent) => onChange(scene.id, {content}), [onChange, scene.id]);
   return <article className="chapter-inline-scene" data-scene-id={scene.id} aria-label={scene.title || 'Untitled scene'}>
-    <SceneCard book={book} scene={scene} disabled={draft.saving || parentDisabled} readOnly={draft.unavailable} onChange={fields => onChange(scene.id, fields)}/>
-    <div className="chapter-scene-meta"><label>Scene status<select aria-label="Scene status" value={scene.status} disabled={blocked} onChange={event => onChange(scene.id, {status: event.target.value as SceneStatus})}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></label></div>
+    <SceneCard book={book} scene={scene} disabled={parentDisabled} readOnly={draft.unavailable} onChange={fields => onChange(scene.id, fields)}
+      footer={<div className="chapter-scene-meta"><label><span>Status</span><select aria-label="Scene status" value={scene.status} disabled={blocked} onChange={event => onChange(scene.id, {status: event.target.value as SceneStatus})}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select></label></div>}/>
     {draft.unavailable && <p className="chapter-scene-error" role="alert">This scene was deleted or moved to another chapter. Your unsaved writing is kept here so you can copy it.</p>}
     {draft.error && <p className="chapter-scene-error" role="alert">{draft.error}</p>}
-    <WritingEditor sceneId={scene.id} initialContent={draft.initialContent} editable={!blocked} onUpdate={onContent}/>
-    <div className="chapter-scene-save-actions"><span role="status">{draft.saving ? 'Saving…' : draft.unavailable ? 'Deleted — unsaved draft retained' : draft.error ? 'Not saved — your writing is still here' : draft.dirty ? 'Unsaved changes' : 'Saved'}</span><button type="button" className="writing-button writing-primary" disabled={blocked} onClick={() => {void onSave(scene.id);}}>{draft.saving ? 'Saving…' : 'Save scene'}</button></div>
+    <div id={editorId} className="chapter-scene-editor-panel">
+      <WritingEditor sceneId={scene.id} initialContent={draft.initialContent} editable={!blocked} inlineScene saveState={draft.saving ? 'saving' : draft.unavailable ? 'unavailable' : draft.error ? 'error' : draft.dirty ? 'dirty' : 'saved'} saveError={draft.error} saveDisabled={blocked || draft.saving || !draft.dirty} onSave={() => {void onSave(scene.id);}} onUpdate={onContent}/>
+    </div>
   </article>;
 });
 

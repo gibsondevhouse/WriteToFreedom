@@ -1,9 +1,10 @@
 import {observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
 import {types,kinds,filterEvents,timelineRows,zoomAt,fitView,rulerTicks,parseStoryDate,minScale,maxScale} from './model.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 const $=selector=>document.querySelector(selector),stage=$('#timeline'),ruler=$('#ruler'),grid=$('#grid'),lanes=$('#lanes'),message=$('#timeline-message'),filters=$('#filters'),orb=$('#filter-toggle');
 const ROW=104,RULER=57;
-let data={events:[],unplaced:[],undated:0,counts:{}},visible=[],rows=[],view={start:1,scale:120,y:0},size={width:stage.clientWidth,height:stage.clientHeight},loaded=false,loading=false,frame=0,filterDirty=false,lastFocus=null,suppressClick=false;
+let data={events:[],unplaced:[],undated:0,counts:{}},visible=[],rows=[],view={start:1,scale:120,y:0},size={width:stage.clientWidth,height:stage.clientHeight},loaded=false,loading=false,queued=false,frame=0,filterDirty=false,lastFocus=null,suppressClick=false;
 const selection={query:'',types:Object.keys(types),kinds:Object.keys(kinds)};
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
 function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;render();});}
@@ -20,6 +21,16 @@ function render(){
   const lane=node('div',undefined,'timeline-row');lane.dataset.type=row.type;lane.style.top=(28+index*ROW-view.y)+'px';
   const name=node('div',undefined,'row-name');name.style.left=Math.max(18,lo)+'px';name.append(node('span',undefined,'row-dot'),node('span',row.name),node('small',row.type));lane.append(name);
   if(points.length>1){const span=node('div',undefined,'event-span');span.style.left=Math.max(-2,lo)+'px';span.style.width=Math.max(1,Math.min(size.width+2,hi)-Math.max(-2,lo))+'px';lane.append(span);}
+  const labelWidth=Math.min(190,Math.max(48,size.width/2)),occupied=[-Infinity,-Infinity,-Infinity];
+  for(const {event,x} of points){
+   if(x< -8||x>size.width+8)continue;
+   const atRight=x>size.width-labelWidth,left=atRight?x-labelWidth:x;
+   let level=occupied.findIndex(end=>left>end+8);if(level<0)level=occupied.indexOf(Math.min(...occupied));occupied[level]=left+labelWidth;
+   const link=node('a',undefined,'timeline-event'+(atRight?' is-right':''));link.href=event.href;
+   link.title=`${row.name} · ${event.label} · ${event.rawDate}`;link.setAttribute('aria-label',`${row.name}: ${event.label}, ${event.rawDate}`);
+   link.style.left=Math.max(8,Math.min(size.width-8,x))+'px';link.style.top=(35+level*20)+'px';
+   link.append(node('span',undefined,'timeline-event-dot'),node('span',event.label,'timeline-event-label'),node('small',event.rawDate,'timeline-event-date'));lane.append(link);
+  }
   fragment.append(lane);
  }
  lanes.replaceChildren(fragment);
@@ -58,10 +69,17 @@ function populateMetadata(){
  const list=$('#unplaced-list');list.replaceChildren();for(const entry of data.unplaced){const li=node('li'),link=node('a',entry.name+' · '+entry.label);link.href=entry.href;li.append(link,node('span',entry.rawDate));list.append(li);}
 }
 async function load(){
- if(loading)return;loading=true;
- try{const response=await fetch(scopedCatalogUrl('/api/timeline'),{credentials:'same-origin',cache:'no-store'});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Sign in again to load your saved timeline.');const next=await response.json();if(!response.ok)throw new Error(next.error||'Please try again.');showCatalogScope(next.scope,document.querySelector('.timeline-header'));const scopeMessage=document.querySelector('[data-novel-scope]');if(scopeMessage&&next.scope?.note&&!scopeMessage.querySelector('small'))scopeMessage.append(node('small',' '+next.scope.note));if(scopeMessage){document.documentElement.style.setProperty('--timeline-scope-height',document.querySelector('.timeline-header').offsetHeight+'px');}const needsFit=!loaded||!data.events.length&&next.events.length;data=next;loaded=true;populateMetadata();applyFilters({fit:needsFit});}
- catch(error){if(!loaded){showMessage('Timeline unavailable',error.message);const retry=node('button','Try again');retry.type='button';retry.addEventListener('click',load);message.append(retry);$('#timeline-count').textContent='Not loaded';}else $('#timeline-count').textContent='Could not refresh · showing last loaded events';}
- finally{loading=false;}
+ if(loading){queued=true;return;}loading=true;
+ try{
+  do{
+   queued=false;
+   try{
+    const next=await requestJSON(scopedCatalogUrl('/api/timeline'),{}, {sessionMessage:'Sign in again to load your saved timeline.',errorMessage:'Please try again.'});
+    if(queued)continue;
+    showCatalogScope(next.scope,document.querySelector('.timeline-header'));const scopeMessage=document.querySelector('[data-novel-scope]');if(scopeMessage&&next.scope?.note&&!scopeMessage.querySelector('small'))scopeMessage.append(node('small',' '+next.scope.note));if(scopeMessage){document.documentElement.style.setProperty('--timeline-scope-height',document.querySelector('.timeline-header').offsetHeight+'px');}const needsFit=!loaded||!data.events.length&&next.events.length;data=next;loaded=true;populateMetadata();applyFilters({fit:needsFit});
+   }catch(error){if(queued)continue;if(!loaded){showMessage('Timeline unavailable',error.message);const retry=node('button','Try again');retry.type='button';retry.addEventListener('click',load);message.append(retry);$('#timeline-count').textContent='Not loaded';}else $('#timeline-count').textContent='Could not refresh · showing last loaded events';}
+  }while(queued);
+ }finally{loading=false;}
 }
 // A virtual viewport avoids giant elements and permits continuous travel through years.
 stage.addEventListener('wheel',event=>{
@@ -73,7 +91,9 @@ stage.addEventListener('wheel',event=>{
 const pointers=new Map();let gesture=null,dragDistance=0;
 function snapshotGesture(){const points=[...pointers.values()];if(points.length>1){const [a,b]=points;gesture={kind:'pinch',distance:Math.hypot(a.x-b.x,a.y-b.y),midX:(a.x+b.x)/2,midY:(a.y+b.y)/2,view:{...view}};}else if(points.length){gesture={kind:'pan',x:points[0].x,y:points[0].y,view:{...view}};}else gesture=null;}
 stage.addEventListener('pointerdown',event=>{
- if(event.button!==0||event.target.closest('.timeline-message'))return;const rect=stage.getBoundingClientRect();pointers.set(event.pointerId,{x:event.clientX-rect.left,y:event.clientY-rect.top});if(pointers.size===1){dragDistance=0;suppressClick=false;stage.focus({preventScroll:true});}else dragDistance=10;snapshotGesture();stage.setPointerCapture(event.pointerId);
+ if(event.button!==0||event.target.closest('.timeline-message'))return;
+ if(event.target.closest('a,button,input,select,textarea')){suppressClick=false;return;}
+ const rect=stage.getBoundingClientRect();pointers.set(event.pointerId,{x:event.clientX-rect.left,y:event.clientY-rect.top});if(pointers.size===1){dragDistance=0;suppressClick=false;stage.focus({preventScroll:true});}else dragDistance=10;snapshotGesture();stage.setPointerCapture(event.pointerId);
 });
 stage.addEventListener('pointermove',event=>{
  if(!pointers.has(event.pointerId)||!gesture)return;const rect=stage.getBoundingClientRect(),point={x:event.clientX-rect.left,y:event.clientY-rect.top};pointers.set(event.pointerId,point);
@@ -86,7 +106,7 @@ function endPointer(event){if(!pointers.has(event.pointerId))return;pointers.del
 window.addEventListener('pointerup',endPointer);window.addEventListener('pointercancel',endPointer);
 stage.addEventListener('click',event=>{if(suppressClick&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation();}},true);
 stage.addEventListener('keydown',event=>{
- if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest('input,select,textarea'))return;
+ if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest('a,button,input,select,textarea'))return;
  let handled=true;
  if(event.key==='ArrowLeft')view.start-=size.width/view.scale*.12;
  else if(event.key==='ArrowRight')view.start+=size.width/view.scale*.12;
@@ -99,5 +119,5 @@ stage.addEventListener('keydown',event=>{
  if(handled){event.preventDefault();schedule();}
 });
 new ResizeObserver(()=>{size={width:stage.clientWidth,height:stage.clientHeight};schedule();}).observe(stage);
-window.addEventListener('focus',load);window.addEventListener('pageshow',load);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});observeWorkspaceChanges(load);setInterval(()=>{if(!document.hidden)load();},30000);
+window.addEventListener('focus',load);let hasShownPage=false;window.addEventListener('pageshow',event=>{if(hasShownPage||event.persisted)load();hasShownPage=true;});document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});observeWorkspaceChanges(load);setInterval(()=>{if(!document.hidden)load();},30000);
 schedule();load();

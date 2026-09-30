@@ -37,15 +37,14 @@ export function collectionRepository(binding){
     binding.prepare('DELETE FROM collections WHERE owner_id = ? AND id = ? AND mutation_token = ?').bind(owner,id,token)
    ]);return Boolean(results[0].meta?.changes);
   },
-  async entries(owner,collection){
-   const entries=await libraryEntries(binding,owner),map=new Map(entries.map(entry=>[libraryKey(entry),entry]));
+    async entries(owner,collection,catalog){
+     const entries=catalog??await libraryEntries(binding,owner),map=new Map(entries.map(entry=>[libraryKey(entry),entry]));
    if(collection.kind==='manual'){
     const members=await this.members(owner,collection.id),order=new Map((collection.order||[]).map((key,index)=>[key,index]));
     return members.sort((a,b)=>(order.get(libraryKey(a))??100000)-(order.get(libraryKey(b))??100000)).map(ref=>map.get(libraryKey(ref))).filter(Boolean);
    }
    const associations=(await binding.prepare('SELECT novel_id,target_kind,target_id FROM novel_associations WHERE owner_id = ?').bind(owner).all()).results;
-   const novels=(await binding.prepare('SELECT id,json_extract(document,\'$.seriesId\') AS seriesId FROM novels WHERE owner_id = ?').bind(owner).all()).results;
-   const seriesByNovel=new Map(novels.map(novel=>[novel.id,novel.seriesId]));
+     const seriesByNovel=new Map(entries.filter(entry=>entry.kind==='novel').map(novel=>[novel.id,novel.seriesId]));
    const linked=new Map();for(const association of associations){const key=libraryKey({kind:association.target_kind,id:association.target_id});if(!linked.has(key))linked.set(key,new Set());linked.get(key).add(association.novel_id);}
    return entries.filter(entry=>smartKinds.includes(entry.kind)).filter(entry=>{
     // Embedded notes retain their own parent-qualified identity and follow

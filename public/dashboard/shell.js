@@ -1,13 +1,12 @@
 import {el,tone,initial,createRails} from './components.js?v=__WTF_ASSET_REVISION__';
 import {createQuestionBanner} from './question-banner.js?v=__WTF_ASSET_REVISION__';
 import {scopedCatalogUrl,showCatalogScope} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 /** Read a private dashboard without coupling the shell to its data shape. */
 export async function fetchDashboard(endpoint,{signal,errorMessage='Your dashboard could not be loaded.'}={}){
- const response=await fetch(scopedCatalogUrl(endpoint),{credentials:'same-origin',cache:'no-store',signal});
- if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Reload the page to sign in again. Keep a copy of any unsaved work.');
- const data=await response.json();
- if(!response.ok)throw new Error(data.error||errorMessage);
+ const data=await requestJSON(scopedCatalogUrl(endpoint),{signal},{errorMessage,sessionMessage:'Reload the page to sign in again. Keep a copy of any unsaved work.'});
  showCatalogScope(data.scope);
  return data;
 }
@@ -87,14 +86,19 @@ export function initDashboardShell({
   if(destroyed||!hasData)return;
   try{paint(data);}catch(reason){showError(reason);}
  }
- const retryClick=()=>refresh(),pageshow=event=>{if(event.persisted)refresh();};
+ let hasShownPage=false;
+ const retryClick=()=>refresh(),pageshow=event=>{if(hasShownPage||event.persisted)refresh();hasShownPage=true;};
+ const focused=()=>refresh(),visible=()=>{if(!document.hidden)refresh();};
+ const stopWatching=observeWorkspaceChanges(refresh);
  const pagehide=event=>{if(!event.persisted)destroy();};
  function destroy(){
   if(destroyed)return;destroyed=true;queued=false;abort.abort();activeView?.destroy();
-  retry.removeEventListener('click',retryClick);window.removeEventListener('pageshow',pageshow);window.removeEventListener('pagehide',pagehide);
+  stopWatching();retry.removeEventListener('click',retryClick);window.removeEventListener('pageshow',pageshow);window.removeEventListener('pagehide',pagehide);
+  window.removeEventListener('focus',focused);document.removeEventListener('visibilitychange',visible);
   body.setAttribute('aria-busy','false');
  }
  retry.addEventListener('click',retryClick);window.addEventListener('pageshow',pageshow);window.addEventListener('pagehide',pagehide);
+ window.addEventListener('focus',focused);document.addEventListener('visibilitychange',visible);
  if(autoload)refresh();
  return {root,rows,refresh,render:rerender,destroy,get data(){return data;}};
 }

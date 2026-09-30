@@ -88,6 +88,7 @@ Supported character samples are `claude`, `gpt`, `deepseek`, and `gemini`; facti
 - Entity redirect checks occur before identity and method checks; dashboard redirects apply a GET/HEAD method gate first. A redirect response does not establish authorization or entity existence.
 - Characters, Factions, Locations, and Story Arcs directories and their `index.html` aliases are generated from `directoryPages` through `renderDirectoryPage` before profile/static routing. They accept HTML `GET`/`HEAD`, reject other methods, and missing-slash redirects keep query strings intact. Their private collection APIs remain owner-scoped. See the [directory shell](directory-shell.md).
 - Static fallback accepts `GET` and `HEAD` only. A slash-ended path maps to `path + 'index.html'`; a directory asset found at `path + '/index.html'` causes a `308`; otherwise unknown assets return text `404`.
+- Static HTML and unversioned assets revalidate with `no-cache`. The current build's revisioned assets and content-hashed Vite JavaScript/CSS are public and immutable for one year. Binary assets decode lazily once per Worker instance, never for HEAD. Private API, profile, and portrait responses do not use this static cache policy.
 
 These describe existing behavior, not a recommended pattern for new endpoints. Tightening path matching or changing redirect query handling is a separate behavior change and should receive request-level tests.
 
@@ -95,7 +96,7 @@ These describe existing behavior, not a recommended pattern for new endpoints. T
 
 Private handlers read `oai-authenticated-user-id` from the request. The trusted hosting layer establishes identity; route code never trusts an owner supplied in JSON. Local development replaces this header with `local-development-author`. Tests call the Worker directly to exercise separate owners.
 
-Mutations check exact same-origin `Origin` and an `application/json` content type, then read and parse the request body. These checks are repeated in each domain handler; there is no shared authentication or mutation middleware. Do not assume changes to one handler update the others.
+JSON mutations use [shared HTTP helpers](../server/http.js) to check exact same-origin `Origin` and the exact `application/json` media type, ignoring media-type case and allowing parameters such as `charset=utf-8`, then read and parse the request body. Lookalike media types are rejected. Authentication, body limits, parsing, domain validation, and check order remain owned by each handler; there is no shared authentication or mutation middleware. Binary portrait uploads retain their own origin and image-type checks.
 
 | Handler family | Request text limit | Notes |
 | --- | --- | --- |
@@ -112,11 +113,11 @@ Expected failures return JSON `{ error }`, normally with `no-store` and `nosniff
 | --- | --- |
 | Static asset | `GET` body; `HEAD` headers with null body; other methods `405`. |
 | Faction and location HTML profiles | `GET` body and `HEAD` null body; other methods `405`, subject to earlier lookup failures. |
-| Character HTML profile | The matched profile branch renders before a method gate. It currently constructs HTML even for methods other than `GET`. |
+| Character HTML profile | `GET` renders the profile; `HEAD` checks existence and returns a null body; other methods return `405`. |
 | Collection/item JSON reads | `GET`; `HEAD` is not an alias for `GET`. |
 | Dashboard/timeline JSON | Identity check, then GET-only method gate before database access. |
 
-The outer `createWorker` skips shell injection for `HEAD`; it does not turn arbitrary inner responses into bodyless responses. In particular, the character profile branch does not implement the same explicit `HEAD` handling as the other profiles. Document consumers and route tests should not infer uniform behavior from one profile implementation.
+The outer `createWorker` skips shell injection for `HEAD`; it does not turn arbitrary inner responses into bodyless responses. Profile handlers return an explicit null body for `HEAD` after checking ownership and existence.
 
 Faction and location handlers load catalogs before most method checks. Country and city handlers check entity existence before their HTML/API method branches. When storage is unavailable or a target does not exist, that earlier failure may determine the status instead of a later `405` or `403`.
 
@@ -124,7 +125,7 @@ Faction and location handlers load catalogs before most method checks. Country a
 
 ### Local validation versus catalog validation
 
-`validate(input, current)` builds from `blankCharacter()`, copies allowed template fields, and retains missing values from the current document. It composes structured names, supports legacy full-name updates, enforces field lengths and enumerated/numeric constraints, validates portrait URLs, and processes:
+`validate(input, current, id)` builds from `blankCharacter()`, copies allowed template fields, and retains missing values from the current document. It composes structured names, supports legacy full-name updates, enforces field lengths and enumerated/numeric constraints, accepts HTTPS portrait URLs or an uploaded portrait URL for that character, and processes:
 
 - `relationships`: required array, at most 100; each entry has `targetId`, `type`, and `description`.
 - `nationalityContinents`: map of selected nationality names to continent IDs; unused nationality entries are removed.
@@ -143,6 +144,8 @@ This helper does not access the database or validate the version. The inline `PU
 | `GET /api/characters?view=cards` | Also loads locations and country/city profiles; uses `dashboardData(...).characters` to enrich the cast for shared cards. |
 | `GET /api/characters/{id}` | Saved record or sample default, with resolved affiliation name. |
 | `GET /api/characters/{id}?view=connections` | Returns `{ character, defaultAffiliationCard, options }` for the featured-item picker. Options derive from the owner's world. |
+| `POST /api/characters/{id}/portraits` | Accepts same-origin PNG, JPEG, WebP, or GIF bytes up to 2 MiB, stores owner-scoped chunks, and returns `201 { url }`. |
+| `GET/HEAD /api/characters/{id}/portraits/{imageId}` | Serves the owner's uploaded image bytes or metadata; another owner's image returns `404`. |
 | `/characters/{id}/` | Loads cast, faction/place catalogs and country/city documents; derives external mentions with `includeOwn: false`; calls `renderProfile`. |
 
 The cards projection overrides document properties such as `roles` and `relationships`: card roles are arrays, and relationships are enriched people with incoming/outgoing connection details. **A card response is not a writable character document.** Dialogs fetch the ordinary item response before making edits. The connections projection's `character` is the document to update; its sibling `options` are presentation data.
@@ -154,7 +157,7 @@ The cards projection overrides document properties such as `roles` and `relation
 `PUT /api/characters/{id}` proceeds through these boundaries:
 
 1. Load saved document or sample default; return `404` if absent.
-2. Run local `validate`; convert validation exceptions to `400`.
+2. Run local `validate`; convert validation exceptions to `400`. For an uploaded portrait URL, verify that the image belongs to this owner and character.
 3. Resolve `factionId` and current affiliation name.
 4. Validate custom nationality continent assignments and birthplace/residence/citizenship references.
 5. Build the owner's cast and substitute the proposed document before computing note targets. This lets notes in the same submitted draft refer to each other.

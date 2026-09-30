@@ -1,3 +1,4 @@
+import {json} from './http.js';
 import {locationProfileGroups} from '../public/locations/template.js';
 import {repository} from './db.js';
 import {characterCast} from './sample-characters.js';
@@ -5,7 +6,6 @@ import {factionCatalog} from './factions.js';
 import {locationCatalog,defaultCountry} from './countries.js';
 import {defaultCity} from './cities.js';
 import {collectTimeline} from '../public/timeline/model.js';
-const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
  * GET /api/timeline: require identity and reject other methods before querying.
  * Merge owner-scoped saved profiles with defaults, then derive story events via

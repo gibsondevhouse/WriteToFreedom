@@ -60,3 +60,31 @@ test('embedded assets preserve binary bytes and MIME types through the Worker, i
  assert.equal(await script.text(),'export const title="Freedom — ✍";');
  assert.equal((await worker.fetch(new Request('https://example.test/frontend/.vite/manifest.json'),{})).status,404);
 });
+
+test('binary assets decode once per Worker instance and HEAD stays lazy',async t=>{
+ const bytes=Buffer.from([0x89,0x50,0x4e,0x47,0x00,0xff]),assets={'/photo.png':{content:bytes.toString('base64'),type:'image/png',encoding:'base64'}};
+ const decode=t.mock.method(globalThis,'atob'),worker=createWorker(assets),url='https://example.test/photo.png';
+ const head=await worker.fetch(new Request(url,{method:'HEAD'}),{});
+ assert.equal((await head.arrayBuffer()).byteLength,0);assert.equal(decode.mock.callCount(),0);
+ for(let attempt=0;attempt<2;attempt++){
+  const response=await worker.fetch(new Request(url),{});
+  const returned=new Uint8Array(await response.arrayBuffer());assert.deepEqual(Buffer.from(returned),bytes);returned[0]=0;
+ }
+ assert.equal(decode.mock.callCount(),1);
+ assert.deepEqual(Buffer.from(await (await createWorker(assets).fetch(new Request(url),{})).arrayBuffer()),bytes);assert.equal(decode.mock.callCount(),2);
+});
+
+test('fingerprinted frontend responses cache immutably without caching HTML',async()=>{
+ const worker=createWorker({
+  '/frontend/assets/entry-12345678.js':{content:'export const ready=true;',type:'text/javascript; charset=utf-8'},
+  '/frontend/assets/entry.js':{content:'export const ready=true;',type:'text/javascript; charset=utf-8'},
+  '/example/index.html':{content:'<html><head></head><body>Example</body></html>',type:'text/html; charset=utf-8'},
+ });
+ for(const method of ['GET','HEAD']){
+  for(const [path,cache] of [['/frontend/assets/entry-12345678.js','public, max-age=31536000, immutable'],['/frontend/assets/entry.js','no-cache'],['/example/?v=12345678','no-cache']]){
+   const response=await worker.fetch(new Request('https://example.test'+path,{method}),{});
+   assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),cache,path);assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+   if(method==='HEAD')assert.equal(await response.text(),'');
+  }
+ }
+});

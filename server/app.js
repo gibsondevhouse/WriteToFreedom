@@ -1,3 +1,5 @@
+import {json,isSameOriginJson} from './http.js';
+import {assetCacheControl} from './asset-url.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {validateChoiceSelections} from '../public/profiles/choice-selections.js';
 import {multiChoiceFields} from '../public/profiles/choices.js';
@@ -41,7 +43,38 @@ import { blankCharacter, fieldNames, idPattern, nameFields, fullName, storyRoles
 import { characters as seeds } from '../public/characters/data.js';
 import { renderProfile } from './render-profile.js';
 import { sampleCharacter, characterCast } from './sample-characters.js';
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+const portraitMimeTypes=new Set(['image/png','image/jpeg','image/webp','image/gif']);
+const portraitMaxBytes=2*1024*1024;
+const portraitChunkBytes=1024*1024;
+const portraitUrlPattern=/^\/api\/characters\/([^/]+)\/portraits\/([0-9a-f-]+)$/i;
+function ownedPortraitId(value,characterId){
+ const match=portraitUrlPattern.exec(value);
+ return match&&match[1]===characterId&&idPattern.test(match[2])?match[2]:null;
+}
+function matchesPortraitType(bytes,type){
+ const starts=(...signature)=>signature.every((value,index)=>bytes[index]===value);
+ if(type==='image/png')return bytes.length>=8&&starts(137,80,78,71,13,10,26,10);
+ if(type==='image/jpeg')return bytes.length>=4&&starts(255,216,255);
+ if(type==='image/webp')return bytes.length>=12&&starts(82,73,70,70)&&[87,69,66,80].every((value,index)=>bytes[index+8]===value);
+ if(type==='image/gif')return bytes.length>=6&&starts(71,73,70,56)&&(bytes[4]===55||bytes[4]===57)&&bytes[5]===97;
+ return false;
+}
+async function readPortraitBytes(request){
+ const reader=request.body?.getReader();if(!reader)return new Uint8Array(0);
+ const chunks=[];let total=0;
+ try{
+  for(;;){
+   const {done,value}=await reader.read();if(done)break;
+   total+=value.byteLength;
+   if(total>portraitMaxBytes){await reader.cancel();return null;}
+   chunks.push(value);
+  }
+ }finally{reader.releaseLock();}
+ const bytes=new Uint8Array(total);let offset=0;
+ for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+ return bytes;
+}
+function portraitHeaders(type,size){return {'content-type':type,'content-length':String(size),'cache-control':'private, no-store','x-content-type-options':'nosniff','cross-origin-resource-policy':'same-origin'};}
 /**
  * Build an allowlisted character document, retaining omitted fields from current.
  * Validates field/relationship shapes, notes, ratings, portrait, and visibility;
@@ -51,7 +84,7 @@ const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:
  * @param {object} current Current saved document or source sample.
  * @returns {object} Normalized editable document, without persistence metadata.
  */
-function validate(input,current) {
+function validate(input,current,id) {
  const output=blankCharacter();
  for(const name of fieldNames) {
   const text=Object.hasOwn(input,name)?input[name]:(current[name]||'');
@@ -74,7 +107,7 @@ function validate(input,current) {
  });
  for(const [key,options] of Object.entries(humanChoices))if(output[key]&&!options.includes(output[key]))throw new Error('Choose a valid '+key+' option.');
  for(const key of numericTextFields)if(!validNumericText(key,output[key]))throw new Error(numericTextError);
- if(!validImageUrl(output.portraitUrl)||output.portraitUrl.length>2048)throw new Error('Use an HTTPS portrait image URL of at most 2048 characters.');
+ if((!validImageUrl(output.portraitUrl)&&!ownedPortraitId(output.portraitUrl,id))||output.portraitUrl.length>2048)throw new Error('Use an HTTPS image URL or an uploaded portrait for this character.');
  const assignments=Object.hasOwn(input,'nationalityContinents')?input.nationalityContinents:(current.nationalityContinents||{});
  if(!assignments||typeof assignments!=='object'||Array.isArray(assignments)||Object.keys(assignments).length>100)throw new Error('Choose a continent for each custom nationality.');
  output.choiceSelections=validateChoiceSelections(input,current,output,multiChoiceFields.filter(key=>fieldNames.includes(key)));
@@ -99,7 +132,9 @@ function validate(input,current) {
  * @param {Record<string, {content: string, type: string, encoding?: string}>} assets Built text or base64 assets.
  * @returns {{fetch: function(Request, object): Promise<Response>}}
  */
-function createAppWorker(assets) { return {async fetch(request,env) {
+function createAppWorker(assets) {
+ const decodedAssets=new Map();
+ return {async fetch(request,env) {
  // Canonicalize/delegate specific location routes before broad APIs and assets.
  const url=new URL(request.url);const path=url.pathname;
  if(/^\/api\/(novels|series|novel-associations)(?:\/|$)/.test(path))return novelRoute(request,env);
@@ -165,16 +200,55 @@ function createAppWorker(assets) { return {async fetch(request,env) {
   if(!owner) return json({error:'Sign in to access your characters.'},401);
   try {
    const db=repository(env.DB);
-   // Existing behavior: this HTML branch precedes the API method gate (including HEAD).
+   const portrait=path.match(/^\/api\/characters\/([^/]+)\/portraits(?:\/([^/]+))?$/i);
+   if(portrait){
+    const [,characterId,imageId]=portrait;
+    if(!idPattern.test(characterId)&&!sampleCharacter(characterId))return json({error:'Character not found.'},404);
+    if(imageId){
+     if(!idPattern.test(imageId))return json({error:'Portrait not found.'},404);
+     if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed.'},405);
+     if(request.method==='HEAD'){
+      const row=await env.DB.prepare('SELECT content_type, total_size FROM character_images WHERE owner_id = ? AND character_id = ? AND image_id = ? AND chunk_index = 0').bind(owner,characterId,imageId).first();
+      return row?new Response(null,{headers:portraitHeaders(row.content_type,row.total_size)}):json({error:'Portrait not found.'},404);
+     }
+     const result=await env.DB.prepare('SELECT chunk_index, content_type, total_size, data FROM character_images WHERE owner_id = ? AND character_id = ? AND image_id = ? ORDER BY chunk_index').bind(owner,characterId,imageId).all();
+     const rows=result.results;if(!rows.length)return json({error:'Portrait not found.'},404);
+     const size=rows[0].total_size,bytes=new Uint8Array(size);let offset=0;
+     for(const [index,row] of rows.entries()){
+      if(row.chunk_index!==index||row.content_type!==rows[0].content_type||row.total_size!==size)return json({error:'Portrait is unavailable.'},503);
+      const chunk=new Uint8Array(row.data);bytes.set(chunk,offset);offset+=chunk.length;
+     }
+     if(offset!==size)return json({error:'Portrait is unavailable.'},503);
+     return new Response(bytes,{headers:portraitHeaders(rows[0].content_type,size)});
+    }
+    if(request.method!=='POST')return json({error:'Method not allowed.'},405);
+    if(request.headers.get('origin')!==url.origin)return json({error:'This request could not be verified. Reload and try again.'},403);
+    const type=request.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase();
+    if(!portraitMimeTypes.has(type))return json({error:'Choose a PNG, JPEG, WebP, or GIF image.'},415);
+    if(Number(request.headers.get('content-length'))>portraitMaxBytes)return json({error:'Portraits must be 2 MiB or smaller.'},413);
+    const bytes=await readPortraitBytes(request);
+    if(!bytes)return json({error:'Portraits must be 2 MiB or smaller.'},413);
+    if(!bytes.length||!matchesPortraitType(bytes,type))return json({error:'The selected file is not a valid '+type+' image.'},400);
+    if(!await db.get(owner,characterId)&&!sampleCharacter(characterId))return json({error:'Character not found.'},404);
+    const newImageId=crypto.randomUUID(),createdAt=new Date().toISOString(),statements=[];
+    for(let offset=0,index=0;offset<bytes.length;offset+=portraitChunkBytes,index++){
+     statements.push(env.DB.prepare('INSERT INTO character_images (image_id, chunk_index, owner_id, character_id, content_type, total_size, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(newImageId,index,owner,characterId,type,bytes.length,bytes.subarray(offset,offset+portraitChunkBytes),createdAt));
+    }
+    await env.DB.batch(statements);
+    return json({url:'/api/characters/'+characterId+'/portraits/'+newImageId},201);
+   }
    if(profile) {
-    const factions=await factionCatalog(db,owner);
-    const character=attachFactionNames([await db.get(owner,profile[1])||sampleCharacter(profile[1])].filter(Boolean),factions)[0];
-    if(!character) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
+    if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{'cache-control':'no-store'}});
+    const record=await db.get(owner,profile[1])||sampleCharacter(profile[1]);
+    if(!record) return new Response('Character not found. Return to /characters/',{status:404,headers:{'cache-control':'no-store'}});
+    const headers={'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'};
+    if(request.method==='HEAD')return new Response(null,{headers});
+    const factions=await factionCatalog(db,owner),character=attachFactionNames([record],factions)[0];
     const [savedCast,locations,countries,cities,lore]=await Promise.all([db.list(owner),locationCatalog(db,owner),db.listCountryProfiles(owner),db.listCityProfiles(owner),db.listLore(owner)]);
     const cast=attachFactionNames(characterCast(savedCast),factions);
     const countryMap=new Map(countries.map(p=>[p.id,p])),cityMap=new Map(cities.map(p=>[p.id,p]));
     const notes=characterMentions(character,{...locationProfileGroups(locations),lore,character:cast,faction:factions,country:locations.filter(l=>l.type==='country').map(l=>({...defaultCountry(l),...countryMap.get(l.id)})),city:locations.filter(l=>l.type==='city').map(l=>({...defaultCity(l),...cityMap.get(l.id)}))},{includeOwn:false});
-    return new Response(renderProfile(character,cast,factions,locations,notes,lore),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    return new Response(renderProfile(character,cast,factions,locations,notes,lore),{headers});
    }
    const id=path.split('/')[3];
    if(id&&!idPattern.test(id)&&!sampleCharacter(id)) return json({error:'Character not found.'},404);
@@ -202,7 +276,7 @@ function createAppWorker(assets) { return {async fetch(request,env) {
    }
    // Mutation envelope checks precede branch-specific field/reference validation.
    if(!['POST','PUT'].includes(request.method)) return json({error:'Method not allowed.'},405);
-   if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json')) return json({error:'This request could not be verified. Reload and try again.'},403);
+    if(!isSameOriginJson(request,url.origin)) return json({error:'This request could not be verified. Reload and try again.'},403);
    const body=await request.text();if(body.length>180000)return json({error:'Character is too large to save.'},413);
    let input;try{input=JSON.parse(body);}catch{return json({error:'Invalid character data.'},400);}
    if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid character data.'},400);
@@ -217,21 +291,23 @@ function createAppWorker(assets) { return {async fetch(request,env) {
     if(Object.hasOwn(input,'id')&&input.id!==id)return json({error:'A character’s ID cannot change.'},400);
     const current=await db.get(owner,id)||sampleCharacter(id);
     if(!current)return json({error:'Character not found.'},404);
-    let document;try{document=validate(input,current);}catch(error){return json({error:error.message},400);}
+    let document;try{document=validate(input,current,id);}catch(error){return json({error:error.message},400);}
+    const imageId=ownedPortraitId(document.portraitUrl,id);
+    if(imageId&&!await env.DB.prepare('SELECT 1 FROM character_images WHERE owner_id = ? AND character_id = ? AND image_id = ? AND chunk_index = 0').bind(owner,id,imageId).first())return json({error:'Choose a portrait uploaded to this character.'},400);
+    const [factions,locations,savedCast,lore]=await Promise.all([factionCatalog(db,owner),locationCatalog(db,owner),db.list(owner),db.listLore(owner)]);
     if(document.factionId){
-     const faction=(await factionCatalog(db,owner)).find(f=>f.id===document.factionId);
+     const faction=factions.find(f=>f.id===document.factionId);
      if(!faction)return json({error:'Choose an existing faction or create one.'},400);
      document.affiliation=faction.name;
     }
-    const locations=await locationCatalog(db,owner);
     if(Object.values(document.nationalityContinents).some(id=>!locations.some(l=>l.id===id&&l.type==='continent')))return json({error:'Choose a continent from your locations for each custom nationality.'},400);
     for(const key of ['birthPlaceId','residenceId','citizenshipId'])if(document[key]&&!locations.some(l=>l.id===document[key]&&(key!=='citizenshipId'||l.type==='country')))return json({error:'Choose an existing location for birthplace or residence, and a country for citizenship.'},400);
-    const savedCast=await db.list(owner),cast=characterCast(savedCast);
+    const cast=characterCast(savedCast);
     const allowed=new Set(cast.map(c=>c.id));
     // Include draft notes when validating links created within the same character save.
     const proposedCast=cast.map(c=>c.id===id?{...document,id}:c);
     try{
-     const targets=noteTargets(proposedCast,await factionCatalog(db,owner),locations,await db.listLore(owner));
+     const targets=noteTargets(proposedCast,factions,locations,lore);
      validateNoteConnections(document.notes,targets,current.notes||[],id);
      await validateCollectedNotes(env.DB,owner,current.id,document);
      if(document.cardConnection){
@@ -255,8 +331,14 @@ function createAppWorker(assets) { return {async fetch(request,env) {
  if(!assets[key]&&assets[path+'/index.html'])return Response.redirect(url.origin+path+'/'+url.search,308);
  const asset=assets[key];
  if(!asset)return new Response('Page not found',{status:404});
- const body=request.method==='HEAD'?null:asset.encoding==='base64'?Uint8Array.from(atob(asset.content),character=>character.charCodeAt(0)):asset.content;
- return new Response(body,{headers:{'content-type':asset.type,'cache-control':'no-cache','x-content-type-options':'nosniff'}});
+ let body=null;
+ if(request.method!=='HEAD'){
+  if(asset.encoding==='base64'){
+   if(!decodedAssets.has(key))decodedAssets.set(key,Uint8Array.from(atob(asset.content),character=>character.charCodeAt(0)));
+   body=decodedAssets.get(key);
+  }else body=asset.content;
+ }
+ return new Response(body,{headers:{'content-type':asset.type,'cache-control':assetCacheControl(url,asset.type),'x-content-type-options':'nosniff'}});
 }};}
 
 

@@ -1,4 +1,5 @@
 import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const relationLabels={appears_in:'Appears in',referenced_by:'Referenced by',linked:'Linked to'};
 const node=(tag,text,className)=>{const element=document.createElement(tag);if(text!==undefined)element.textContent=text;if(className)element.className=className;return element;};
@@ -76,11 +77,7 @@ export function initNovelAppearances(){
  function message(text,failed=false){status.textContent=text;if(failed){error.textContent=text;error.hidden=false;}else error.hidden=true;}
  function setBusy(value){busy=value;fields.disabled=value;submit.disabled=value;close.disabled=value;unlink.disabled=value;review.disabled=value;}
  async function request(url,options){
-  const response=await fetch(url,{credentials:'same-origin',...options});
-  if(response.status===204)return null;
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Your draft is still here. Sign in before saving.');
-  const data=await response.json();if(!response.ok){const failure=new Error(data.error||'Could not save these details.');failure.conflict=response.status===409;throw failure;}
-  return data;
+    return requestJSON(url,options,{sessionMessage:'Your session may have expired. Your draft is still here. Sign in before saving.',errorMessage:'Could not save these details.'});
  }
  document.addEventListener('click',event=>{
   const edit=event.target.closest('[data-edit-appearance]'),link=event.target.closest('[data-link-appearance]');
@@ -97,7 +94,7 @@ export function initNovelAppearances(){
    const saved=await request(base+(editing.new?'':'/'+encodeURIComponent(draft.id)),{method:editing.new?'POST':'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
    drafts.delete(editing.key);associations.set(saved.id,saved);editing={key:saved.id,id:saved.id,version:saved.version,new:false};picker.disabled=true;unlink.hidden=false;relation.value=saved.relationKind;prose.value=saved.prose;
    review.hidden=true;preview.hidden=true;paint();message('Saved details');announceWorkspaceChange();
-  }catch(failure){remember();message(failure.message+' Your details are still in this editor.',true);review.hidden=!failure.conflict;}
+    }catch(failure){remember();message(failure.message+' Your details are still in this editor.',true);review.hidden=failure.status!==409;}
   finally{setBusy(false);}
  });
  review.addEventListener('click',async()=>{
@@ -115,7 +112,7 @@ export function initNovelAppearances(){
   try{
    await request('/api/novels/'+encodeURIComponent(picker.value)+'/associations/'+encodeURIComponent(editing.id),{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({version:editing.version})});
    associations.delete(editing.id);drafts.delete(editing.key);editing=null;paint();dialog.close();announceWorkspaceChange();
-  }catch(failure){remember();message(failure.message+' Your details are still in this editor.',true);review.hidden=!failure.conflict;}
+   }catch(failure){remember();message(failure.message+' Your details are still in this editor.',true);review.hidden=failure.status!==409;}
   finally{setBusy(false);}
  });
  close.addEventListener('click',()=>{if(!busy){remember();dialog.close();}});

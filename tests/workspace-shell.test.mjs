@@ -35,9 +35,10 @@ function navigationSession(saved = new Map(), mobile = false) {
   const elements = new Map(['#novel-search','#search-results','#search-list','#search-status','.workspace-search kbd','.sidebar-toggle','#workspace-sidebar'].map(selector=>[selector,node()]));
   const document = {...node(),documentElement:node(),querySelector:selector=>elements.get(selector)};
   const media = {...node(),matches:mobile};
-  const context = vm.createContext({document,window:node(),navigator:{platform:'Mac'},matchMedia:()=>media,localStorage:{getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)}});
+  const context = vm.createContext({document,window:node(),navigator:{platform:'Mac'},matchMedia:()=>media,localStorage:{getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)},observeWorkspaceChanges:()=>()=>{}});
   vm.runInContext(readFileSync('public/workspace-state.js','utf8'),context);
-  vm.runInContext(readFileSync('public/dashboard/workspace.js','utf8').replace(/^import .*\n/,'').replace('export function updateWorkspace','function updateWorkspace'),context);
+  vm.runInContext(readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,''),context);
+  vm.runInContext(readFileSync('public/dashboard/workspace.js','utf8').replace(/^import .*\n/gm,'').replace('export function updateWorkspace','function updateWorkspace'),context);
   return {document,media,menu:elements.get('.sidebar-toggle'),click(){elements.get('.sidebar-toggle').handlers.click[0]();}};
 }
 test('sidebar collapse survives navigation and mobile menu does not overwrite desktop preference', () => {
@@ -59,6 +60,42 @@ test('sidebar collapse survives navigation and mobile menu does not overwrite de
   assert.equal(saved.get('wtf-sidebar-collapsed'),'true');
   next.click();
   assert.equal(saved.get('wtf-sidebar-collapsed'),'false');
+});
+
+test('a saved change refreshes global search and the selected novel breadcrumb', async () => {
+ const novelId='d1bf0371-9115-4d74-9903-77831ca6bd47';
+ let title='Original title',changed,stopped=false;
+ const node=()=>({children:[],handlers:{},dataset:{},attrs:{},value:'',hidden:false,
+  addEventListener(type,handler){(this.handlers[type]??=[]).push(handler);},
+  setAttribute(name,value){this.attrs[name]=value;},
+  replaceChildren(...children){this.children=children;},
+  append(...children){this.children.push(...children);},
+  contains(){return false;},focus(){},select(){},closest(){return null}
+ });
+ const elements=new Map(['#novel-search','#search-results','#search-list','#search-status','.workspace-search kbd','.sidebar-toggle','#workspace-sidebar','.workspace-context'].map(selector=>[selector,node()]));
+ const document={...node(),documentElement:node(),body:{classList:{contains:()=>false}},
+  querySelector:selector=>elements.get(selector),createElement:()=>node()};
+ const window=node(),media={...node(),matches:false};
+ const response=data=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>data});
+ const context=vm.createContext({document,window,navigator:{platform:'Mac'},matchMedia:()=>media,
+  localStorage:{setItem(){}},location:{href:'https://novel.example/characters/?novel='+novelId},URL,
+  observeWorkspaceChanges(callback){changed=callback;return()=>{stopped=true;}},
+  searchCatalog(catalog,query){return catalog.novels.filter(record=>record.title.includes(query)).map(record=>({name:record.title,href:'/novels/'+record.id+'/',label:'Novel'}));},
+  fetch:async url=>response(url.startsWith('/api/dashboard')?{novels:[{id:novelId,title}]}:{title})
+ });
+ vm.runInContext(readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,''),context);
+ vm.runInContext(readFileSync('public/dashboard/workspace.js','utf8').replace(/^import .*\n/gm,'').replace('export function updateWorkspace','function updateWorkspace'),context);
+ const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
+ await flush();
+ const breadcrumb=elements.get('.workspace-context').children[2];
+ assert.equal(breadcrumb.textContent,'Original title');
+ const searchInput=elements.get('#novel-search');searchInput.value='title';
+ searchInput.handlers.input[0]();await flush();
+ assert.equal(elements.get('#search-list').children[0].children[0].children[0].children[0].textContent,'Original title');
+ title='Revised title';changed();await flush();
+ assert.equal(breadcrumb.textContent,'Revised title');
+ assert.equal(elements.get('#search-list').children[0].children[0].children[0].children[0].textContent,'Revised title');
+ window.handlers.pagehide[0]({persisted:false});assert.equal(stopped,true);
 });
 
 test('the workspace gives every page asset one coherent revision',()=>{

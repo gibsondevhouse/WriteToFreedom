@@ -1,6 +1,7 @@
 import {loreTypes,loreHref} from '../lore/template.js';
 import {locationHref} from '../locations/data.js';
 import {locationTypes,typeLabels,parentChoices,parentTypes,requiresParent,areaTypes} from '../locations/data.js?v=worlds-1';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 export function createNoteItemButton(initial,connections,addNote){
  const launch=node('button','＋ Create new item','note-action create-note-item');launch.type='button';
@@ -33,7 +34,7 @@ export function createNoteItemButton(initial,connections,addNote){
  type.addEventListener('change',()=>{requestId=null;configure();});
  name.addEventListener('input',()=>name.setCustomValidity(''));text.addEventListener('input',()=>text.setCustomValidity(''));
  back.addEventListener('click',()=>dialog.close());dialog.addEventListener('cancel',e=>{if(saving)e.preventDefault();});
- async function api(path,payload){const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Keep this note open and try again after signing in.');const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not create this item. Your note is still here.');return result;}
+ async function api(path,payload){return requestJSON(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)},{sessionMessage:'Your session may have expired. Keep this note open and try again after signing in.',errorMessage:'Could not create this item. Your note is still here.'});}
  form.addEventListener('submit',async e=>{
   e.preventDefault();if(saving)return;const label=name.value.trim();if(!label){name.setCustomValidity('Enter a name or title.');name.reportValidity();return;}
   const kind=type.value,isNote=kind==='note';if(isNote&&!text.value.trim()){text.setCustomValidity('Enter the note or lore detail.');text.reportValidity();return;}

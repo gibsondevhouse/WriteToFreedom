@@ -1,10 +1,10 @@
+import {json,isSameOriginJson} from './http.js';
 import {writingRepository} from './writing-repository.js';
 import {repository} from './db.js';
 import {supportedSchemaVersion} from './document-storage.js';
 import {validateWritingContent,writingContentSchemaVersion,writingRequestMaxBytes} from '../public/writing/document.js';
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const field=(input,current,key,fallback)=>Object.hasOwn(input,key)?input[key]:current?.[key]??fallback;
 function metadata(input,current){
@@ -12,6 +12,28 @@ function metadata(input,current){
  if(typeof title!=='string'||!title.trim()||title.length>160)throw new Error('Enter a title from 1 to 160 characters.');
  if(typeof summary!=='string'||summary.length>10000)throw new Error('Keep the summary within 10,000 characters.');
  return {title:title.trim().replace(/\s+/g,' '),summary};
+}
+
+async function chapterMetadata(input,current,document,library,owner){
+ for(const key of ['status','chapterNumber','connectedArcIds']){
+  if(!Object.hasOwn(input,key)&&!Object.hasOwn(current||{},key))continue;
+  const value=field(input,current,key);
+  if(key==='status'&&!['draft','revising','complete'].includes(value))throw new Error('Choose Draft, Revising, or Complete as the chapter status.');
+  if(key==='chapterNumber'&&(!Number.isSafeInteger(value)||value<1||value>9999))throw new Error('Enter a chapter number from 1 to 9,999.');
+  if(key==='connectedArcIds'){
+   if(!Array.isArray(value)||value.length>50||value.some(id=>typeof id!=='string'||!uuid.test(id))||new Set(value).size!==value.length)throw new Error('Choose up to 50 different story arcs.');
+   // Retained IDs stay removable even after a separate novel unlink or arc
+   // deletion. Only newly selected IDs need live owner/novel references.
+   const introduced=value.filter(id=>!current?.connectedArcIds?.includes(id));
+   if(introduced.length){
+    if(!document.novelId)throw new Error('Choose story arcs linked to this chapter’s novel.');
+    const linked=new Set((await library.listNovelAssociations(owner,document.novelId)).filter(item=>item.targetKind==='story_arc').map(item=>item.targetId));
+    if(introduced.some(id=>!linked.has(id))||(await Promise.all(introduced.map(id=>library.getStoryArc(owner,id)))).some(arc=>!arc))throw new Error('Choose story arcs linked to this chapter’s novel.');
+   }
+  }
+  document[key]=Array.isArray(value)?[...value]:value;
+ }
+ return document;
 }
 
 /** JSON-only chapters/scenes endpoints; the caller routes these exact paths. */
@@ -22,7 +44,7 @@ export async function writingRoute(request,env){
  const [,collection,id]=match,scene=collection==='scenes',singular=scene?'scene':'chapter';
  if(!['GET','POST','PUT','DELETE'].includes(request.method)||id&&request.method==='POST'||!id&&['PUT','DELETE'].includes(request.method))return json({error:'Method not allowed.'},405);
  if(id&&!uuid.test(id))return json({error:'Writing entry not found.'},404);
- if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase()!=='application/json'))return json({error:'This request could not be verified.'},403);
+ if(request.method!=='GET'&&!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
  try{
   const db=writingRepository(env.DB),library=repository(env.DB),current=id?await (scene?db.getScene(owner,id):db.getChapter(owner,id)):null;
   if(id&&!current)return json({error:`This ${singular} was not found.`},404);
@@ -88,6 +110,7 @@ export async function writingRoute(request,env){
       document.novelId=novels[0]?.id||null;
      }
     }
+    document=await chapterMetadata(input,current,document,library,owner);
    }
    if(scene){
     const chapterId=field(input,current,'chapterId'),status=field(input,current,'status','draft'),contentSchemaVersion=field(input,current,'contentSchemaVersion');

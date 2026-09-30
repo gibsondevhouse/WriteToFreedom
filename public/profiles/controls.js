@@ -1,6 +1,7 @@
 import {initProfileViewport} from './viewport.js?v=profile-reading-1';
 import {initDatePicker} from './date-picker.js?v=profile-reading-1';
 import {choicesFor} from './choice-selections.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from './request.js?v=__WTF_ASSET_REVISION__';
 export function resize(input){if(input.tagName==='TEXTAREA'&&input.getClientRects().length){input.style.height='auto';input.style.height=input.scrollHeight+2+'px';}}
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 
@@ -42,7 +43,7 @@ function buildChoiceControl(control){
   storeChoice(multiple?chosen.join(' · '):text);paint();markDirty();return true;
  }
  async function refreshContinents(){
-  try{const response=await fetch('/api/locations',{credentials:'same-origin',cache:'no-store'});if(!response.ok)return;const data=await response.json();const selected=continent.value;continent.replaceChildren(new Option('Custom continent',''),...data.locations.filter(l=>l.type==='continent').map(l=>new Option(l.name,l.id)));if([...continent.options].some(o=>o.value===selected))continent.value=selected;}catch{}
+    try{const data=await requestJSON('/api/locations');const selected=continent.value;continent.replaceChildren(new Option('Custom continent',''),...data.locations.filter(l=>l.type==='continent').map(l=>new Option(l.name,l.id)));if([...continent.options].some(o=>o.value===selected))continent.value=selected;}catch{}
  }
  if(continent){continent.addEventListener('focus',refreshContinents);window.addEventListener('focus',()=>{if(!custom.hidden)refreshContinents();});}
  function closeCustom(){custom.hidden=true;input.value='';input.setCustomValidity('');}

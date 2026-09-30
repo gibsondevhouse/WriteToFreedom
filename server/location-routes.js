@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {locationTemplates} from '../public/locations/template.js';
 import {connectedNotes} from './note-connections.js';
@@ -6,7 +7,6 @@ import { locationCatalog } from './countries.js';
 import { repository } from './db.js';
 import { locationTypes,areaTypes,parentChoices,requiresParent } from '../public/locations/data.js';
 import { idPattern } from '../public/characters/template.js';
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
  * Handle exactly /api/locations: GET catalog plus explicit note backlinks, POST
  * any supported location type, or legacy basic PUTs for types other than country/city.
@@ -23,7 +23,7 @@ export async function locationRoute(request,env){
   const db=repository(env.DB),records=await locationCatalog(db,owner);
   if(request.method==='GET'){const cast=characterCast(await db.list(owner)),lore=await db.listLore(owner);return json({locations:records.map(l=>({...l,linkedNotes:connectedNotes(cast,{kind:'location',id:l.id},lore)}))});}
   if(!['POST','PUT'].includes(request.method))return json({error:'Method not allowed.'},405);
-  const url=new URL(request.url);if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    const url=new URL(request.url);if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>4096)return json({error:'Location details are too long.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid location details.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input)||!(idPattern.test(input.id)||request.method==='PUT'&&records.some(r=>r.id===input.id))||typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>160||!locationTypes.includes(input.type))return json({error:'Enter a name and choose a location type.'},400);

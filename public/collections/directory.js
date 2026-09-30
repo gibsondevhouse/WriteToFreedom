@@ -7,6 +7,7 @@ import {validateCollectionRules,smartKinds} from './rules.js?v=__WTF_ASSET_REVIS
 import {typeLabels} from '../locations/data.js?v=__WTF_ASSET_REVISION__';
 import {loreTypes} from '../lore/template.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange,observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const initial=JSON.parse(document.querySelector('#collection-data').textContent),detail=Boolean(initial);
 let collection=initial,ruleSummary='',draftOrder=[],savedOrder=[],orderDirty=false,orderBaseVersion=initial?.version;
@@ -24,10 +25,7 @@ function setMutationBusy(value){
 }
 
 async function mutate(path,method,body){
- const response=await fetch(path,{method,credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:abort.signal});
- if(response.status===204)return null;
- if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Copy your changes before reloading to sign in again.');
- const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save this collection. Your draft is still here.');return data;
+ return requestJSON(path,{method,headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:abort.signal},{errorMessage:'Could not save this collection. Your draft is still here.'});
 }
 async function loadSources(){
  const data=await fetchDirectory('/api/library',{signal:abort.signal});

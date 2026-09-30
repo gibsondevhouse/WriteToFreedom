@@ -1,3 +1,5 @@
+import {displayImageSource} from '../image-source.js?v=__WTF_ASSET_REVISION__';
+
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 
 const iconPaths={
@@ -29,7 +31,8 @@ export function storyCardInitials(name){
 
 export function storyCardPicture(record,cls){
  const frame=el('span',cls),mark=el('span','character-initials',storyCardInitials(record.name));mark.setAttribute('aria-hidden','true');frame.append(mark);
- if(record.image){try{const url=new URL(record.image);if(url.protocol==='https:'&&!url.username&&!url.password){const img=el('img');img.src=url.href;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});frame.append(img);}}catch{}}
+ const source=displayImageSource(record.image);
+ if(source){const img=el('img');img.src=source;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});frame.append(img);}
  return frame;
 }
 

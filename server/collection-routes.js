@@ -1,10 +1,10 @@
+import {json,isSameOriginJson} from './http.js';
 import {collectionRepository} from './collection-repository.js';
 import {libraryEntries,libraryKey,cleanLibraryReference} from './library-targets.js';
 import {repository} from './db.js';
 import {validateCollectionRules,collectionRuleSummary} from '../public/collections/rules.js';
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const conflict=input=>json({error:'This collection changed in another tab. Your draft is still here. Reload before saving.',draft:input},409);
 function document(input,current,kind){
  const value=(key,fallback)=>Object.hasOwn(input,key)?input[key]:current?.[key]??fallback;
@@ -32,7 +32,7 @@ export async function collectionRoute(request,env){
  const [,id,operation]=match;
  if(id&&!uuid.test(id))return json({error:'Collection not found.'},404);
  if(!['GET','POST','PUT','DELETE'].includes(request.method)||!id&&['PUT','DELETE'].includes(request.method)||id&&!operation&&request.method==='POST'||operation==='entries'&&request.method!=='GET'||operation==='members'&&!['GET','POST','DELETE'].includes(request.method))return json({error:'Method not allowed.'},405);
- if(request.method!=='GET'&&(request.headers.get('origin')!==url.origin||request.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase()!=='application/json'))return json({error:'This request could not be verified.'},403);
+ if(request.method!=='GET'&&!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
  try{
   const db=collectionRepository(env.DB),current=id?await db.get(owner,id):null;
   if(id&&!current)return json({error:'Collection not found.'},404);
@@ -40,7 +40,7 @@ export async function collectionRoute(request,env){
    if(!id)return json(await db.list(owner));
    if(operation==='members')return json({members:current.kind==='manual'?await db.members(owner,id):[]});
    if(operation==='entries'){
-    const entries=await db.entries(owner,current),labels=Object.fromEntries((await libraryEntries(env.DB,owner)).filter(entry=>['novel','series'].includes(entry.kind)).map(entry=>[entry.id,entry.name]));
+    const catalog=await libraryEntries(env.DB,owner),entries=await db.entries(owner,current,catalog),labels=Object.fromEntries(catalog.filter(entry=>['novel','series'].includes(entry.kind)).map(entry=>[entry.id,entry.name]));
     return json({entries,ruleSummary:current.kind==='smart'?collectionRuleSummary(current.rules,labels)+' · Embedded notes use their parent character’s novel links.':'Selected library entries'});
    }
    return json(current);

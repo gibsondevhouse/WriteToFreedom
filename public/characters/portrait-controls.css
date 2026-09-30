@@ -1,0 +1,109 @@
+/* Compact portrait source controls in the character information card. */
+.character-profile .infobox .portrait-source-field {
+  align-items:center;
+}
+
+.character-profile .infobox .portrait-source-field > label {
+  align-self:center;
+}
+
+.character-profile .portrait-source-control {
+  min-width:0;
+}
+
+.character-profile .portrait-source-actions {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-height:34px;
+}
+
+.character-profile .portrait-source-button {
+  display:inline-flex;
+  flex:0 0 32px;
+  align-items:center;
+  justify-content:center;
+  width:32px;
+  height:32px;
+  padding:0;
+  border:1px solid #ffffff14;
+  border-radius:7px;
+  background:#ffffff08;
+  color:#aebcd0;
+  line-height:1;
+  transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease;
+}
+
+.character-profile .portrait-source-button:hover:not(:disabled) {
+  background:#ffffff13;
+  border-color:#ffffff28;
+  color:#eef3fb;
+}
+
+.character-profile .portrait-source-button:is(.is-active,[aria-pressed="true"]) {
+  background:#9fbbe221;
+  border-color:#9fbbe259;
+  color:#d8e8ff;
+}
+
+.character-profile .portrait-source-button:focus-visible {
+  outline:2px solid #a9c0fa;
+  outline-offset:2px;
+}
+
+.character-profile .portrait-source-button:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.character-profile .portrait-source-button svg {
+  display:block;
+  width:16px;
+  height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.character-profile .portrait-source-panel {
+  margin-top:6px;
+}
+
+.character-profile .portrait-source-panel[hidden] {
+  display:none;
+}
+
+.character-profile .infobox .portrait-source-panel input#field-portraitUrl {
+  width:100%;
+  min-height:32px;
+  border:1px solid #ffffff1c;
+  background:#ffffff08;
+  font-size:12px;
+}
+
+.character-profile .infobox #portrait-image-file[hidden] {
+  display:none;
+}
+
+.character-profile .portrait-source-status {
+  display:block;
+  margin-top:4px;
+  color:#8999ad;
+  font-size:11px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+
+.character-profile .portrait-source-status[hidden] {
+  display:none;
+}
+
+.character-profile .portrait-source-status.is-error {
+  color:#d9a5a5;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .character-profile .portrait-source-button { transition:none; }
+}

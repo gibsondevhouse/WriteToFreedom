@@ -1,7 +1,4 @@
 import {repository} from './db.js';
-import {sampleCharacter} from './sample-characters.js';
-import {factionCatalog} from './factions.js';
-import {locationCatalog} from './countries.js';
 import {locationPaths} from '../public/locations/data.js';
 import {escape,jsonData,renderSection,renderInfoGroup} from './profile-components.js';
 
@@ -16,12 +13,24 @@ function profileTarget(path){
  }
  return null;
 }
-async function resolveTarget(db,owner,target){
- if(target.kind==='character')return await db.get(owner,target.id)||sampleCharacter(target.id);
- if(target.kind==='faction')return (await factionCatalog(db,owner)).find(item=>item.id===target.id);
- if(target.kind==='location')return (await locationCatalog(db,owner)).find(item=>item.id===target.id&&item.type===target.type);
- if(target.kind==='lore')return db.getLore(owner,target.id);
- return db.getStoryArc(owner,target.id);
+function profileLabel(html,target){
+ const match=html.match(/<script id="profile-data" type="application\/json">([\s\S]*?)<\/script>/);
+ if(!match)throw new Error('Profile data is missing.');
+ const data=JSON.parse(match[1]),record=data?.character||data?.record||data;
+ if(!record||record.id!==target.id)throw new Error('Profile identity does not match its URL.');
+ return record.name||record.title||'This article';
+}
+function insertBefore(html,marker,content){
+ const index=html.indexOf(marker);
+ if(index<0)throw new Error('Profile appearance insertion point is missing.');
+ return html.slice(0,index)+content+html.slice(index);
+}
+function insertIntoInfobox(html,content){
+ const start=html.match(/<aside\b[^>]*\bid="identity"[^>]*>/);
+ if(!start)throw new Error('Profile identity card is missing.');
+ const end=html.indexOf('</aside>',start.index+start[0].length);
+ if(end<0)throw new Error('Profile identity card is incomplete.');
+ return html.slice(0,end)+content+html.slice(end);
 }
 function appearanceSection(data,{native=false}={}){
  const map=new Map(data.novels.map(novel=>[novel.id,novel]));
@@ -51,18 +60,20 @@ export async function enhanceNovelAppearances(request,env,response){
  if(!target||!owner)return response;
  let html=await response.clone().text();if(html.includes('id="novel-appearances-data"'))return response;
  try{
-  const db=repository(env.DB),record=await resolveTarget(db,owner,target);if(!record)return response;
+  const label=profileLabel(html,target),db=repository(env.DB);
   const [novels,series,associations]=await Promise.all([db.listNovels(owner),db.listSeries(owner),db.listNovelAssociationsByTarget(owner,target.kind,target.id)]);
   const owned=new Map(novels.map(novel=>[novel.id,novel])),seriesMap=new Map(series.map(item=>[item.id,item]));
-  const data={target:{kind:target.kind,id:target.id,label:record.name||record.title||'This article'},novels:novels.map(novel=>({id:novel.id,title:novel.title||'Untitled novel',status:novel.status,seriesId:novel.seriesId||'',seriesTitle:seriesMap.get(novel.seriesId)?.title||''})),associations:associations.filter(association=>owned.has(association.novelId)).sort((a,b)=>String(owned.get(a.novelId).title||'').localeCompare(String(owned.get(b.novelId).title||''))||a.novelId.localeCompare(b.novelId))};
+  const data={target:{kind:target.kind,id:target.id,label},novels:novels.map(novel=>({id:novel.id,title:novel.title||'Untitled novel',status:novel.status,seriesId:novel.seriesId||'',seriesTitle:seriesMap.get(novel.seriesId)?.title||''})),associations:associations.filter(association=>owned.has(association.novelId)).sort((a,b)=>String(owned.get(a.novelId).title||'').localeCompare(String(owned.get(b.novelId).title||''))||a.novelId.localeCompare(b.novelId))};
   const pilot=html.includes('id="lore-profile-root"'),section=appearanceSection(data,{native:pilot}),info=infobox(data,{native:pilot});
-  html=html.replace('<footer class="profile-footer">',section+'<footer class="profile-footer">');
-  html=html.replace(/(<aside\b[^>]*class="[^"]*\binfobox\b[^"]*"[^>]*>[\s\S]*?)(<\/aside>)/,(_,inside,close)=>inside+info+close);
+  if(!pilot){html=insertBefore(html,'<footer class="profile-footer">',section);html=insertIntoInfobox(html,info);}
   // The React note pilot mounts its article after this response. Inert templates
   // let the separate client mount the same section without owning React fields.
-  html=html.replace('</head>','<link rel="stylesheet" href="/novels/appearances.css?v=__WTF_ASSET_REVISION__"><script type="module" src="/novels/appearances.js?v=__WTF_ASSET_REVISION__"></script></head>');
-  html=html.replace('</body>',`<template id="novel-appearances-template">${section}</template><template id="novel-appearances-infobox-template">${info}</template>${editor()}<script id="novel-appearances-data" type="application/json">${jsonData(data)}</script></body>`);
+  html=insertBefore(html,'</head>','<link rel="stylesheet" href="/novels/appearances.css?v=__WTF_ASSET_REVISION__"><script type="module" src="/novels/appearances.js?v=__WTF_ASSET_REVISION__"></script>');
+  html=insertBefore(html,'</body>',`<template id="novel-appearances-template">${section}</template><template id="novel-appearances-infobox-template">${info}</template>${editor()}<script id="novel-appearances-data" type="application/json">${jsonData(data)}</script>`);
   const headers=new Headers(response.headers);headers.delete('content-length');headers.set('cache-control','no-store');
   return new Response(html,{status:response.status,headers});
- }catch(error){console.error('Novel appearance links could not be loaded',error.message);return response;}
+ }catch(error){
+  console.error('Novel appearance links could not be loaded',error.message);
+  return new Response('Novel appearance details could not be loaded. Please try again.',{status:503,headers:{'content-type':'text/plain; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
+ }
 }

@@ -73,7 +73,7 @@
 .entity-profile .profile-content{grid-column:1;grid-row:1;min-width:0}
 .entity-profile #identity{grid-column:2;grid-row:1;float:none;width:100%;margin:0;align-self:start;position:relative;max-height:calc(100dvh - var(--profile-header-height) - 12px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#536479 transparent;scroll-padding:8px;scroll-margin-top:var(--profile-header-height)}
 .entity-profile .profile-reading #identity{position:sticky;top:var(--profile-header-height)}
-.entity-profile .profile-content .profile-section,.entity-profile .profile-content .section-header,.entity-profile .profile-content .section-header h2{scroll-margin-top:var(--profile-header-height)}
+.entity-profile :is(.profile-content,.profile-leading) .profile-section,.entity-profile :is(.profile-content,.profile-leading) .section-header,.entity-profile :is(.profile-content,.profile-leading) .section-header h2{scroll-margin-top:var(--profile-header-height)}
 .entity-profile #identity [data-profile-field]{scroll-margin:8px}
 .entity-profile .current-view{position:relative;overflow:hidden;white-space:nowrap;min-width:0;max-width:60%;flex-shrink:1}
 .current-view-label{display:block;overflow:hidden;text-overflow:ellipsis;line-height:21px}

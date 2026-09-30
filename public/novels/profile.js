@@ -1,5 +1,6 @@
 import {initProfileEditor} from '../profiles/editor.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const novel=initial.kind==='novel';
@@ -54,9 +55,7 @@ if(novel){
   busy=true;add.disabled=true;message('Linking entry…');
   try{
    const relationKind=['lore','story_arc'].includes(target.kind)?'referenced_by':'appears_in';
-   const response=await fetch('/api/novels/'+encodeURIComponent(initial.id)+'/associations',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),targetKind:target.kind,targetId:target.id,relationKind,prose:''})});
-   if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
-   const association=await response.json();if(!response.ok)throw new Error(association.error||'Could not link this entry.');
+    const association=await requestJSON('/api/novels/'+encodeURIComponent(initial.id)+'/associations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),targetKind:target.kind,targetId:target.id,relationKind,prose:''})},{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Could not link this entry.'});
    addItem(association);picker.value='';message('Entry linked.');announceWorkspaceChange();
   }catch(error){message(error.message,true);}
   finally{busy=false;add.disabled=false;}
@@ -66,11 +65,7 @@ if(novel){
   const row=button.closest('[data-association-id]'),id=button.dataset.removeAssociation;
   busy=true;button.disabled=true;message('Removing link…');
   try{
-   const response=await fetch('/api/novels/'+encodeURIComponent(initial.id)+'/associations/'+encodeURIComponent(id),{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({version:associationVersions.get(id)})});
-   if(!response.ok){
-    let detail;try{detail=await response.json();}catch{}
-    throw new Error(detail?.error||'Could not remove this link.');
-   }
+    await requestJSON('/api/novels/'+encodeURIComponent(initial.id)+'/associations/'+encodeURIComponent(id),{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({version:associationVersions.get(id)})},{sessionMessage:'Could not remove this link.',errorMessage:'Could not remove this link.'});
    const key=associationKeys.get(id);if(key)linked.delete(key);associationKeys.delete(id);associationVersions.delete(id);
    const container=row.closest('[data-association-group]');row.remove();
    if(!container.querySelector('li')){const empty=document.createElement('p');empty.className='section-note';empty.dataset.groupEmpty='';empty.textContent='No entries linked yet.';container.append(empty);}
@@ -101,9 +96,7 @@ if(!novel&&initial.novelIds?.length>1){
   if(orderBusy||!orderDirty)return;
   orderBusy=true;updateOrderControls();profileSave.disabled=true;status.textContent='Saving book order…';status.dataset.error='false';
   try{
-   const response=await fetch('/api/series/'+encodeURIComponent(initial.id)+'/order',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({version:seriesVersion,novelIds:order()})});
-   if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Copy your changes before reloading to sign in again.');
-   const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save the book order.');
+    const data=await requestJSON('/api/series/'+encodeURIComponent(initial.id)+'/order',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({version:seriesVersion,novelIds:order()})},{errorMessage:'Could not save the book order.'});
    seriesVersion=data.series.version;editor.setVersion(seriesVersion);savedOrder=order();status.textContent='Book order is saved.';announceWorkspaceChange();
   }catch(error){status.textContent=error.message+' Your order is still here.';status.dataset.error='true';if(fromProfile)throw error;}
   finally{orderBusy=false;if(!fromProfile)profileSave.disabled=false;updateOrderControls();}

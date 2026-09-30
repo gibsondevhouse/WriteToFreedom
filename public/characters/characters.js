@@ -2,6 +2,7 @@ import {createCharacterCard} from '../components/character-card/card.js?v=2';
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
 import {characters,selectCharacters} from './data.js';
 import {scopedCatalogUrl,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const directory=initDirectoryShell({
  async load(options){
@@ -18,9 +19,7 @@ let pendingId,creating=false;
 newButton.addEventListener('click',async()=>{
  if(creating)return;creating=true;newButton.disabled=true;newButton.textContent='Creating…';directory.clearError();pendingId??=crypto.randomUUID();
  try{
-  const response=await fetch(scopedCatalogUrl('/api/characters'),{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})});
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
-  const character=await response.json();if(!response.ok)throw new Error(character.error||'Unable to create your character.');
+    const character=await requestJSON(scopedCatalogUrl('/api/characters'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId})},{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Unable to create your character.'});
   location.assign(novelContextHref('/characters/'+encodeURIComponent(character.id)+'/'));
  }catch(error){directory.showError(error);creating=false;newButton.disabled=false;newButton.textContent='+ New character';}
 });

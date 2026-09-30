@@ -42,7 +42,7 @@
 .character-about-fact-fields :is(input,select) { width:100%; min-width:0; height:40px; padding:7px 8px; border:1px solid #4b6078; border-radius:7px; background:#101a26; color:#edf2f8; font:13px/1.2 Arial,sans-serif; color-scheme:dark; }
 .character-about-fact-fields input::placeholder { color:#8295ad; opacity:1; }
 .character-about-fact-fields :is(input,select):hover { border-color:#687e99; }
-.character-mentions-placeholder { display:grid; min-height:100%; place-items:center; text-align:center; }
+.character-mentions .detail-empty { text-align:center; }
 .attribute-artwork { border-top:1px solid #35465a; padding-top:14px; margin-top:24px; color:#aebfd2; font-size:12px; }
 .attribute-artwork summary { cursor:pointer; font-size:14px; }
 .attribute-artwork label { display:block; margin:14px 0 6px; }

@@ -7,6 +7,7 @@ import {writingRepository} from '../server/writing-repository.js';
 import {chapterPageRoute} from '../server/chapter-pages.js';
 import {createWorker} from '../server/app.js';
 import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
+import {blankStoryArc} from '../public/story-arcs/template.js';
 
 const origin='https://chapters.example';
 const text=value=>({type:'text',text:value});
@@ -70,7 +71,16 @@ test('chapter profiles use a wrapping title and owned inline scene records witho
  assert.doesNotMatch(html,/id="manuscript"/);
  assert.equal((html.match(/name="title"/g)||[]).length,1);assert.match(html,/<textarea[^>]*name="title"[^>]*maxlength="160"|<textarea[^>]*maxlength="160"[^>]*name="title"/);
  assert.match(html,/Chapter title/);assert.match(html,/Chapter summary/);assert.match(html,/<textarea[^>]*name="summary"/);
- assert.ok(html.includes('/novels/'+parent.id+'/'));assert.match(html,/<dt>Chapter number<\/dt><dd>2<\/dd>/);assert.match(html,/<dt>Scenes<\/dt><dd[^>]*id="chapter-scene-count"[^>]*>1<\/dd>/);
+ assert.match(html,/class="profile-overview-card"[^>]*role="group"[^>]*aria-label="Chapter overview"/);
+ assert.ok(html.indexOf('id="overview"')<html.indexOf('id="identity"'),'overview is rendered before the identity rail');
+ assert.match(html,/<button[^>]*id="chapter-new-scene"[^>]*>New scene<\/button>/);
+ assert.doesNotMatch(html,/class="chapter-scene-actions"/);
+ assert.doesNotMatch(html,/<span>Scenes<\/span>/);
+ assert.match(html,/<div class="chapter-scene-card-header"><h2 class="chapter-scene-title">Scene &lt;one&gt;<\/h2><\/div>/);
+ assert.doesNotMatch(html,/class="chapter-scene-heading"/);
+ assert.ok(html.includes('/novels/'+parent.id+'/'));assert.match(html,/<dt>Chapter number<\/dt><dd[^>]*>2<\/dd>/);assert.match(html,/<dt>Scenes<\/dt><dd[^>]*id="chapter-scene-count"[^>]*>1<\/dd>/);
+ assert.match(html,/<select[^>]*name="status"[^>]*aria-label="Chapter status"/);assert.match(html,/<option value="draft" selected>Draft<\/option>/);
+ assert.match(html,/<input[^>]*name="chapterNumber"[^>]*type="number"[^>]*min="1"[^>]*max="9999"[^>]*value="2"/);
  assert.match(html,/id="chapter-scenes-editor"/);assert.match(html,/class="[^"]*chapter-inline-scene[^"]*"[^>]*data-scene-id="/);
  assert.ok(html.includes('data-scene-id="'+selected.id+'"'));
  assert.doesNotMatch(html,/Write scenes →|Write scene →/);
@@ -84,6 +94,33 @@ test('chapter profiles use a wrapping title and owned inline scene records witho
  const scenePayload=JSON.parse(sceneInitial[1]);assert.equal(scenePayload.chapter.id,entry.id);assert.equal(scenePayload.chapter.novelId,parent.id);
  assert.deepEqual(scenePayload.novel,{id:parent.id,title:parent.title,coverUrl:''});
  assert.deepEqual(scenePayload.scenes.map(scene=>scene.id),[selected.id]);assert.equal(scenePayload.scenes[0].summary,selected.summary);assert.deepEqual(scenePayload.scenes[0].content,selected.content);
+});
+
+test('chapter overview renders its planning fields and offers only owned story arcs connected to its novel',async t=>{
+ const {request,novel,chapter,db}=setup(t),parent=await novel('The winter archive'),other=await novel('A different novel');
+ const arc=async(name,owner='author')=>db.createStoryArc(owner,crypto.randomUUID(),{...blankStoryArc(),name});
+ const linked=await arc('The <missing> map'),unlinked=await arc('Unlinked owned secret'),otherLinked=await arc('Other novel secret'),foreign=await arc('Foreign story arc secret','other'),retained=await arc('Previously connected arc');
+ for(const [novelId,target] of [[parent.id,linked],[other.id,otherLinked]])await db.createNovelAssociation('author',crypto.randomUUID(),novelId,'story_arc',target.id,'referenced_by','');
+ // An imported stale selection may remain removable, but must not disclose
+ // a foreign record. An owned selection remains recognizable after unlinking.
+ const entry=await chapter(parent.id,'The sealed letter',{status:'revising',chapterNumber:27,connectedArcIds:[linked.id,retained.id,foreign.id]});
+ const html=await (await request('/chapters/'+entry.id+'/')).text();
+ const hero=html.match(/<div class="profile-overview-card"[\s\S]*?<\/section>/)?.[0];assert.ok(hero);
+ assert.match(hero,/<option value="revising" selected>Revising<\/option>/);assert.match(hero,/<input[^>]*name="chapterNumber"[^>]*value="27"/);
+ assert.match(hero,/The &lt;missing&gt; map/);assert.ok(hero.includes('/story-arcs/'+linked.id+'/?novel='+parent.id));
+ assert.ok(hero.includes('Disconnect story arc: Previously connected arc'));assert.match(hero,/Unavailable arc/);
+ assert.doesNotMatch(html,/Unlinked owned secret|Other novel secret|Foreign story arc secret/);
+ assert.match(hero,/<button[^>]*id="chapter-new-scene"[^>]*>New scene<\/button>/);
+ const picker=hero.match(/<select[^>]*id="chapter-arc-picker"[^>]*>([\s\S]*?)<\/select>/)?.[1];assert.ok(picker);
+ assert.ok(picker.includes('value="'+linked.id+'" disabled'));assert.ok(!picker.includes(retained.id));assert.ok(!picker.includes(foreign.id));
+ const payload=JSON.parse(html.match(/<script[^>]*id="profile-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+ assert.equal(payload.status,'revising');assert.equal(payload.chapterNumber,27);assert.deepEqual(payload.connectedArcIds,entry.connectedArcIds);
+ assert.deepEqual(payload.arcOptions.map(item=>({id:item.id,name:item.name,available:item.available})).sort((a,b)=>a.id.localeCompare(b.id)),[{id:linked.id,name:linked.name,available:true},{id:retained.id,name:retained.name,available:false}].sort((a,b)=>a.id.localeCompare(b.id)));
+ const empty=await chapter(other.id,'No selected arcs');
+ const noLinks=await chapter((await novel('No arcs novel')).id);
+ const noLinksHtml=await (await request('/chapters/'+noLinks.id+'/')).text();
+ assert.match(noLinksHtml,/No story arcs linked to this novel/);assert.match(noLinksHtml,/aria-label="Manage this novel&#39;s story arcs"|aria-label="Manage this novel's story arcs"/);
+ assert.equal((await request('/chapters/'+empty.id+'/?novel='+parent.id)).status,404);
 });
 
 test('scene cards derive sanitized book artwork only from their owned parent novel',async t=>{
@@ -129,7 +166,21 @@ test('inline scene fallbacks preserve supported rich prose while escaping execut
  for(const tag of ['strong','em','u','code','blockquote','ul','li'])assert.match(html,new RegExp('<'+tag+'(?:>| )'));
  assert.match(html,/<(?:s|del)(?:>| )/);assert.match(html,/<br\s*\/?\s*>/);assert.match(html,/<hr\s*\/?\s*>/);
  assert.match(html,/<ol[^>]*start="3"/);assert.match(html,/<ol[^>]*type="A"/);
+ // Saved manuscripts are readable below their cards before React loads, with
+ // one copy of each authored heading and safely escaped body text.
+ assert.equal((html.match(/class="profile-section chapter-scene-manuscript"/g)||[]).length,2);
+ assert.doesNotMatch(html,/<details class="chapter-scene-reading">/);
+ const firstArticle=html.match(new RegExp('<article[^>]*data-scene-id="'+first.id+'"[\\s\\S]*?<\\/article>'))?.[0];assert.ok(firstArticle);
+ assert.match(firstArticle,/<section class="profile-section chapter-scene-manuscript" aria-label="Scene manuscript"><div class="collapsible-region chapter-scene-manuscript-body"><div class="chapter-scene-writing-area"><div class="chapter-scene-prose"><h6>A &lt;heading&gt;<\/h6>/);
+ assert.doesNotMatch(firstArticle,/<label>Scene text<\/label>|<h2>Scene manuscript<\/h2>/);
+ assert.equal((firstArticle.match(/A &lt;heading&gt;/g)||[]).length,1);
+ assert.ok(firstArticle.indexOf('chapter-scene-card chapter-scene-image')<firstArticle.indexOf('chapter-scene-manuscript'));
+ assert.ok(firstArticle.indexOf('A &lt;heading&gt;')<firstArticle.indexOf('Formatted &lt;script&gt;'),'authored heading precedes the body');
+ const secondArticle=html.match(new RegExp('<article[^>]*data-scene-id="'+second.id+'"[\\s\\S]*?<\\/article>'))?.[0];assert.ok(secondArticle);
+ assert.match(secondArticle,/<h2 class="chapter-scene-opening-heading" data-placeholder="true"><button type="button" disabled>Opening heading<\/button><\/h2><div class="chapter-scene-prose"><p>Later scene prose\.<\/p>/);
  assert.ok(html.indexOf(first.title)<html.indexOf(second.title));assert.ok(html.indexOf('Remember this.')<html.indexOf('Later scene prose.'));
+ const initial=JSON.parse(html.match(/<script[^>]*id="chapter-scenes-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+ assert.deepEqual(initial.scenes[0].content,rich,'rendering the opening heading preserves the manuscript');
 });
 
 test('empty chapter profiles include a landscape placeholder and mount their own first-scene composer',async t=>{

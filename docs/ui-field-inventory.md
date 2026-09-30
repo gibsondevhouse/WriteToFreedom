@@ -1098,6 +1098,9 @@ Storage: `chapters.document`.
 | --- | --- | --- |
 | `title` | Title | string |
 | `summary` | Summary | string |
+| `status` | Status | string |
+| `chapterNumber` | Chapter number | integer |
+| `connectedArcIds` | Connected arcs | array |
 
 ## Manuscript scene (scene)
 

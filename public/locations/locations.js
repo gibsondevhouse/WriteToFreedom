@@ -2,13 +2,14 @@ import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
 import {locationHref,ancestors,selectLocations,typeLabels,typePlurals,locationTypes,parentTypes,requiresParent,parentChoices} from './data.js?v=location-profiles-1';
 import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
 import {scopedCatalogUrl,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 const root=document.querySelector('[data-directory-shell]'),search=root.querySelector('[data-directory-search]');
 const dialog=document.querySelector('#new-location-dialog'),form=document.querySelector('#new-location-form'),fields=document.querySelector('#location-fields'),type=document.querySelector('#location-type'),name=document.querySelector('#location-name'),parent=document.querySelector('#location-parent'),parentField=document.querySelector('#parent-field'),parentHint=document.querySelector('#parent-hint'),createError=document.querySelector('#create-error'),save=document.querySelector('#save-location'),cancel=document.querySelector('#cancel-location');
 const newButton=document.querySelector('#new-location'),areaType=document.querySelector('#area-type'),areaTypeField=document.querySelector('#area-type-field');
 const requestedType=new URLSearchParams(location.search).get('type');
 let filter=locationTypes.includes(requestedType)?requestedType:'',loading=true,catalogReady=false,opening=false,saving=false,pendingId,editing=null,contextLocations=[],parentCatalog=[];
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
-async function api(options={}){const response=await fetch(scopedCatalogUrl('/api/locations'),{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load locations.');return data;}
+async function api(options={}){return requestJSON(scopedCatalogUrl('/api/locations'),options,{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Could not load locations.'});}
 const filterControl=document.querySelector('.directory-filter-control'),filterToggle=document.querySelector('#location-filter-toggle'),filterMenu=document.querySelector('#location-filter-menu'),filters=filterMenu.querySelector('.type-filters');
 for(const kind of locationTypes){const button=node('button','',typePlurals[kind]);button.type='button';button.dataset.type=kind;filters.append(button);type.append(new Option(typeLabels[kind],kind));}
 function setFilterOpen(open){filterMenu.hidden=!open;filterToggle.setAttribute('aria-expanded',String(open));}
@@ -58,7 +59,7 @@ async function openEditor(record=null){
  try{
   if(!await directory.refresh())return;
   // Parent choices remain available throughout the owner's library.
-  const parentResponse=await fetch('/api/locations',{credentials:'same-origin',cache:'no-store'});if(!parentResponse.ok)throw new Error('Could not load parent locations.');parentCatalog=(await parentResponse.json()).locations;
+    parentCatalog=(await requestJSON('/api/locations',{}, {sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Could not load parent locations.'})).locations;
   if(record){record=directory.records.find(r=>r.id===record.id);if(!record)throw new Error('This location is no longer available.');}
   editing=record?{...record}:null;form.reset();name.setCustomValidity('');pendingId=undefined;createError.hidden=true;type.disabled=!!editing;
   type.value=record?.type||filter||'country';name.value=record?.name||'';areaType.value=record?.areaType||'Neighborhood';populateParent(record?.parentId||'');

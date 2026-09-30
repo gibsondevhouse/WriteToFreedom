@@ -67,6 +67,19 @@ test('chapters and scenes open focused writing routes with their own primary act
  }
 });
 
+test('empty chapter creation remains disabled until the novel context loads successfully',async({page})=>{
+ await page.route('**/api/novels',route=>route.abort('failed'));
+ await page.goto('/chapters/?novel='+testNovelId);
+ await expect(page.getByRole('link',{name:'Open my novels',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'New chapter',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Create your first chapter',exact:true})).toBeDisabled();
+ await expect(page.getByRole('dialog',{name:'New chapter',exact:true})).toHaveCount(0);
+ await page.unroute('**/api/novels');await page.reload();
+ await expect(page.getByRole('button',{name:'Create your first chapter',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Create your first chapter',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'New chapter',exact:true})).toBeVisible();
+});
+
 test('the local development host accepts a localhost same-origin chapter creation',async({page})=>{
  const localhostOrigin=origin.replace('127.0.0.1','localhost');
  await page.goto(localhostOrigin+'/chapters/?novel='+testNovelId);
@@ -85,6 +98,56 @@ test('the local development host accepts a localhost same-origin chapter creatio
   return response.json();
  });
  expect(catalog.chapters).toContainEqual(expect.objectContaining({id:chapter.id,title:chapter.title}));
+});
+
+test('incomplete scene titles retain the mounted editor and prose until a corrected title saves',async({page,request})=>{
+ const chapter=await createChapter(request),scene=await createScene(request,chapter),errors:string[]=[];
+ let writes=0;
+ page.on('pageerror',error=>errors.push(error.message));
+ page.on('request',candidate=>{if(candidate.url()===origin+'/api/scenes/'+scene.id&&candidate.method()==='PUT')writes++;});
+ await openScene(page,scene);
+ await editor(page).fill('Retain this unsaved prose while replacing the scene title.');
+ const title=page.getByRole('textbox',{name:'Scene title',exact:true});
+ for(const incomplete of ['', '   ']){
+  await title.fill(incomplete);
+  await expect(editor(page)).toBeVisible();await expect(editor(page)).toHaveText('Retain this unsaved prose while replacing the scene title.');
+  await title.press('ControlOrMeta+s');
+  await expect(page.locator('#scene-error')).toContainText('Enter a scene title');
+  await expect(title).toHaveValue(incomplete);expect(writes).toBe(0);
+ }
+ expect((await readScene(request,scene.id)).title).toBe(scene.title);
+ await title.fill('Corrected scene title');
+ const saved=await saveScene(page,scene.id);
+ expect(saved.title).toBe('Corrected scene title');expect(textFrom(saved.content)).toBe('Retain this unsaved prose while replacing the scene title.');
+ expect(writes).toBe(1);expect(errors).toEqual([]);
+ await page.reload();await expect(title).toHaveValue('Corrected scene title');await expect(editor(page)).toHaveText('Retain this unsaved prose while replacing the scene title.');
+});
+
+test('chapter counts and outline groups follow draft moves without resetting scene prose or undo',async({page,request})=>{
+ const first=await createChapter(request,'First indexed chapter '+randomUUID()),second=await createChapter(request,'Second indexed chapter '+randomUUID()),empty=await createChapter(request,'Empty indexed chapter '+randomUUID());
+ const moving=await createScene(request,first,{title:'Moving scene '+randomUUID()}),retained=await createScene(request,first,{title:'Retained scene '+randomUUID()}),destination=await createScene(request,second,{title:'Destination scene '+randomUUID()});
+ await page.goto('/chapters/?novel='+testNovelId);
+ const card=(chapter:Chapter)=>page.locator('article.writing-chapter-story-card').filter({has:page.getByRole('heading',{name:chapter.title,exact:true})});
+ await expect(card(first).locator('.character-power')).toHaveText('2 scenes');await expect(card(second).locator('.character-power')).toHaveText('1 scene');await expect(card(empty).locator('.character-power')).toHaveText('0 scenes');
+ await openScene(page,moving);
+ const prose=editor(page),original=textFrom(moving.content),suffix=' Retained edit while moving.';
+ await prose.evaluate(element=>{
+  element.focus();const selection=element.ownerDocument.getSelection(),range=element.ownerDocument.createRange();
+  range.selectNodeContents(element);range.collapse(false);selection?.removeAllRanges();selection?.addRange(range);
+ });
+ await prose.pressSequentially(suffix);
+ const firstGroup=page.locator('#chapter-scenes-'+first.id),secondGroup=page.locator('#chapter-scenes-'+second.id),emptyGroup=page.locator('#chapter-scenes-'+empty.id);
+ await page.getByLabel('Scene chapter',{exact:true}).selectOption(second.id);
+ await expect(firstGroup.getByRole('button',{name:'Open scene: '+moving.title,exact:true})).toHaveCount(0);
+ await expect(firstGroup.getByRole('button',{name:'Open scene: '+retained.title,exact:true})).toBeVisible();
+ await expect(secondGroup.getByRole('button',{name:'Open scene: '+moving.title,exact:true})).toBeVisible();await expect(secondGroup.getByRole('button',{name:'Open scene: '+destination.title,exact:true})).toBeVisible();
+ await expect(emptyGroup).toContainText('No scenes yet');await expect(prose).toHaveText(original+suffix);
+ expect((await readScene(request,moving.id)).chapterId).toBe(first.id);
+ await prose.press('ControlOrMeta+z');await expect(prose).toHaveText(original);
+ await prose.press('ControlOrMeta+Shift+z');await expect(prose).toHaveText(original+suffix);
+ const saved=await saveScene(page,moving.id);expect(saved.chapterId).toBe(second.id);expect(textFrom(saved.content)).toBe(original+suffix);
+ await page.goto('/chapters/?novel='+testNovelId);
+ await expect(card(first).locator('.character-power')).toHaveText('1 scene');await expect(card(second).locator('.character-power')).toHaveText('2 scenes');await expect(card(empty).locator('.character-power')).toHaveText('0 scenes');
 });
 
 test('creates a chapter and a rich-text scene through the writing workspace',async({page,request})=>{
@@ -205,6 +268,47 @@ test('external chapter deletion keeps a dirty scene draft available to copy and 
  expect((await request.get('/api/scenes/'+scene.id)).status()).toBe(404);
 });
 
+test('another tab refreshes a clean scene without replacing an unsaved draft',async({page,request,context})=>{
+ const scene=await createScene(request,await createChapter(request));
+ await openScene(page,scene);
+ const other=await context.newPage();
+ await openScene(other,scene);
+ await editor(other).fill('Saved prose from another tab.');
+ await saveScene(other,scene.id);
+ await expect(editor(page)).toHaveText('Saved prose from another tab.');
+ await expect(page.locator('#scene-save-status')).toHaveText('Saved');
+
+ await editor(page).fill('Keep this unsaved local draft.');
+ await editor(page).evaluate(element=>{Reflect.set(window,'__localSceneEditor',element);});
+ await editor(other).fill('A newer competing save.');
+ await saveScene(other,scene.id);
+ await expect(page.locator('#scene-save-status')).toHaveText('Unsaved changes');
+ await expect(editor(page)).toHaveText('Keep this unsaved local draft.');
+ expect(await editor(page).evaluate(element=>element===Reflect.get(window,'__localSceneEditor'))).toBe(true);
+ await page.getByRole('button',{name:'Undo',exact:true}).click();
+ await expect(editor(page)).toHaveText('Saved prose from another tab.');
+ await page.getByRole('button',{name:'Redo',exact:true}).click();
+ await expect(editor(page)).toHaveText('Keep this unsaved local draft.');
+ expect(textFrom((await readScene(request,scene.id)).content)).toBe('A newer competing save.');
+});
+
+test('open references refresh after a workspace change in another tab',async({page,request,context})=>{
+ const scene=await createScene(request,await createChapter(request));
+ await openScene(page,scene);
+ await page.getByRole('button',{name:'Show references',exact:true}).click();
+ await page.getByRole('button',{name:'Browse the whole library',exact:true}).click();
+ const panel=page.locator('#writing-references');
+ await expect(panel).toContainText('Your whole library.');
+ const name='Cross-tab reference '+randomUUID();
+ const created=await request.post('/api/characters',{headers:{origin},data:{id:randomUUID(),name}});
+ expect(created.status(),await created.text()).toBe(201);
+ await expect(panel).not.toContainText(name);
+ const other=await context.newPage();
+ await other.goto('/scenes/?novel='+testNovelId);
+ await other.evaluate(()=>localStorage.setItem('write-to-freedom:workspace-change',Date.now()+':'+Math.random()));
+ await expect(panel).toContainText(name);
+});
+
 test('a chapters page restored from browser history refreshes its saved catalog',async({page,request})=>{
  const removed=await createChapter(request),retained=await createChapter(request);
  await createScene(request,removed);
@@ -316,6 +420,79 @@ test('toolbar and keyboard formatting preserve selection, undo history and saved
  await expect(text.locator('em')).toHaveCount(2);
  expect(await text.innerHTML()).toBe(formatted);
  await page.screenshot({path:testInfo.outputPath('writing-workspace-desktop.png'),fullPage:true});
+});
+
+test('scene properties and writing controls stay compact and clear during a long scene',async({page,request},testInfo)=>{
+ await page.setViewportSize({width:1198,height:866});
+ const chapter=await createChapter(request,'The Madness is Never Madness');
+ const scene=await createScene(request,chapter,{title:'Shrimp & Okra',content:manuscript(1200)});
+ await openScene(page,scene);
+
+ const form=page.locator('.writing-scene-form');
+ const title=page.getByRole('textbox',{name:'Scene title',exact:true});
+ const properties=form.locator('.writing-scene-meta');
+ const chapterControl=properties.getByRole('combobox',{name:'Scene chapter',exact:true});
+ const statusControl=properties.getByRole('combobox',{name:'Scene status',exact:true});
+ const summaryControl=properties.locator('summary');
+ const save=page.getByRole('button',{name:'Save scene',exact:true});
+ const canvas=page.locator('.writing-editor:not(.writing-editor-inline)');
+ const toolbar=canvas.getByRole('toolbar',{name:'Text formatting'});
+ const viewbar=page.locator('.writing-viewbar');
+ await expect(chapterControl).toHaveValue(chapter.id);
+ await expect(statusControl).toHaveValue('draft');
+ await expect(summaryControl).toHaveText('Scene summary');
+ await expect(form.locator('.writing-scene-heading')).toContainText('Save scene');
+ await expect(form).toHaveAttribute('data-dirty','false');
+
+ const titleBox=await title.boundingBox(),propertiesBox=await properties.boundingBox();
+ const chapterBox=await chapterControl.boundingBox(),statusBox=await statusControl.boundingBox(),summaryBox=await summaryControl.boundingBox();
+ const canvasBox=await canvas.boundingBox(),toolbarBox=await toolbar.boundingBox();
+ expect(titleBox&&propertiesBox&&chapterBox&&statusBox&&summaryBox&&canvasBox&&toolbarBox).toBeTruthy();
+ expect(propertiesBox!.y).toBeGreaterThanOrEqual(titleBox!.y+titleBox!.height-3);
+ expect(propertiesBox!.y-(titleBox!.y+titleBox!.height)).toBeLessThan(24);
+ expect(Math.max(chapterBox!.y,statusBox!.y,summaryBox!.y)-Math.min(chapterBox!.y,statusBox!.y,summaryBox!.y)).toBeLessThan(16);
+ expect(Math.abs(toolbarBox!.y-canvasBox!.y)).toBeLessThan(8);
+ expect(toolbarBox!.x).toBeGreaterThanOrEqual(canvasBox!.x-2);
+ expect(toolbarBox!.x+toolbarBox!.width).toBeLessThanOrEqual(canvasBox!.x+canvasBox!.width+2);
+ await page.screenshot({path:testInfo.outputPath('scene-layout-desktop-header.png')});
+
+ const cleanBackground=await save.evaluate(element=>getComputedStyle(element).backgroundColor);
+ expect(cleanBackground).toMatch(/^rgba\(/);
+ await page.evaluate(()=>window.scrollTo(0,500));
+ await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeGreaterThan(300);
+ const sticky=await viewbar.evaluate(element=>{
+  const style=getComputedStyle(element),bounds=element.getBoundingClientRect();
+  const blur=style.backdropFilter==='none'?style.getPropertyValue('-webkit-backdrop-filter'):style.backdropFilter;
+  return {position:style.position,blur,top:parseFloat(style.top),y:bounds.y,bottom:bounds.bottom};
+ });
+ expect(sticky.position).toBe('sticky');
+ expect(sticky.blur).toContain('blur(');
+ expect(Math.abs(sticky.y-sticky.top)).toBeLessThan(5);
+ const scrolledToolbar=await toolbar.boundingBox();
+ expect(scrolledToolbar).not.toBeNull();
+ expect(scrolledToolbar!.y).toBeGreaterThanOrEqual(sticky.bottom-2);
+ await page.screenshot({path:testInfo.outputPath('scene-layout-desktop.png'),fullPage:true});
+
+ await title.fill('Shrimp & Okra revised');
+ await expect(form).toHaveAttribute('data-dirty','true');
+ await expect.poll(()=>save.evaluate(element=>getComputedStyle(element).backgroundColor)).toMatch(/^rgb\(/);
+ const dirtyBackground=await save.evaluate(element=>getComputedStyle(element).backgroundColor);
+ expect(dirtyBackground).not.toBe(cleanBackground);
+
+ await page.setViewportSize({width:390,height:844});
+ await title.evaluate(element=>window.scrollTo(0,Math.max(0,window.scrollY+element.getBoundingClientRect().top-165)));
+ await expect(chapterControl).toBeVisible();
+ await expect(statusControl).toBeVisible();
+ await expect(summaryControl).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('scene-layout-mobile-header.png')});
+ await toolbar.scrollIntoViewIfNeeded();
+ await expect(toolbar).toBeVisible();
+ const mobile=await page.evaluate(()=>({width:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth}));
+ expect(mobile.scrollWidth).toBeLessThanOrEqual(mobile.width+1);
+ const mobileCanvas=await canvas.boundingBox(),mobileToolbar=await toolbar.boundingBox();
+ expect(mobileCanvas&&mobileToolbar).toBeTruthy();
+ expect(Math.abs(mobileToolbar!.y-mobileCanvas!.y)).toBeLessThan(8);
+ await page.screenshot({path:testInfo.outputPath('scene-layout-mobile.png'),fullPage:true});
 });
 
 test('rich HTML paste keeps supported prose and drops executable or unsupported elements',async({page,request})=>{

@@ -64,6 +64,25 @@ test('appearance enhancement covers all canonical shared profile adapters and th
  }
 });
 
+test('appearance enhancement uses profile data without reading the target again',async t=>{
+ const {env,request}=setup(t),statements=[];
+ const counted={...env.DB,prepare(sql){statements.push(sql);return env.DB.prepare(sql);}};
+ const response=await createWorker({}).fetch(request('/characters/claude/'),{DB:counted});
+ assert.equal(response.status,200);
+ assert.equal(statements.filter(sql=>sql.includes('FROM character_drafts WHERE owner_id = ? AND id = ?')).length,1);
+ assert.equal(initial(await response.text(),'novel-appearances-data').target.label,'Claude');
+});
+
+test('appearance data and template failures return a visible error status',async t=>{
+ const {env,request}=setup(t),req=request('/characters/claude/');
+ const broken={...env.DB,prepare(sql){if(sql.startsWith('SELECT * FROM novels WHERE owner_id = ?'))throw new Error('Injected appearance lookup failure');return env.DB.prepare(sql);}};
+ const failed=await createWorker({}).fetch(req,{DB:broken});
+ assert.equal(failed.status,503);assert.match(await failed.text(),/Novel appearance details could not be loaded/);
+ const malformed=new Response('<html><head></head><body><script id="profile-data" type="application/json">{"character":{"id":"claude","name":"Claude"}}</script></body></html>',{headers:{'content-type':'text/html'}});
+ const missingSlot=await enhanceNovelAppearances(req,env,malformed);
+ assert.equal(missingSlot.status,503);assert.match(await missingSlot.text(),/Novel appearance details could not be loaded/);
+});
+
 test('appearance enhancer is idempotent and does not touch unrelated, failed, or unauthenticated responses',async t=>{
  const {env,request,worker}=setup(t),req=request('/characters/claude/');
  const first=await enhanceNovelAppearances(req,env,await worker.fetch(req,env));

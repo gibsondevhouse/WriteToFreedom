@@ -4,9 +4,21 @@ import {readFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ASSET_REVISION_PLACEHOLDER,revisionForAssets,stampAssets} from '../scripts/asset-revision.mjs';
-import {assetUrl} from '../server/asset-url.js';
+import {assetUrl,assetCacheControl} from '../server/asset-url.js';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+
+test('only fingerprinted static assets are immutable while HTML and development URLs revalidate',()=>{
+ const revision='a1b2c3d4e5f6',immutable='public, max-age=31536000, immutable';
+ const cache=(path,type='text/javascript; charset=utf-8',expectedRevision=revision)=>assetCacheControl(new URL(path,'https://example.test'),type,expectedRevision);
+ assert.equal(cache('/profiles/editor.js?v='+revision),immutable);
+ assert.equal(cache('/profiles/editor.css?v='+revision,'text/css'),immutable);
+ for(const path of ['/profiles/editor.js','/profiles/editor.js?v=old','/profiles/editor.js?v=dev','/frontend/assets/entry.js'])assert.equal(cache(path),'no-cache',path);
+ assert.equal(cache('/frontend/assets/entry-Ab12_3-x.js'),immutable);
+ assert.equal(cache('/frontend/assets/entry-Ab12_3-x.css','text/css'),immutable);
+ assert.equal(cache('/profiles/editor.js?v=dev','text/javascript','dev'),'no-cache');
+ assert.equal(cache('/timeline/?v='+revision,'text/html; charset=utf-8'),'no-cache');
+});
 
 test('one content revision identifies and stamps a complete asset build',()=>{
  const first={'/b.js':{content:'import "./a.js"; import {c} from "./c.js?v=old"',type:'text/javascript'},'/a.js':{content:'export default 1',type:'text/javascript'},'/theme.css':{content:'@import url("./base.css?v='+ASSET_REVISION_PLACEHOLDER+'");',type:'text/css'}};

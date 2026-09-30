@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {repository} from './db.js';
 import {characterCast} from './sample-characters.js';
@@ -9,7 +10,6 @@ import {readHiddenFields} from '../public/profiles/schema.js';
 import {arcTypes,arcStatuses,arcBeats,pacingMetrics,blankStoryArc,storyArcFields,storyArcHideableFields} from '../public/story-arcs/template.js';
 import {renderStoryArc} from './render-story-arc.js';
 
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const targetKey=target=>target.kind+':'+target.id;
 function entityTargets(characters,factions,locations){
  return [
@@ -66,7 +66,7 @@ export async function storyArcRoute(request,env){
   if(!html&&request.method==='GET')return json(id?current:{storyArcs:arcs});
   const [characters,factions,locations]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner)]),targets=entityTargets(characterCast(characters),factions,locations);
   if(html)return new Response(renderStoryArc(current,targets,arcs.filter(arc=>arc.id!==id)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
-  if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'This story arc is too large to save.'},413);let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid story arc data.'},400);}if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid story arc data.'},400);
   try{validateSchemaVersion(input);}catch(error){return json({error:error.message},400);}
   if(!id){

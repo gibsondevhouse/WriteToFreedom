@@ -1,4 +1,6 @@
 import {searchCatalog} from './search.js?v=__WTF_ASSET_REVISION__';
+import {observeWorkspaceChanges} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const input = document.querySelector('#novel-search');
 const results = document.querySelector('#search-results');
@@ -52,9 +54,7 @@ async function ensureCatalog() {
   searchError = '';
   loadingCatalog = (async () => {
     try {
-      const response = await fetch('/api/dashboard', {credentials: 'same-origin', cache: 'no-store'});
-      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error();
-      updateWorkspace(await response.json());
+      updateWorkspace(await requestJSON('/api/dashboard'));
     } catch {
       searchError = 'Search could not load. Type again to retry.';
       search();
@@ -141,7 +141,20 @@ adaptNavigation();
 
 // Route/query context survives refreshes and copied links. Library search stays
 // global, while manuscript navigation carries the selected novel explicitly.
-async function showNovelContext(){
+let selectedNovelId='';
+let selectedNovelLink;
+let novelContextRevision=0;
+async function refreshNovelContext(){
+ if(!selectedNovelId||!selectedNovelLink)return;
+ const revision=++novelContextRevision;
+ try{
+  const novel=await requestJSON('/api/novels/'+encodeURIComponent(selectedNovelId));
+  if(revision!==novelContextRevision)return;
+  selectedNovelLink.textContent=novel.title||'Untitled novel';
+  selectedNovelLink.title=novel.title||'Untitled novel';
+ }catch{}
+}
+function showNovelContext(){
  const context=document.querySelector('.workspace-context');if(!context)return;
  const url=new URL(location.href),profile=url.pathname.match(/^\/novels\/([0-9a-f-]{36})(?:\/|$)/i);
  let chapterNovel='';
@@ -150,19 +163,17 @@ async function showNovelContext(){
  }
  const novelId=profile?.[1]||url.searchParams.get('novel')||chapterNovel;
  if(!novelId||!/^[0-9a-f-]{36}$/i.test(novelId))return;
+ selectedNovelId=novelId;
  const library=document.createElement('a'),current=document.createElement('a'),separator=document.createElement('span');
  library.href='/novels/';library.textContent='My library';library.dataset.libraryLink='';
  current.href='/novels/'+encodeURIComponent(novelId)+'/';current.textContent='Selected novel';current.dataset.currentNovel='';
+ selectedNovelLink=current;
  separator.textContent='/';separator.setAttribute('aria-hidden','true');
  context.replaceChildren(library,separator,current);
  for(const path of ['/dashboard/','/characters/','/factions/','/locations/','/lore/','/chapters/','/scenes/','/timeline/','/story-arcs/']){
   const link=document.querySelector('#workspace-navigation a[href="'+path+'"]');if(link)link.href=path+'?novel='+encodeURIComponent(novelId);
  }
- try{
-  const response=await fetch('/api/novels/'+encodeURIComponent(novelId),{credentials:'same-origin',cache:'no-store'});
-  if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))return;
-  const novel=await response.json();current.textContent=novel.title||'Untitled novel';current.title=novel.title||'Untitled novel';
- }catch{}
+ refreshNovelContext();
 }
 showNovelContext();
 
@@ -173,12 +184,17 @@ export function updateWorkspace(data) {
   search();
 }
 
-// A page can save without navigating away (for example, a quick Lore note).
-// Let any in-flight read settle before invalidating its potentially stale result.
-window.addEventListener('workspace:changed', async () => {
-  await loadingCatalog;
-  catalog = undefined;
-  searchError = '';
-  search();
-  if (input.value.trim()) ensureCatalog();
-});
+// Profiles can save in this document or another tab. Let an in-flight search
+// settle before invalidating its potentially stale result.
+async function refreshSavedWorkspace(){
+ refreshNovelContext();
+ await loadingCatalog;
+ catalog = undefined;
+ searchError = '';
+ search();
+ if (input.value.trim()) ensureCatalog();
+}
+const stopObservingWorkspace=observeWorkspaceChanges(refreshSavedWorkspace);
+let hasShownPage=false;
+window.addEventListener('pageshow',event=>{if(hasShownPage||event.persisted)refreshSavedWorkspace();hasShownPage=true;});
+window.addEventListener('pagehide',event=>{if(!event.persisted)stopObservingWorkspace();});

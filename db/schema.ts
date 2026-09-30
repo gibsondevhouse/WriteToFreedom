@@ -3,7 +3,7 @@
 // Cross-row and JSON invariants also live in the custom 0011 migration;
 // Drizzle does not model SQLite triggers. Preserve them in future table rebuilds.
 import {sql} from 'drizzle-orm';
-import { sqliteTable, text, integer, index, uniqueIndex, primaryKey, check } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, blob, index, uniqueIndex, primaryKey, check } from 'drizzle-orm/sqlite-core';
 
 export const chapters = sqliteTable('chapters', {
  id: text('id').primaryKey(),
@@ -59,6 +59,27 @@ export const characterDrafts = sqliteTable('character_drafts', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, table => [index('idx_character_drafts_owner_created').on(table.ownerId, table.createdAt)]);
+
+// An image is split into at most two BLOB rows so a full 2 MiB portrait stays
+// below D1's 2,000,000-byte per-row limit. Sample characters use their public
+// IDs here because their private draft IDs are owner-derived.
+export const characterImages = sqliteTable('character_images', {
+ imageId: text('image_id').notNull(),
+ chunkIndex: integer('chunk_index').notNull(),
+ ownerId: text('owner_id').notNull(),
+ characterId: text('character_id').notNull(),
+ contentType: text('content_type').notNull(),
+ totalSize: integer('total_size').notNull(),
+ data: blob('data', {mode:'buffer'}).notNull(),
+ createdAt: text('created_at').notNull(),
+}, table => [
+ primaryKey({columns:[table.imageId,table.chunkIndex]}),
+ index('idx_character_images_owner_character').on(table.ownerId,table.characterId,table.imageId),
+ check('character_images_chunk_index',sql`${table.chunkIndex} IN (0, 1)`),
+ check('character_images_content_type',sql`${table.contentType} IN ('image/png', 'image/jpeg', 'image/webp', 'image/gif')`),
+ check('character_images_total_size',sql`${table.totalSize} BETWEEN 1 AND 2097152`),
+ check('character_images_chunk_size',sql`length(${table.data}) BETWEEN 1 AND 1048576`),
+]);
 
 export const factions = sqliteTable('factions', {
  id: text('id').primaryKey(),

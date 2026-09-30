@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {test,expect,type APIRequestContext} from '@playwright/test';
+import {test,expect,type APIRequestContext,type Page} from '@playwright/test';
 
 const origin='http://127.0.0.1:'+(process.env.WTF_BROWSER_TEST_PORT||'4175');
 interface Novel{id:string;title:string;version:number;seriesId:string;seriesOrder:number}
@@ -12,6 +12,34 @@ async function createSeries(request:APIRequestContext,title:string):Promise<Seri
  const response=await request.post('/api/series',{headers:{origin},data:{id:randomUUID(),title}});
  expect(response.status(),await response.text()).toBe(201);return response.json();
 }
+
+test('renaming a novel refreshes its cards in open library and dashboard tabs',async({page,request})=>{
+ const original='Card sync '+randomUUID(),renamed='Renamed card '+randomUUID();
+ const novel=await createNovel(request,original),href='/novels/'+novel.id+'/';
+ const cardTitle=(tab:Page)=>tab.locator('.book-cover-card .compact-story-card-main[href="'+href+'"] h3');
+
+ await page.goto('/novels/');
+ const libraryTitle=cardTitle(page);
+ await expect(libraryTitle).toHaveText(original);
+
+ const dashboard=await page.context().newPage();
+ try{
+  await dashboard.goto('/dashboard/');
+  const dashboardTitle=cardTitle(dashboard);
+  await expect(dashboardTitle).toHaveText(original);
+
+  const profile=await page.context().newPage();
+  try{
+   await profile.goto(href);
+   await profile.getByLabel('Title',{exact:true}).fill(renamed);
+   await profile.getByRole('button',{name:'Save changes',exact:true}).click();
+   await expect(profile.locator('#save-status')).toHaveText('Saved');
+
+   await expect(libraryTitle).toHaveText(renamed);
+   await expect(dashboardTitle).toHaveText(renamed);
+  }finally{await profile.close();}
+ }finally{await dashboard.close();}
+});
 
 test('novel inline editing retains hidden prose and association actions retain the manuscript draft',async({page,request})=>{
  const novel=await createNovel(request,'Profile novel '+randomUUID());
@@ -83,6 +111,26 @@ test('series book order saves independently and keeps the title editor on the re
  const savedOne=await (await request.get('/api/novels/'+one.id)).json();
  const savedTwo=await (await request.get('/api/novels/'+two.id)).json();
  expect(savedTwo.seriesOrder).toBeLessThan(savedOne.seriesOrder);
+});
+
+test('a failed book-order save does not report the committed series profile as unsaved',async({page,request})=>{
+ const series=await createSeries(request,'Order failure '+randomUUID());
+ await createNovel(request,'First book '+randomUUID(),{seriesId:series.id,seriesOrder:1});
+ const second=await createNovel(request,'Second book '+randomUUID(),{seriesId:series.id,seriesOrder:2});
+ await page.goto('/series/'+series.id+'/');
+ const title='Saved series title '+randomUUID();
+ await page.getByLabel('Title',{exact:true}).fill(title);
+ await page.getByRole('button',{name:'Move '+second.title+' earlier',exact:true}).click();
+ const orderUrl='**/api/series/'+series.id+'/order';
+ await page.route(orderUrl,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Simulated order failure.'})}));
+ await page.getByRole('button',{name:'Save changes',exact:true}).click();
+ await expect(page.locator('#save-status')).toHaveText('Saved');
+ await expect(page.locator('#editor-error')).toContainText('Profile saved, but Simulated order failure.');
+ await expect(page.locator('#series-order-status')).toContainText('Simulated order failure.');
+ expect((await (await request.get('/api/series/'+series.id)).json()).title).toBe(title);
+ await page.unroute(orderUrl);
+ await page.getByRole('button',{name:'Save book order',exact:true}).click();
+ await expect(page.locator('#series-order-status')).toHaveText('Book order is saved.');
 });
 
 test('a stale novel-profile unlink preserves newer appearance prose and the local synopsis draft',async({page,request})=>{

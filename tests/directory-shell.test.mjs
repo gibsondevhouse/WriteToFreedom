@@ -66,10 +66,14 @@ function session(){
  const hooks=new Map(['search','sort','view','direction','clear','reset','list','results','count','empty','empty-title','empty-description','error','error-message','retry'].map(name=>[name,node()]));
  hooks.get('sort').value='order';hooks.get('view').value='cards';hooks.get('empty').hidden=true;
  hooks.get('empty').dataset={emptyTitle:'No entries yet',emptyDescription:'Start writing',filteredTitle:'No matches',filteredDescription:'Try another name'};
- const root={...node(),dataset:{singular:'entry',plural:'entries'},querySelector:selector=>hooks.get(selector.slice(16,-1))},window=node();
- const context=vm.createContext({document:{querySelector:()=>root,createElement:()=>node()},window,AbortController,Promise,scopedCatalogUrl:path=>path,novelContextHref:path=>path,showCatalogScope(){}});
- vm.runInContext(readFileSync('public/directory/shell.js','utf8').replace(/^import .*\n/gm,'').replace(/^export /gm,'')+'\nglobalThis.mount=initDirectoryShell;globalThis.fetchDirectory=fetchDirectory;',context);
- return {hooks,root,window,context,mount:options=>context.mount({root,autoload:false,...options}),names:()=>Array.from(hooks.get('list').children,item=>item.children[0].textContent)};
+ const root={...node(),dataset:{singular:'entry',plural:'entries'},querySelector:selector=>hooks.get(selector.slice(16,-1))},window=node(),document=node();
+ document.querySelector=()=>root;document.createElement=()=>node();
+ const context=vm.createContext({document,window,AbortController,Promise,scopedCatalogUrl:path=>path,novelContextHref:path=>path,showCatalogScope(){}});
+ const events=readFileSync('public/profiles/workspace-events.js','utf8').replace(/^export \{.*\};?$/gm,'').replace(/^export /gm,'');
+ const requests=readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,'');
+ const source=readFileSync('public/directory/shell.js','utf8').replace(/^import .*\n/gm,'').replace(/^export /gm,'');
+ vm.runInContext(events+'\n'+requests+'\n'+source+'\nglobalThis.mount=initDirectoryShell;globalThis.fetchDirectory=fetchDirectory;',context);
+ return {hooks,root,window,document,context,mount:options=>context.mount({root,autoload:false,...options}),names:()=>Array.from(hooks.get('list').children,item=>item.children[0].textContent)};
 }
 const select=(records,{query,sort,reversed})=>{const matches=records.filter(r=>r.name.toLowerCase().includes(query.trim().toLowerCase()));if(sort==='name')matches.sort((a,b)=>a.name.localeCompare(b.name));return reversed?matches.reverse():matches;};
 const renderItem=record=>({...node(),textContent:record.name});
@@ -111,6 +115,21 @@ test('queued reads discard stale results; teardown aborts late paints; back navi
  s.window.dispatch('pageshow',{persisted:true});await tick();assert.equal(reads,3);shell.destroy();assert.equal(signal.aborted,true);late.resolve([{name:'Late'}]);await tick();assert.deepEqual(s.names(),['Fresh']);
 });
 
+test('saved profile events and tab activation refresh directory cards without clearing filters',async()=>{
+ const s=session();let records=[{name:'Original novel'}],reads=0;
+ const shell=s.mount({load:async()=>{reads++;return records;},select,renderItem});await shell.refresh();
+ s.hooks.get('search').value='renamed';s.hooks.get('search').dispatch('input');
+ records=[{name:'Renamed novel'}];s.window.dispatch('storage',{key:'write-to-freedom:workspace-change'});await tick();
+ assert.deepEqual(s.names(),['Renamed novel']);assert.equal(s.hooks.get('search').value,'renamed');
+ s.window.dispatch('pageshow',{persisted:false});const beforeReturn=reads;
+ records=[{name:'Renamed on return'}];s.window.dispatch('pageshow',{persisted:false});await tick();
+ assert.equal(reads,beforeReturn+1);assert.deepEqual(s.names(),['Renamed on return']);
+ records=[{name:'Renamed again'}];s.window.dispatch('focus');await tick();assert.deepEqual(s.names(),['Renamed again']);
+ shell.destroy();const previousReads=reads;
+ s.window.dispatch('storage',{key:'write-to-freedom:workspace-change'});s.window.dispatch('focus');s.document.dispatch('visibilitychange');await tick();
+ assert.equal(reads,previousReads);assert.equal(s.window.listeners('storage'),0);assert.equal(s.document.listeners('visibilitychange'),0);
+});
+
 test('a renderer failure preserves existing records and disposes incomplete items',async()=>{
  const s=session();let records=[{name:'First'}],fail=false,disposed=0;
  const shell=s.mount({load:async()=>records,renderItem(record){if(fail&&record.name==='Bad')throw new Error('Bad card');return {element:renderItem(record),destroy(){disposed++;}};}});
@@ -133,7 +152,7 @@ test('character adapter retains creation IDs across retries, excludes double sub
   initDirectoryShell:options=>{config=options;return directory;},createCharacterCard:(record,options)=>{cardOptions=options;return record;},
   fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return request.promise;}
  });
- vm.runInContext(readFileSync('public/characters/characters.js','utf8').replace(/^import .*\n/gm,''),context);
+ vm.runInContext(readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,'')+'\n'+readFileSync('public/characters/characters.js','utf8').replace(/^import .*\n/gm,''),context);
  assert.deepEqual(navigations,['/characters/claude/']);const loaded=await config.load({});assert.equal(loaded[0].provider,'Anthropic');config.renderItem(loaded[0]);cardOptions.onUpdate({alignment:'Good'});assert.equal(loaded[0].alignment,'Good');
  const first=button.dispatch('click')[0];button.dispatch('click');assert.equal(calls.length,1);request.resolve(new Response('{"error":"Try again"}',{status:503,headers:{'content-type':'application/json'}}));await first;
  assert.equal(button.disabled,false);assert.deepEqual(errors,['Try again']);request=defer();const retry=button.dispatch('click')[0];assert.equal(calls[1].id,calls[0].id);
@@ -162,7 +181,7 @@ test('faction adapter retains retries, guards double creation, and sorts without
   createProfileStoryCard:(record,options)=>({record,options}),
   fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return request.promise;}
  });
- vm.runInContext(readFileSync('public/factions/factions.js','utf8').replace(/^import .*\n/gm,''),context);
+ vm.runInContext(readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,'')+'\n'+readFileSync('public/factions/factions.js','utf8').replace(/^import .*\n/gm,''),context);
  assert.deepEqual(await config.load({}),records);
  assert.deepEqual(Array.from(config.select(records,{query:'promises',sort:'order'}),r=>r.id),['house']);
  assert.deepEqual(Array.from(config.select(records,{query:'',sort:'type'}),r=>r.id),['guild','house']);assert.equal(records[0].id,'house');

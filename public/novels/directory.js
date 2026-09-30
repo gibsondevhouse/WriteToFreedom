@@ -1,5 +1,6 @@
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=__WTF_ASSET_REVISION__';
 import {bookCoverCard} from '../dashboard/components.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const root=document.querySelector('[data-directory-shell]');
 const novel=root.id==='novels-directory',kind=novel?'novel':'series',plural=novel?'novels':'series';
@@ -56,15 +57,11 @@ form.addEventListener('submit',async event=>{
  creating=true;pendingId??=crypto.randomUUID();
  const submit=form.querySelector('[type=submit]');submit.disabled=true;createError.hidden=true;
  try{
-  const response=await fetch(endpoint,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,title})});
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
-  let data=await response.json();if(!response.ok)throw new Error(data.error||'Could not create this '+kind+'.');
+    let data=await requestJSON(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,title})},{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Could not create this '+kind+'.'});
   const normalizedTitle=title.replace(/\s+/g,' ');
   if(data.title!==normalizedTitle){
    if(data.version!==1)throw new Error('This '+kind+' changed after it was created. Your title is still here; open its profile before changing the saved version.');
-   const updated=await fetch(endpoint+'/'+data.id,{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({version:data.version,title:normalizedTitle})});
-   if(!updated.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Your title is still here.');
-   data=await updated.json();if(!updated.ok)throw new Error(data.error||'Could not save your revised title.');
+     data=await requestJSON(endpoint+'/'+data.id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({version:data.version,title:normalizedTitle})},{sessionMessage:'Your session may have expired. Your title is still here.',errorMessage:'Could not save your revised title.'});
   }
   location.assign(href(data));
  }catch(error){createError.textContent=error.message;createError.hidden=false;creating=false;submit.disabled=false;}

@@ -196,7 +196,7 @@ Tests import server and shared source modules directly, so they do not require a
 
 `scripts/build.mjs` runs Vite for the Lore note and writing workspace entries, reads its manifest, then collects legacy `public/` assets and generated `dist/client/` assets. Generated files are served under the reserved `/frontend/` prefix. The script writes an entry module that calls `createWorker(assets)`, then bundles that module and the frontend manifest with esbuild into `dist/server/index.js`, targeting ES2022 and browser-compatible APIs.
 
-`scripts/collect-assets.mjs` stores known text formats as UTF-8 and binary formats as base64 with their content types. The Worker decodes binary bytes on delivery. Unknown formats use `application/octet-stream`; dotfiles and Vite's internal manifest are not publicly served. Images and fonts can be embedded, but they increase Worker size.
+`scripts/collect-assets.mjs` stores known text formats as UTF-8 and binary formats as base64 with their content types. The Worker lazily decodes each binary asset on its first GET and reuses those bytes within that Worker instance; HEAD requests do not decode it. Unknown formats use `application/octet-stream`; dotfiles and Vite's internal manifest are not publicly served. Images and fonts can be embedded, but they increase Worker size.
 
 Legacy browser modules remain individual served assets and retain their shared revision stamping. Vite owns the generated frontend's hashes and imports; generated chunks are not rewritten by the legacy stamper. `server/frontend-assets.js` renders entry scripts, CSS and transitive module preloads from the manifest. `npm run build` runs TypeScript checking separately from Vite transpilation.
 
@@ -214,7 +214,7 @@ The outer Worker then decorates non-HEAD HTML responses with `workspaceShell`, p
 
 Directories retain static HTML with browser scripts that fetch their catalogs. Home and Lore use `renderDashboardPage` and page definitions, with `initDashboardShell` owning loading, errors, refresh and section cleanup. Their shared stylesheet dependency is automatic; see the [dashboard shell contract](docs/dashboard-shell.md). Standalone Lore notes mount a React profile into a dedicated region using escaped initial JSON. Other profiles remain server-rendered and enhanced by browser editors. Saving sends JSON to the relevant API and updates the version held by the owning editor.
 
-Static assets use `Cache-Control: no-cache`; private JSON responses and successful dynamic profile responses use `Cache-Control: no-store`. Rendered text is escaped through the server rendering code. Preserve those boundaries when adding fields or new markup.
+Static HTML and unversioned assets use `Cache-Control: no-cache`. Assets with the current build revision and content-hashed Vite JavaScript/CSS use `Cache-Control: public, max-age=31536000, immutable`. Private JSON responses and successful dynamic profile responses use `Cache-Control: no-store`; private portraits remain `private, no-store`. Rendered text is escaped through the server rendering code. Preserve those boundaries when adding fields or new markup.
 
 ### Local runtime adapter
 
@@ -240,7 +240,7 @@ The hosted application expects the Sites authentication layer to provide the aut
 
 The local server **overwrites** the identity header on every request. Passing another identity with `curl` against the local server will not simulate another author. Use the test fixtures, which invoke `worker.fetch` directly, to exercise multiple owners and unauthenticated requests.
 
-JSON mutations require both an `Origin` header exactly matching the request URL's origin and a `Content-Type` beginning with `application/json`. Browser calls use same-origin requests. Command-line clients must supply these headers explicitly. Missing identity results in `401`; failed origin/content-type checks result in `403`.
+JSON mutations require both an `Origin` header exactly matching the request URL's origin and the `application/json` media type, checked case-insensitively with optional parameters such as `charset=utf-8`. Lookalike types such as `application/json-invalid` are rejected. The shared HTTP helpers keep this check and private JSON response headers consistent across routes. Browser calls use same-origin requests. Command-line clients must supply these headers explicitly. Missing identity results in `401`; failed origin/content-type checks result in `403`.
 
 ## Persistence and migrations
 
@@ -408,6 +408,8 @@ Relationships point to another character available to the same author. Self-refe
 
 A character's `factionId` is the structured faction link. Displayed affiliation names are resolved from the current faction catalog, so a faction rename propagates without rewriting every character. Existing free-text affiliations remain available until replaced or cleared. Inline faction creation persists the faction immediately; the author must still save the character to persist its selection.
 
+The portrait controls accept an HTTPS image link or a local PNG, JPEG, WebP, or GIF up to 2 MiB. Local images are stored in owner-scoped `character_images` rows. Uploading a file makes it available immediately; Save changes records that image on the character. AI portrait generation is a disabled placeholder.
+
 Faction founders and leaders link to characters. Membership is derived from character faction selections rather than maintained as an independent membership list. Named faction creation trims and normalizes whitespace and compares names using Unicode NFKC normalization and locale-aware lowercasing.
 
 ### Character cards, attributes, and notes
@@ -447,7 +449,7 @@ Moving an area changes the ancestry of everything beneath it without changing ea
 
 Countries may designate a capital and largest city only from their own cities. A city currently designated as either cannot move to another country until those references are changed on the original country profile. Country and city leaders must refer to available characters.
 
-All location profiles accept optional HTTPS image URLs for their supported image fields. The browser loads those remote images; the application does not upload image files or persist them in R2. Invalid URLs are rejected, and failed previews retain the editable field with feedback.
+All location profiles accept optional HTTPS image URLs for their supported image fields. The browser loads those remote images; location profiles do not upload image files or persist them in R2. Invalid URLs are rejected, and failed previews retain the editable field with feedback.
 
 ## Shared profile system
 

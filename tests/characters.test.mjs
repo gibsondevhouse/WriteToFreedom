@@ -6,7 +6,7 @@ import { createWorker } from '../server/app.js';
 import { d1Adapter } from '../scripts/sqlite-adapter.mjs';
 import { blankCharacter, fieldNames, normalizeCharacter } from '../public/characters/template.js';
 const origin='https://novel.example';
-function setup(){const sqlite=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));const worker=createWorker({});const env={DB:d1Adapter(sqlite)};return async(path,method='GET',body,owner='author-a',source=origin)=>worker.fetch(new Request(origin+path,{method,headers:{...(owner?{'oai-authenticated-user-id':owner}:{}),...(body===undefined?{}:{origin:source,'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);}
+function setup(queries){const sqlite=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));const worker=createWorker({});const binding=d1Adapter(sqlite),env={DB:queries?{...binding,prepare(sql){queries.push(sql);return binding.prepare(sql);}}:binding};return async(path,method='GET',body,owner='author-a',source=origin,headers={})=>worker.fetch(new Request(origin+path,{method,headers:{...(owner?{'oai-authenticated-user-id':owner}:{}),...(body===undefined?{}:{origin:source,'content-type':'application/json'}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);}
 test('blank creation is idempotent, saves complete template, and reopens by stable ID',async()=>{
  const request=setup(),id=crypto.randomUUID();
  let response=await request('/api/characters','POST',{id});assert.equal(response.status,201);const blank=await response.json();
@@ -31,6 +31,22 @@ test('private ownership, cross-origin requests, and invalid relationship targets
  assert.equal((await request('/api/characters','POST',{id},'author-b')).status,409);
  assert.equal((await request('/api/characters/'+id,'PUT',{...blankCharacter(),version:1,relationships:[{targetId:crypto.randomUUID(),type:'Rival',description:''}]})).status,400);
  assert.equal((await request('/api/characters/'+id,'PUT',{...blankCharacter(),version:1,relationships:[{targetId:id,type:'Self',description:''}]})).status,400);
+});
+test('character saves read each reference catalog once and preserve faction affiliation',async()=>{
+ const queries=[],request=setup(queries),id=crypto.randomUUID();
+ await request('/api/characters','POST',{id});queries.length=0;
+ const response=await request('/api/characters/'+id,'PUT',{...blankCharacter(),firstName:'Nia',factionId:'sample-ember',version:1});
+ assert.equal(response.status,200);assert.equal((await response.json()).affiliation,'The House of Ember');
+ for(const table of ['factions','faction_profiles','locations','country_profiles','city_profiles','location_details','lore_entries'])assert.equal(queries.filter(sql=>new RegExp('\\bFROM '+table+'\\b','i').test(sql)).length,1,table);
+ assert.equal(queries.filter(sql=>sql==='SELECT * FROM character_drafts WHERE owner_id = ? ORDER BY created_at ASC, id ASC').length,1);
+});
+test('character mutations accept JSON parameters and reject lookalike media types',async()=>{
+ const request=setup();
+ for(const type of ['application/json; charset=utf-8','Application/JSON']){
+  const response=await request('/api/characters','POST',{id:crypto.randomUUID()},'author-a',origin,{'content-type':type});
+  assert.equal(response.status,201,type);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+ }
+ for(const type of ['application/json-invalid','application/jsonp','text/plain',''])assert.equal((await request('/api/characters','POST',{id:crypto.randomUUID()},'author-a',origin,{'content-type':type})).status,403,type);
 });
 test('profile text is escaped, blank saves remain valid, and malformed data is rejected',async()=>{
  const request=setup(),id=crypto.randomUUID();await request('/api/characters','POST',{id});
@@ -112,6 +128,17 @@ test('blank and sample profiles expose the full editable template and redirect o
  }
  const unauth=await request('/characters/claude/','GET',undefined,null);assert.equal(unauth.status,401);
  assert.equal((await request('/characters/claude/index.html')).headers.get('location'),origin+'/characters/claude/');
+});
+
+test('character profiles send an empty HEAD response and reject unsupported methods',async()=>{
+ const request=setup(),id=crypto.randomUUID();
+ await request('/api/characters','POST',{id});
+ for(const target of ['claude',id]){
+  const head=await request('/characters/'+target+'/','HEAD');
+  assert.equal(head.status,200);assert.equal(head.headers.get('content-type'),'text/html; charset=utf-8');assert.equal(await head.text(),'');
+  assert.equal((await request('/characters/'+target+'/','POST')).status,405);
+ }
+ assert.equal((await request('/characters/'+id+'/','HEAD',undefined,'another-owner')).status,404);
 });
 
 test('human details and hidden subsection settings persist without deleting hidden content',async()=>{

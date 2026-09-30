@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {validImageUrl} from '../public/locations/countries/template.js';
 import {readHiddenFields} from '../public/profiles/schema.js';
@@ -8,7 +9,6 @@ import { idPattern } from '../public/characters/template.js';
 import { characterCast } from './sample-characters.js';
 import {factionRatingGroups,validateProfileRatings} from '../public/profiles/ratings.js';
 import { renderFaction } from './render-faction.js';
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 /**
  * Handle /api/factions[/id] and /factions/id/: owner-scoped collection/item GET,
  * HTML GET/HEAD, idempotent blank or name-deduplicated POST, and versioned PUT.
@@ -33,7 +33,7 @@ export async function factionRoute(request,env){
   }
   if(request.method==='GET')return id?(current?json(current):json({error:'Faction not found.'},404)):json({factions});
   if(!['POST','PUT'].includes(request.method))return json({error:'Method not allowed.'},405);
-  if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>250000)return json({error:'Faction is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid faction data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid faction data.'},400);

@@ -6,6 +6,8 @@ import {moralityIcons} from '../../characters/attributes.js?v=__WTF_ASSET_REVISI
 import {createDateControl,initDatePicker} from '../../profiles/date-picker.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange} from '../../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 import {bindNumericText} from '../../characters/numeric-text.js?v=__WTF_ASSET_REVISION__';
+import {displayImageSource} from '../image-source.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function button(text,cls,action){const n=el('button',cls,text);n.type='button';n.addEventListener('click',action);return n;}
@@ -17,9 +19,7 @@ function excerpt(value,limit=380){
  return clipped.slice(0,breakAt>limit*.72?breakAt:limit).trimEnd()+'…';
 }
 async function request(url,options={}){
- const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
- if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
- const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load the character. Try again.');return data;
+ return requestJSON(url,options,{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Could not load the character. Try again.'});
 }
 
 const detailTabs=[['about','About'],['ratings','Ratings'],['mentions','Mentions']];
@@ -28,8 +28,8 @@ let activeDialog;
 /**
  * Open one module-wide character dialog. The attributes action is the shared
  * More preview: About opens first, Ratings owns the existing editable controls,
- * and Mentions is reserved for its later design. Other card actions keep their
- * dedicated views. Editable views fetch a fresh document before a versioned PUT.
+ * and Mentions shows the card's current note references. Other card actions keep
+ * their dedicated views. Editable views fetch a fresh document before a versioned PUT.
  * @param {object} record Rich card record; updated in place after a successful save.
  * @param {string} view morality, attributes, connection, relationships, or mentions.
  * @param {Function} [onUpdate] Receives updated card state after persistence.
@@ -94,7 +94,7 @@ export function openCharacter(record,view,onUpdate){
   tabPanels.clear();
   const about=makeTabPanel('about','character-about');
   const media=el('figure','character-about-media'),fallback=el('span','character-about-initials',initials(record.name));fallback.setAttribute('aria-hidden','true');media.append(fallback);aboutMedia=media;
-  renderAboutArtwork(/^https:\/\//i.test(portraitUrl)?portraitUrl:record.image||'');
+  renderAboutArtwork(displayImageSource(portraitUrl)||displayImageSource(record.image));
   const biography=documentData.biography||documentData.introduction||documentData.summary||record.summary||'';
   const bio=el('p','character-about-bio',excerpt(biography)||'No biography yet.');
   const facts=el('dl','character-about-facts');facts.setAttribute('aria-label','Editable character details');
@@ -102,14 +102,15 @@ export function openCharacter(record,view,onUpdate){
   about.append(media,bio,facts);
 
   const ratings=makeTabPanel('ratings','character-ratings');ratings.append(buildAttributes());
-  const mentions=makeTabPanel('mentions','character-mentions-placeholder');mentions.append(el('p','detail-empty','Mentions will appear here.'));
+  const mentions=makeTabPanel('mentions','character-mentions');mentions.append(mentionsContent());
   panel.replaceChildren(about,ratings,mentions);datePicker?.destroy();datePicker=initDatePicker(dialog,{requestSave:saveChanges});activateTab(activeTab);
  }
  function renderAboutArtwork(source=portraitUrl){
   if(!aboutMedia)return;
   aboutMedia.querySelector('.character-about-photo')?.remove();aboutMedia.classList.add('is-placeholder');
-  if(!/^https:\/\//i.test(source))return;
-  const image=el('img','character-about-photo');image.src=source;image.alt='Portrait of '+record.name;image.loading='eager';image.decoding='async';image.referrerPolicy='no-referrer';
+  const imageSource=displayImageSource(source);
+  if(!imageSource)return;
+  const image=el('img','character-about-photo');image.src=imageSource;image.alt='Portrait of '+record.name;image.loading='eager';image.decoding='async';image.referrerPolicy='no-referrer';
   image.addEventListener('error',()=>{image.remove();aboutMedia?.classList.add('is-placeholder');});aboutMedia.append(image);aboutMedia.classList.remove('is-placeholder');
  }
  function factShell(label){
@@ -182,7 +183,7 @@ export function openCharacter(record,view,onUpdate){
   const layout=el('div','attribute-stack');
   layout.append(createAttributeControls(draft,markDirty));
   const artwork=el('details','attribute-artwork');artwork.append(el('summary','','Card portrait'));
-  const label=el('label','','Portrait image URL'),url=el('input');url.id='attribute-portrait-url';url.type='url';url.value=portraitUrl;url.placeholder='https://…';url.maxLength=2048;url.pattern='https://.*';label.htmlFor=url.id;
+  const label=el('label','','Portrait image URL'),url=el('input');url.id='attribute-portrait-url';url.type='text';url.inputMode='url';url.value=portraitUrl;url.placeholder='https://…';url.maxLength=2048;label.htmlFor=url.id;
   url.addEventListener('input',()=>{portraitUrl=url.value.trim();renderAboutArtwork();markDirty();});artwork.append(label,url);layout.append(artwork);return layout;
  }
  async function saveChanges(){
@@ -204,19 +205,19 @@ export function openCharacter(record,view,onUpdate){
   }catch(error){notice.textContent=error.message;}
   finally{saving=false;save.disabled=!dirty;close.disabled=false;panel.querySelectorAll('input,select,button').forEach(n=>n.disabled=false);tabButtons.forEach(tab=>{tab.disabled=false;});}
  }
- function renderMentions(){
-  if(!record.mentions.length){panel.append(el('p','detail-empty','No notes mentioning this character yet.'));return;}
+ function mentionsContent(){
+  if(!record.mentions.length)return el('p','detail-empty','No notes mentioning this character yet.');
   const list=el('ul','character-mention-list');
   for(const note of record.mentions){
    const item=el('li'),link=el('a','mention-entry');link.href=note.href;link.title=note.source+' · '+note.label+' — '+note.text;
    link.append(el('strong','mention-source',note.source+' · '+note.label),el('span','mention-excerpt',note.text.replace(/\s+/g,' ').trim()),el('span','mention-arrow','↗'));item.append(link);list.append(item);
   }
-  panel.append(list);
+  return list;
  }
 
  dialog.addEventListener('cancel',event=>{event.preventDefault();attemptClose();});
  dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)attemptClose();}});
  dialog.addEventListener('close',()=>{datePicker?.destroy();datePicker=null;dialog.remove();activeDialog=null;document.body.classList.remove('character-overlay-open');if(opener?.isConnected)opener.focus();else{const card=[...document.querySelectorAll('.story-character-card')].find(item=>item.querySelector('.character-profile-link')?.getAttribute('href')===record.href);card?.querySelector({attributes:'.character-more',morality:'.morality-action',relationships:'.relationships-action',mentions:'.mentions-action',connection:'.affiliation-picker'}[view])?.focus();}});
  const preventUnload=event=>{if(dirty){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',preventUnload);dialog.addEventListener('close',()=>window.removeEventListener('beforeunload',preventUnload),{once:true});
- dialog.append(header,discard,...(tabs?[tabs]:[]),panel,footer);document.body.append(dialog);document.body.classList.add('character-overlay-open');dialog.showModal();if(view==='mentions')renderMentions();else load();(tabButtons.get('about')||close).focus();
+ dialog.append(header,discard,...(tabs?[tabs]:[]),panel,footer);document.body.append(dialog);document.body.classList.add('character-overlay-open');dialog.showModal();if(view==='mentions')panel.append(mentionsContent());else load();(tabButtons.get('about')||close).focus();
 }

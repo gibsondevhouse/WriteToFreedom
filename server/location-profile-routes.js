@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {repository} from './db.js';
 import {locationCatalog} from './countries.js';
@@ -8,7 +9,6 @@ import {readHiddenFields} from '../public/profiles/schema.js';
 import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
 import {renderLocation} from './render-location.js';
 
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 const conflict=()=>json({error:'This location changed in another tab. Copy your unsaved text, then reload before saving.'},409);
 const responseRecord=(record,locations)=>({...record,ancestry:ancestors(record,locations).map(l=>({id:l.id,name:l.name,href:locationHref(l)}))});
 
@@ -28,7 +28,7 @@ export async function locationProfileRoute(request,env){
   }
   if(request.method==='GET')return json(responseRecord(current,locations));
   if(request.method!=='PUT')return json({error:'Method not allowed.'},405);
-  if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'Location profile is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid location data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input)||!Number.isSafeInteger(input.version)||input.version>=Number.MAX_SAFE_INTEGER||input.version<0)return json({error:'Reload this location before saving.'},400);

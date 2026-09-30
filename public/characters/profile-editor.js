@@ -5,6 +5,7 @@ import {initProfileControls,resize} from '../profiles/controls.js?v=worlds-1';
 import { fieldNames, nameFields, fullName } from './template.js?v=character-cards-1';
 import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 import {numericTextFields,bindNumericText} from './numeric-text.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 const initial=JSON.parse(document.querySelector('#profile-data').textContent);
 const id=initial.character.id,form=document.querySelector('#profile-form'),fields=document.querySelector('#editor-fields');
 const status=document.querySelector('#save-status'),save=document.querySelector('#save-character'),error=document.querySelector('#editor-error');
@@ -15,7 +16,7 @@ const attributeRatings={...(initial.character.attributeRatings||{})};
 let factionSelect,factionPanel,factionName,factionFeedback,createFactionButton,cancelFactionButton,previousFaction='',legacyAffiliation=initial.character.affiliation||'',creatingFaction=false,factionRequestId;
 function node(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 function showError(message){error.textContent=message;error.hidden=false;}
-async function request(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Keep a copy of your changes before reloading to sign in again.');const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save your character. Please try again.');return data;}
+async function request(url,options={}){return requestJSON(url,options,{sessionMessage:'Your session may have expired. Keep a copy of your changes before reloading to sign in again.',errorMessage:'Could not save your character. Please try again.'});}
 function populateFactions(selected=''){
  factionSelect.replaceChildren();const empty=node('option','No faction selected');empty.value='';factionSelect.append(empty);
  [...factions].sort((a,b)=>a.name.localeCompare(b.name)).forEach(faction=>{const option=node('option',faction.name||'Untitled faction');option.value=faction.id;factionSelect.append(option);});
@@ -40,7 +41,7 @@ function buildFactionControl(field,input){
   factionName.setCustomValidity('');creatingFaction=true;createFactionButton.disabled=true;cancelFactionButton.disabled=true;save.disabled=true;factionName.disabled=true;factionSelect.disabled=true;factionFeedback.textContent='Creating faction…';factionRequestId??=crypto.randomUUID();
   try{const created=await request('/api/factions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:factionRequestId,name})});if(!factions.some(f=>f.id===created.id))factions.push(created);populateFactions(created.id);updateFactionLink();factionPanel.hidden=true;factionName.value='';factionRequestId=undefined;markDirty();factionFeedback.textContent='Faction ready. Save character to keep this affiliation.';factionSelect.focus();}
   catch(e){factionFeedback.textContent=e.message;}
-  finally{creatingFaction=false;createFactionButton.disabled=false;cancelFactionButton.disabled=false;save.disabled=false;factionName.disabled=false;factionSelect.disabled=false;if(factionPanel.hidden)factionSelect.focus();else factionName.focus();}
+  finally{creatingFaction=false;createFactionButton.disabled=false;cancelFactionButton.disabled=false;save.disabled=portraitControls.uploading||saving;factionName.disabled=false;factionSelect.disabled=false;if(factionPanel.hidden)factionSelect.focus();else factionName.focus();}
  });
 }
 
@@ -66,6 +67,54 @@ const numericReaders=new Map(numericTextFields.map(key=>[key,bindNumericText(for
 const noteEditor=initCharacterNotes(form,initial.character.notes||[],markDirty,controls,initial);
 function updateTitle(){const name=fullName(Object.fromEntries(nameFields.map(key=>[key,form.elements.namedItem(key).value])));document.querySelectorAll('[data-display-name]').forEach(n=>n.textContent=name||'Untitled character');document.title=(name||'Untitled character')+' — Write to Freedom';document.querySelector('#monogram').textContent=name.split(/\s+/).slice(0,2).map(n=>n[0]||'').join('').toUpperCase()||'?';}
 function markDirty(){dirty=true;status.textContent='Unsaved changes';updateTitle();}
+function initPortraitControls(){
+ const linkButton=document.querySelector('#portrait-link-action');
+ const imageButton=document.querySelector('#portrait-image-action');
+ const linkPanel=document.querySelector('#portrait-link-panel');
+ const urlInput=document.querySelector('#field-portraitUrl');
+ const fileInput=document.querySelector('#portrait-image-file');
+ const feedback=document.querySelector('#portrait-source-status');
+ let uploading=false;
+ const internal=value=>value.startsWith('/api/characters/');
+ const updateSource=()=>{
+  linkButton.setAttribute('aria-pressed',String(!linkPanel.hidden||Boolean(urlInput.value)&&!internal(urlInput.value)));
+  imageButton.setAttribute('aria-pressed',String(internal(urlInput.value)));
+ };
+ const message=(text,isError=false)=>{feedback.textContent=text;feedback.hidden=!text;feedback.classList.toggle('is-error',isError);};
+ linkButton.addEventListener('click',()=>{
+  linkPanel.hidden=!linkPanel.hidden;
+  linkButton.setAttribute('aria-expanded',String(!linkPanel.hidden));
+  updateSource();
+  if(!linkPanel.hidden){urlInput.focus();urlInput.select();}
+ });
+ urlInput.addEventListener('input',()=>{message('');updateSource();});
+ imageButton.addEventListener('click',()=>fileInput.click());
+ fileInput.addEventListener('change',async()=>{
+  const file=fileInput.files?.[0];
+  fileInput.value='';
+  if(!file)return;
+  if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size===0||file.size>2*1024*1024){message('Choose a PNG, JPEG, WebP, or GIF image under 2 MB.',true);return;}
+  uploading=true;
+  imageButton.disabled=true;
+  linkButton.disabled=true;
+  save.disabled=true;
+  message('Uploading image…');
+  try{
+   const result=await request('/api/characters/'+encodeURIComponent(id)+'/portraits',{method:'POST',headers:{'content-type':file.type},body:file});
+   if(typeof result.url!=='string'||!internal(result.url))throw new Error('The uploaded image URL could not be verified.');
+   urlInput.value=result.url;
+   urlInput.dispatchEvent(new Event('input',{bubbles:true}));
+   linkPanel.hidden=true;
+   linkButton.setAttribute('aria-expanded','false');
+   updateSource();
+   message('Image uploaded. Save changes to use it.');
+  }catch(cause){message(cause instanceof Error?cause.message:'Could not upload this image. Try again.',true);}
+  finally{uploading=false;imageButton.disabled=false;linkButton.disabled=false;save.disabled=saving||creatingFaction;}
+ });
+ updateSource();
+ return {get uploading(){return uploading;},saved(value){urlInput.value=value||'';updateSource();message('');}};
+}
+const portraitControls=initPortraitControls();
 form.addEventListener('input',event=>{if(event.target===factionName)return;resize(event.target);markDirty();});
 form.addEventListener('change',event=>{if(event.target===factionName)return;markDirty();});
 buildFactionControl(document.querySelector('#field-factionId').parentElement,document.querySelector('#field-factionId'));
@@ -73,13 +122,13 @@ populateFactions(initial.character.factionId||'');
 initial.character.relationships.forEach(addRelationship);
 document.querySelector('#add-relationship').addEventListener('click',()=>{addRelationship();markDirty();relationshipHost.lastElementChild.querySelector('select').focus();});
 form.addEventListener('submit',async event=>{
- event.preventDefault();if(saving||creatingFaction||!noteEditor.readyToSave())return;if(!controls.commitChoices()||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
+ event.preventDefault();if(saving||creatingFaction||portraitControls.uploading||!noteEditor.readyToSave())return;if(!controls.commitChoices()||!form.reportValidity())return;saving=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
  const payload=Object.fromEntries(fieldNames.map(key=>[key,numericReaders.has(key)?numericReaders.get(key)():choiceValues.has(key)?choiceValues.get(key):form.elements.namedItem(key).value]));payload.choiceSelections=controls.choiceSelections();payload.notes=noteEditor.notes;payload.nationalityContinents={...nationalityContinents};payload.attributeRatings={...attributeRatings};payload.hiddenFields=controls.hiddenFields();payload.version=documentVersion;payload.affiliation=factionSelect.value==='__legacy__'?legacyAffiliation:'';if(factionSelect.value==='__legacy__')payload.factionId='';
  payload.relationships=[...relationshipHost.children].map(row=>Object.fromEntries([...row.querySelectorAll('[data-key]')].map(input=>[input.dataset.key,input.value])));
  fields.disabled=true;
- try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';updateTitle();announceWorkspaceChange();}
+ try{const updated=await request('/api/characters/'+id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});documentVersion=updated.version;dirty=false;status.textContent='Saved';portraitControls.saved(updated.portraitUrl);updateTitle();announceWorkspaceChange();}
  catch(e){showError(e.message);status.textContent='Not saved — your changes are still here';}
- finally{saving=false;save.disabled=false;fields.disabled=false;}
+ finally{saving=false;save.disabled=portraitControls.uploading||creatingFaction;fields.disabled=false;}
 });
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(!save.disabled)form.requestSubmit();}});

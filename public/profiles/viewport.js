@@ -12,7 +12,7 @@ export function sectionAtHeader(tops,edge){
 export function initProfileViewport(form){
  const bar=form.querySelector('.article-bar'),current=bar?.querySelector('.current-view'),content=form.querySelector('.profile-content'),identity=form.querySelector('.infobox');
  if(!bar||!current||!content||!identity)return;
- const headings=[...content.querySelectorAll('.profile-section > .section-header h2')],original=current.textContent.trim();
+ const article=form.querySelector('#editor-fields'),original=current.textContent.trim();
  const label=document.createElement('span');label.className='current-view-label';label.textContent=original;current.replaceChildren(label);
  const reduced=matchMedia('(prefers-reduced-motion: reduce)');let frame=0,last=original,animations=[],previous=null,headerHeight=0;
  function clearAnimation(){animations.forEach(animation=>animation.cancel());animations=[];previous?.remove();previous=null;}
@@ -28,14 +28,21 @@ export function initProfileViewport(form){
  function update(){
   frame=0;const bounds=bar.getBoundingClientRect(),offset=parseFloat(getComputedStyle(bar).top)||0,height=bounds.height+offset;
   if(height!==headerHeight){headerHeight=height;form.style.setProperty('--profile-header-height',height+'px');}
+  // Chapter scene titles live inside their cards. Keep them in the same
+  // reading-order tracker as ordinary profile section headings.
+  const headings=[...article.querySelectorAll('.section-header h2, .chapter-scene-card-header .chapter-scene-title')];
   const index=bounds.top<=offset?sectionAtHeader(headings.map(heading=>heading.getClientRects().length?heading.getBoundingClientRect().top:Infinity),bounds.bottom):-1;
   form.classList.toggle('profile-reading',index>=0);
-  show(index<0?original:headings[index].textContent.trim());
+  const heading=headings[index];
+  show(index<0?original:(heading instanceof HTMLTextAreaElement ? heading.value : heading.getAttribute('aria-label')||heading.textContent).trim()||'Untitled scene');
  }
  function schedule(){if(!frame)frame=requestAnimationFrame(update);}
  window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',schedule);window.addEventListener('hashchange',schedule);
  form.addEventListener('click',schedule);form.addEventListener('input',schedule);form.addEventListener('change',schedule);form.addEventListener('toggle',schedule,true);
- const observer=new ResizeObserver(schedule);observer.observe(bar);observer.observe(content);observer.observe(identity);content.querySelectorAll('.profile-section').forEach(section=>observer.observe(section));
+ const observer=new ResizeObserver(schedule);observer.observe(bar);observer.observe(article);observer.observe(content);observer.observe(identity);
+ // Scene native input events are contained so their drafts never dirty chapter
+ // metadata. Observe their heading labels independently for the reading bar.
+ const headingsObserver=new MutationObserver(schedule);headingsObserver.observe(article,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-label']});
  reduced.addEventListener('change',()=>{if(reduced.matches)clearAnimation();});
  update();
 }

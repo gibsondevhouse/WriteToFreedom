@@ -3,6 +3,7 @@ import {initDashboardShell} from '../dashboard/shell.js?v=__WTF_ASSET_REVISION__
 import {loreTypes,loreCollections,primaryCollection,loreHref} from './template.js?v=__WTF_ASSET_REVISION__';
 import {announceWorkspaceChange} from '../profiles/workspace-events.js?v=__WTF_ASSET_REVISION__';
 import {scopedCatalogUrl,showCatalogScope,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 const $=selector=>document.querySelector(selector);
 const search=$('#lore-search'),dialog=$('#new-lore-dialog'),form=$('#new-lore-form');
@@ -26,10 +27,7 @@ const collectionCopy={
 const collectionType=id=>Object.keys(primaryCollection).find(type=>primaryCollection[type]===id)||'note';
 const createAction=id=>({label:'New '+loreTypes[collectionType(id)].toLowerCase(),onClick:()=>openNewEntry(collectionType(id))});
 async function api(options={}){
- const response=await fetch(scopedCatalogUrl('/api/lore'),{credentials:'same-origin',cache:'no-store',...options});
- if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Reload to sign in again. Keep a copy of any unsaved notes.');
- const body=await response.json();
- if(!response.ok)throw new Error(body.error||'Your lore could not be loaded.');
+ const body=await requestJSON(scopedCatalogUrl('/api/lore'),options,{sessionMessage:'Reload to sign in again. Keep a copy of any unsaved notes.',errorMessage:'Your lore could not be loaded.'});
  showCatalogScope(body.scope);
  return body;
 }

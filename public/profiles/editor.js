@@ -1,6 +1,7 @@
 import {locationHref} from '../locations/data.js';
 import {initProfileControls,resize} from './controls.js?v=profile-reading-1';
 import {announceWorkspaceChange} from './workspace-events.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from './request.js?v=__WTF_ASSET_REVISION__';
 
 // Entity adapters supply only their field names, endpoint, and image constraints.
 /**
@@ -33,16 +34,16 @@ export function initProfileEditor({fieldNames,endpoint,type,nameField='name',ima
   const selections=controls.choiceSelections();
   const payload={...Object.fromEntries(fieldNames.map(key=>[key,controls.choiceValues.has(key)?controls.choiceValues.get(key):form.elements.namedItem(key).value])),...extra,...(Object.keys(selections).length?{choiceSelections:selections}:{}),hiddenFields:controls.hiddenFields(),schemaVersion:initial.schemaVersion??1,version};
   saving=true;fields.disabled=true;save.disabled=true;error.hidden=true;status.textContent='Saving…';
+  let committed=false;
   try{
-   const response=await fetch(endpoint+'/'+form.dataset.id,{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
-   if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Copy your changes before reloading to sign in again.');
-   const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save. Please try again.');
+    const data=await requestJSON(endpoint+'/'+form.dataset.id,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)},{errorMessage:'Could not save. Please try again.'});
+   committed=true;
    version=data.version;form.dataset.version=String(version);dirty=false;form.elements.namedItem(nameField).value=data[nameField];update();
    const country=form.elements.namedItem('parentId');if(country)document.querySelectorAll('[data-country-link]').forEach(link=>{link.href=locationHref({type:'country',id:data.parentId});link.textContent=country.selectedOptions[0]?.textContent||'Country';});
    status.textContent='Saved';
    announceWorkspaceChange();
    await onSaved(data);
-  }catch(e){error.hidden=false;error.textContent=e.message;status.textContent='Not saved — your changes are still here';}
+  }catch(e){error.hidden=false;error.textContent=committed?'Profile saved, but '+e.message:e.message;status.textContent=committed?'Saved':'Not saved — your changes are still here';}
   finally{saving=false;fields.disabled=false;save.disabled=false;}
  });
  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});

@@ -1,6 +1,7 @@
 import {initDirectoryShell,fetchDirectory} from '../directory/shell.js?v=1';
 import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
 import {scopedCatalogUrl,novelContextHref} from '../profiles/novel-context.js?v=__WTF_ASSET_REVISION__';
+import {requestJSON} from '../profiles/request.js?v=__WTF_ASSET_REVISION__';
 
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
 const directory=initDirectoryShell({
@@ -22,9 +23,7 @@ let pendingId,creating=false;
 newButton.addEventListener('click',async()=>{
  if(creating)return;creating=true;newButton.disabled=true;newButton.textContent='Creating…';directory.clearError();pendingId??=crypto.randomUUID();
  try{
-  const response=await fetch(scopedCatalogUrl('/api/factions'),{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,blank:true})});
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Your session may have expired. Reload to sign in again.');
-  const faction=await response.json();if(!response.ok)throw new Error(faction.error||'Unable to create your faction.');
+    const faction=await requestJSON(scopedCatalogUrl('/api/factions'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pendingId,blank:true})},{sessionMessage:'Your session may have expired. Reload to sign in again.',errorMessage:'Unable to create your faction.'});
   location.assign(novelContextHref('/factions/'+encodeURIComponent(faction.id)+'/'));
  }catch(error){directory.showError(error);creating=false;newButton.disabled=false;newButton.textContent='+ New faction';}
 });

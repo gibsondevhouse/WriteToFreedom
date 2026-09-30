@@ -42,6 +42,7 @@ Chapters/Scenes use the second typed entry, `frontend/writing-workspace.tsx`. `W
 | --- | --- | --- |
 | Workspace navigation HTML | `server/workspace-shell.js` | Outer `createWorker`, every HTML page. |
 | Workspace layout/preferences/search UI | `public/workspace-shell.css`, `public/workspace-state.js`, `public/dashboard/workspace.js` | Dashboard, directories, profiles, timeline. |
+| Browser JSON requests | `public/profiles/request.js` | Legacy browser controllers and React clients; `frontend/writing/request.ts` supplies the typed writing wrapper. |
 | Dashboard data projection | `server/dashboard-routes.js`, `server/character-card-data.js` | Dashboard endpoint and character cards view. |
 | Complete dashboard frame and lifecycle | `server/dashboard-shell.js`, `server/dashboard-pages.js`, `public/dashboard/shell.js`, `shell.css` | Home, Lore, and future dashboard pages; see [shell contract](dashboard-shell.md). |
 | Shared dashboard cards/rails and question rotation | `public/dashboard/components.js`, `question-banner.js`, `dashboard.css` | Home and Lore dashboards. |
@@ -59,6 +60,14 @@ Chapters/Scenes use the second typed entry, `frontend/writing-workspace.tsx`. `W
 | Place ancestry | `public/locations/data.js`, `server/countries.js` | Location routes, profiles, cards, dashboard. |
 | Story-date interpretation | `public/profiles/dates.js` | Date picker and timeline. |
 | Timeline derivation/view math | `public/timeline/model.js` | Timeline/dashboard routes and timeline browser controller. |
+
+## Shared browser requests
+
+Source: [public/profiles/request.js](../public/profiles/request.js).
+
+`requestJSON(path, options, messages)` defaults to same-origin credentials and `no-store`, forwards request options including `AbortSignal`, and returns parsed JSON or `null` for a successful `204`. Callers still supply mutation headers and serialized bodies. Non-JSON session responses use the caller's `sessionMessage`; failed JSON responses preserve a nonempty server error or use `errorMessage`, with the HTTP status available as `error.status`. Network, cancellation, and malformed JSON errors propagate to the caller.
+
+This helper does not own loading state, retries, novel scoping, record validation, revisions, or drafts. Page controllers retain those responsibilities, including stable creation IDs and draft-preserving conflict recovery. The writing wrapper preserves its `Promise<unknown>` boundary, so writing clients still validate response records before adopting them.
 
 ## Workspace shell
 
@@ -112,6 +121,8 @@ Source: [server/profile-components.js](../server/profile-components.js). These f
 | `renderSection(section, content, record, options)` | Article section, collapsible heading, optional visibility menu and create-note button. | Stable section IDs define `aria-controls`, body IDs, and deep links. `menuFields` can differ from rendered fields. |
 | `renderInfoGroup(title, id, content)` | Collapsible group inside the infobox. | ID is the controlled region's stable identifier. |
 | `renderProfileName(record, type, { official })` | Name heading and `#edit-name` focus button. | Official names use `#official-heading`; normal names use `data-display-name`. |
+| `renderArticleProfile({ identity, sections, leadingSections, ...page })` | Canonical character article, shared directly by character and chapter adapters. | Identity supplies record/type, trusted epithet/portrait fragments and groups; sections supply entity content and disclosure options; optional leadingSections span the article above both columns. Owns identity ordering, the optional overview-first layout, and `/profiles/article.css`; chapter CSS must not redefine article columns or identity styling. |
+| `renderProfileHero(content, { label })` | Optional wide overview card using the canonical identity card's surface. | Escape user text before composing content; label names the accessible group. |
 | `renderProfilePage(config)` | Full HTML document with form, save bar, infobox, article, footer and initial JSON. | Does not add the workspace shell; outer Worker does that. One profile form is assumed per page. |
 | `renderRatingsHost(groups, sectionId)` | Client mount for rating groups assigned to an existing article section. | The first assigned group supplies the stable `#ratings` card-menu target. |
 
@@ -143,7 +154,7 @@ Renaming a hook is an interface change spanning server markup, CSS, browser cont
 
 `renderFaction`, `renderCountry`, and `renderCity` configure `createFieldRenderer`, compose infobox and article sections, append derived linked notes, and delegate the complete document to `renderProfilePage`. Their adapters choose valid option lists: faction founders/leaders from the cast, country cities from that country's locations, and city parents from countries.
 
-`renderProfile` for characters uses the same shared primitives but retains specialized field composition, relationship controls, attributes, and authored notes. Its `initial` JSON contains `character`, `locations`, `noteTargets`, `noteBacklinks`, a compact `{ id, name }` cast, and factions. It is intentionally richer than the ordinary record embedded in the other profiles.
+`renderProfile` for characters and `renderChapterProfile` both supply fields to `renderArticleProfile`, the extracted character template. The template uses `data-profile-template="article"` to apply its shared identity card, portrait and group styles without borrowing entity classes. Character field composition, relationship controls, attributes, and authored notes remain specialized. Its `initial` JSON contains `character`, `locations`, `noteTargets`, `noteBacklinks`, a compact `{ id, name }` cast, and factions. Chapters supply their planning hero through the leading section slot, then their parent novel, chapter number portrait, details group and inline scenes below it, retaining their separate versioned save adapter.
 
 Renderers receive already owner-scoped data from routes; they do not authenticate or persist. UI option restrictions supplement server validation and cannot replace it.
 
@@ -155,7 +166,7 @@ Renderers receive already owner-scoped data from routes; they do not authenticat
 
 ### Story arc profiles
 
-`public/story-arcs/template.js` defines the shared arc fields, three guided questions for each of the six narrative beats, drafting metadata, and default tension/pace/action values. `server/render-story-arc.js` composes these into the standard profile shell: logistics and linked key entities stay in the right infobox, while the central article begins with an editable SVG pacing graph followed by collapsible beat, stakes, subplot, scene, and question sections. `public/story-arcs/profile.js` owns the pacing projection and the dynamic connected-arc and key-scene rows, then passes their serialized values through `initProfileEditor.readExtra()`.
+`public/story-arcs/template.js` defines the shared arc fields, three guided questions for each of the six narrative beats, drafting metadata, and default tension/pace/action values. `server/render-story-arc.js` composes these into the standard profile shell: the pacing timeline spans the full article width, then Overview starts the left column with the logistics and linked key entities infobox beside it. The beat, stakes, subplot, scene, and question sections follow Overview. `public/story-arcs/profile.js` owns the pacing projection and the dynamic connected-arc and key-scene rows, then passes their serialized values through `initProfileEditor.readExtra()`.
 
 Story arc documents are owner-scoped and versioned in `story_arcs`. Start and end dates use the shared story-date picker and feed the derived global timeline. Arc titles, summaries, dates, type, and status are included in workspace search.
 
@@ -302,7 +313,6 @@ For a new profile type, supply a renderer composed from shared profile functions
 For a reusable visual component, define its data shape, returned DOM or HTML, state ownership, callbacks, CSS scope, network effects, and cleanup. Put cross-page components under `public/components/` or their established shared module. For searchable collection pages, use the complete [directory shell](directory-shell.md). For dashboards, use the complete [dashboard shell](dashboard-shell.md) for headings, status, rails and lifecycle; page adapters retain filtering and domain actions. For a new action that writes, start from a fresh plain document and preserve optimistic concurrency.
 
 Verify server rendering and save/reopen in `tests/profile-standard.test.mjs`, shared navigation in `tests/workspace-shell.test.mjs`, card behavior in `tests/character-cards.test.mjs`, graph math in `tests/connections-map.test.mjs`, notes in `tests/cursor-notes.test.mjs`, and dashboard/search in their dedicated suites. These are Node tests and DOM stubs where used; visual behavior, focus, and responsive layout still need browser verification when those behaviors change.
-
 
 ## Lore dashboard and profile adapters
 

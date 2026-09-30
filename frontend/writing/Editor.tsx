@@ -1,6 +1,7 @@
-import {memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode} from 'react';
+import {memo, useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode} from 'react';
 import {EditorContent, useEditor, useEditorState, type Editor} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import {TextSelection} from '@tiptap/pm/state';
 import type {WritingContent} from './contracts';
 
 // Keep editor extensions and the persisted schema in public/writing/document.js aligned.
@@ -24,13 +25,19 @@ interface EditorProps {
   initialContent: WritingContent;
   editable: boolean;
   active?: boolean;
+  inlineScene?: boolean;
+  saveState?: 'saved' | 'dirty' | 'saving' | 'error' | 'unavailable';
+  saveError?: string;
+  saveDisabled?: boolean;
+  onSave?: () => void;
   onUpdate: (content: WritingContent) => void;
 }
 
 /** The mounted editor owns selection/history; parent saves never call setContent. */
-export const WritingEditor = memo(function WritingEditor({sceneId, initialContent, editable, active = true, onUpdate}: EditorProps) {
+export const WritingEditor = memo(function WritingEditor({sceneId, initialContent, editable, active = true, inlineScene = false, saveState = 'saved', saveError = '', saveDisabled = false, onSave, onUpdate}: EditorProps) {
   const update = useRef(onUpdate); update.current = onUpdate;
-  const initial = useRef(initialContent), failed = useRef(false), [error, setError] = useState('');
+  const initial = useRef(initialContent), failed = useRef(false), [error, setError] = useState(''), [toolsOpen, setToolsOpen] = useState(false), [editing, setEditing] = useState(false);
+  const toolbarId = 'chapter-scene-toolbar-' + sceneId;
   const editor = useEditor({
     extensions,
     content: initial.current,
@@ -38,10 +45,10 @@ export const WritingEditor = memo(function WritingEditor({sceneId, initialConten
     shouldRerenderOnTransaction: false,
     enableContentCheck: true,
     editorProps: {
-      attributes: {class: 'writing-prose', role: 'textbox', 'aria-label': 'Scene text', 'aria-multiline': 'true', 'data-scene-editor': sceneId, spellcheck: 'true'},
+      attributes: {class: 'writing-prose', role: 'textbox', 'aria-label': 'Scene text', 'aria-multiline': 'true', 'data-scene-editor': sceneId, spellcheck: 'true', ...(inlineScene ? {id: 'chapter-scene-prose-' + sceneId} : {})},
       transformPastedHTML: cleanPastedHTML,
     },
-    onUpdate: ({editor}) => {if (!failed.current) update.current(editor.getJSON() as WritingContent);},
+    onUpdate: ({editor}) => {if (!failed.current) {if (inlineScene) setEditing(true); update.current(editor.getJSON() as WritingContent);}},
     onContentError: () => {failed.current = true; setError('This scene contains formatting the editor cannot read. Your saved writing has not been changed.');},
   }, [sceneId]);
 
@@ -59,23 +66,71 @@ export const WritingEditor = memo(function WritingEditor({sceneId, initialConten
   }, [editor, editable, active, error]);
   // Hidden visited scenes stay mounted, retaining their own undo stacks and selection.
   const previouslyActive = useRef(active);
-  useEffect(() => {
-    let frame = 0;
-    if (editor && active && !previouslyActive.current) frame = requestAnimationFrame(() => {if (!editor.isDestroyed) editor.commands.focus(undefined, {scrollIntoView: false});});
+  useLayoutEffect(() => {
+    // Restore the current selection before input resumes. Tiptap's focus
+    // command defers selection restoration and can overwrite a newer edit.
+    if (editor && !editor.isDestroyed && active && !previouslyActive.current) editor.view.focus();
     previouslyActive.current = active;
-    return () => cancelAnimationFrame(frame);
   }, [active, editor]);
 
+  const previousSaveState = useRef(saveState);
+  useEffect(() => {
+    // The editing controls are transient. A successful save ends the editing
+    // session, but a response to an older revision leaves a newer draft open.
+    if (inlineScene && previousSaveState.current !== 'saved' && saveState === 'saved') {
+      setEditing(false);
+      setToolsOpen(false);
+    }
+    previousSaveState.current = saveState;
+  }, [inlineScene, saveState]);
+  const showEditingDock = inlineScene && (editing || saveState !== 'saved');
+  const leaveEditor = (event: FocusEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null) || saveState !== 'saved') return;
+    setEditing(false);
+    setToolsOpen(false);
+  };
+
   if (!editor) return <p role="status">Opening scene…</p>;
-  return <div className="writing-editor">
-    <FormattingToolbar editor={editor} disabled={!editable || Boolean(error)}/>
-    {error && <p role="alert">{error}</p>}
-    <EditorContent editor={editor}/>
-    <EditorStatistics editor={editor}/>
+  return <div className={'writing-editor' + (inlineScene ? ' writing-editor-inline' : '')} onFocusCapture={inlineScene ? () => setEditing(true) : undefined} onBlurCapture={inlineScene ? leaveEditor : undefined}>
+    {inlineScene ? <section className="profile-section chapter-scene-manuscript" aria-label="Scene manuscript">
+      <div className="collapsible-region chapter-scene-manuscript-body">
+        {error && <p role="alert">{error}</p>}
+        <div className="chapter-scene-writing-area">
+          <OpeningHeadingPrompt editor={editor} disabled={!editable || Boolean(error)}/>
+          <EditorContent editor={editor}/>
+        </div>
+        {showEditingDock && <div className="chapter-scene-editing-dock" role="group" aria-label="Scene editing controls">
+          <FormattingToolbar editor={editor} disabled={!editable || Boolean(error)} id={toolbarId} hidden={!toolsOpen}/>
+          <div className="chapter-scene-editing-dock-main">
+            <EditorStatistics editor={editor} inlineScene/>
+            <div className="chapter-scene-editor-actions">
+              <button type="button" className="chapter-scene-format-toggle" aria-label="Formatting tools" aria-expanded={toolsOpen} aria-controls={toolbarId} disabled={!editable || Boolean(error)} onMouseDown={event => event.preventDefault()} onClick={() => setToolsOpen(open => !open)}>{toolsOpen ? 'Hide formatting' : 'Formatting'}</button>
+              <span className="chapter-scene-save-state" data-state={saveState} role="status" title={saveState === 'error' ? saveError : undefined}><span>{saveState === 'saving' ? 'Saving…' : saveState === 'unavailable' ? 'Deleted — unsaved draft retained' : saveState === 'error' ? 'Not saved — ' + (saveError || 'your writing is still here') : saveState === 'dirty' ? 'Unsaved changes' : 'Saved'}</span></span>
+              <button type="button" className="writing-button writing-primary chapter-scene-save-button" aria-keyshortcuts="Control+S Meta+S" disabled={saveDisabled || Boolean(error)} onClick={onSave}>{saveState === 'saving' ? 'Saving…' : 'Save scene'}</button>
+            </div>
+          </div>
+        </div>}
+      </div>
+    </section> : <><FormattingToolbar editor={editor} disabled={!editable || Boolean(error)}/>{error && <p role="alert">{error}</p>}<EditorContent editor={editor}/><EditorStatistics editor={editor} inlineScene={false}/></>}
   </div>;
 });
 
-const FormattingToolbar = memo(function FormattingToolbar({editor, disabled}: {editor: Editor; disabled: boolean}) {
+function OpeningHeadingPrompt({editor, disabled}: {editor: Editor; disabled: boolean}) {
+  const hasHeading = useEditorState({editor, selector: ({editor}) => editor.state.doc.firstChild?.type.name === 'heading'});
+  if (hasHeading) return null;
+  const addHeading = () => {
+    if (disabled || editor.isDestroyed || !editor.isEditable) return;
+    const {state, view} = editor;
+    const heading = state.schema.nodes.heading.create({level: 1});
+    const transaction = state.tr.insert(0, heading);
+    transaction.setSelection(TextSelection.create(transaction.doc, 1));
+    view.dispatch(transaction);
+    view.focus();
+  };
+  return <h2 className="chapter-scene-opening-heading" data-placeholder="true"><button type="button" disabled={disabled} onClick={addHeading}>Opening heading</button></h2>;
+}
+
+const FormattingToolbar = memo(function FormattingToolbar({editor, disabled, id, hidden = false}: {editor: Editor; disabled: boolean; id?: string; hidden?: boolean}) {
   const state = useEditorState({editor, selector: ({editor}) => ({
     bold: editor.isActive('bold'), italic: editor.isActive('italic'), underline: editor.isActive('underline'), strike: editor.isActive('strike'),
     paragraph: editor.isActive('paragraph'), h1: editor.isActive('heading', {level: 1}), h2: editor.isActive('heading', {level: 2}), h3: editor.isActive('heading', {level: 3}),
@@ -91,7 +146,7 @@ const FormattingToolbar = memo(function FormattingToolbar({editor, disabled}: {e
     buttons[next]?.focus();
   }
   const button = (label: string, children: ReactNode, command: () => void, pressed?: boolean, unavailable = false) => <button key={label} type="button" title={label} aria-label={label} aria-pressed={pressed} disabled={disabled || unavailable} onMouseDown={event => event.preventDefault()} onClick={command}>{children}</button>;
-  return <div className="writing-toolbar" role="toolbar" aria-label="Text formatting" onKeyDown={moveFocus}>
+  return <div className="writing-toolbar" role="toolbar" aria-label="Text formatting" id={id} hidden={hidden} onKeyDown={moveFocus}>
     <span className="writing-toolbar-group">
       {button('Bold', <strong>B</strong>, () => {editor.chain().focus().toggleBold().run();}, state.bold)}
       {button('Italic', <em>I</em>, () => {editor.chain().focus().toggleItalic().run();}, state.italic)}
@@ -117,7 +172,8 @@ const FormattingToolbar = memo(function FormattingToolbar({editor, disabled}: {e
   </div>;
 });
 
-function EditorStatistics({editor}: {editor: Editor}) {
+function EditorStatistics({editor, inlineScene}: {editor: Editor; inlineScene: boolean}) {
   const words = useEditorState({editor, selector: ({editor}) => {const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ').trim(); return text ? text.split(/\s+/u).length : 0;}});
-  return <div className="writing-editor-footer"><span aria-label="Word count">{words.toLocaleString()} {words === 1 ? 'word' : 'words'}</span><span>Changes are saved when you choose Save scene.</span></div>;
+  const count = <span aria-label="Word count">{words.toLocaleString()} {words === 1 ? 'word' : 'words'}</span>;
+  return inlineScene ? <span className="chapter-scene-word-count">{count}</span> : <div className="writing-editor-footer">{count}<span>Changes are saved when you choose Save scene.</span></div>;
 }

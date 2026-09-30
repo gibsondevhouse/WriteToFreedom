@@ -29,6 +29,17 @@ test('novel and series contracts preserve profile fields and exclude association
  assert.equal(documentSchemas.series['x-storage'].table,'series');
 });
 
+test('chapter profile metadata remains optional and uses bounded owner-scoped arc references',()=>{
+ const legacy={title:'Chapter one',summary:''},id=crypto.randomUUID();assertDocumentSchema('chapter',legacy);
+ assertDocumentSchema('chapter',{...legacy,status:'revising',chapterNumber:9999,connectedArcIds:[id]});
+ assertDocumentSchema('chapter',{...legacy,status:'draft',chapterNumber:1,connectedArcIds:[]});
+ for(const extra of [{status:'drafting'},{chapterNumber:0},{chapterNumber:10000},{chapterNumber:1.5},{chapterNumber:null},{connectedArcIds:[id,id]},{connectedArcIds:['not-an-arc']},{connectedArcIds:Array.from({length:51},()=>crypto.randomUUID())}])assert.equal(documentValidator('chapter')({...legacy,...extra}),false,JSON.stringify(extra));
+ assert.equal(documentSchemas.chapter.properties.connectedArcIds.items['x-reference'].scope,'owner');
+ assert.equal(documentSchemas.chapter.properties.connectedArcIds.items['x-reference'].within,'this chapter’s novel');
+ const scene={...legacy,chapterId:crypto.randomUUID(),status:'draft',contentSchemaVersion:1,content:{type:'doc',content:[{type:'paragraph'}]}};
+ assertDocumentSchema('scene',scene);assert.equal(documentValidator('scene')({...scene,chapterNumber:2}),false);assert.equal(documentValidator('scene')({...scene,connectedArcIds:[]}),false);
+});
+
 test('manual and smart collections have separate bounded document contracts',()=>{
  const metadata={name:'A collection',summary:'Entries',coverUrl:''};
  assertDocumentSchema('collection_manual',{...metadata,order:['character::claude']});

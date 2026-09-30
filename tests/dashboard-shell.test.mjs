@@ -52,18 +52,21 @@ function node(){
 const defer=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function shellSession(){
- const root={...node(),id:'test-dashboard'},window=node(),hooks=new Map();
+ const root={...node(),id:'test-dashboard'},window=node(),document=node(),hooks=new Map();
  for(const name of ['body','rows','loading','error','error-message','retry','empty'])hooks.set(name,node());
  root.querySelector=selector=>hooks.get(selector.match(/^\[data-dashboard-(.*)\]$/)[1]);
  const counts={rails:0,banners:0,prefixes:[]};
- const context=vm.createContext({window,document:{querySelector:()=>root},AbortController,Promise,scopedCatalogUrl:path=>path,showCatalogScope(){},
+ document.querySelector=()=>root;
+ const context=vm.createContext({window,document,AbortController,Promise,scopedCatalogUrl:path=>path,showCatalogScope(){},
   el:()=>node(),tone:()=>'',initial:()=>'',
   createRails({idPrefix}){counts.rails++;counts.prefixes.push(idPrefix);let destroyed=false;return {rail(title,records){return {title,records};},destroy(){assert.equal(destroyed,false,'one disposal per view');destroyed=true;counts.rails--;}};},
   createQuestionBanner(records,{idPrefix}){counts.banners++;counts.prefixes.push(idPrefix);return {element:{questions:records},destroy(){counts.banners--;}};}
  });
+ const events=readFileSync('public/profiles/workspace-events.js','utf8').replace(/^export \{.*\};?$/gm,'').replace(/^export /gm,'');
+ const requests=readFileSync('public/profiles/request.js','utf8').replace(/^export /gm,'');
  const source=readFileSync('public/dashboard/shell.js','utf8').replace(/^import .*\n/gm,'').replace(/^export /gm,'');
- vm.runInContext(source+'\nglobalThis.mount=initDashboardShell;globalThis.readDashboard=fetchDashboard;',context);
- return {root,window,counts,hooks,context,mount:options=>context.mount({root,autoload:false,...options})};
+ vm.runInContext(events+'\n'+requests+'\n'+source+'\nglobalThis.mount=initDashboardShell;globalThis.readDashboard=fetchDashboard;',context);
+ return {root,window,document,counts,hooks,context,mount:options=>context.mount({root,autoload:false,...options})};
 }
 
 test('refresh after an in-flight read waits for fresh data instead of losing a mutation',async()=>{
@@ -100,6 +103,20 @@ test('destroy aborts pending reads and prevents late rendering; persisted pages 
  session.window.dispatch('pageshow',{persisted:true});await tick();assert.equal(reads,2);
  shell.destroy();assert.equal(signal.aborted,true);late.resolve({late:true});await tick();assert.equal(painted,1);
  assert.equal(session.counts.rails,0);assert.equal(session.window.listeners('pagehide'),0);
+});
+
+test('saved profile events and tab activation refresh dashboard cards, then detach on destroy',async()=>{
+ const session=shellSession(),painted=[];let name='Original novel',reads=0;
+ const shell=session.mount({load:async()=>{reads++;return {name};},render(data,view){painted.push(data.name);view.append(data.name);}});
+ await shell.refresh();name='Renamed novel';session.window.dispatch('storage',{key:'write-to-freedom:workspace-change'});await tick();
+ assert.deepEqual(painted,['Original novel','Renamed novel']);
+ session.window.dispatch('pageshow',{persisted:false});const beforeReturn=reads;
+ name='Restored novel';session.window.dispatch('pageshow',{persisted:false});await tick();
+ assert.equal(reads,beforeReturn+1);assert.equal(shell.data.name,'Restored novel');
+ name='Another edit';session.window.dispatch('focus');await tick();assert.equal(shell.data.name,'Another edit');
+ shell.destroy();const previousReads=reads;
+ session.window.dispatch('storage',{key:'write-to-freedom:workspace-change'});session.window.dispatch('focus');session.document.dispatch('visibilitychange');await tick();
+ assert.equal(reads,previousReads);assert.equal(session.window.listeners('storage'),0);assert.equal(session.document.listeners('visibilitychange'),0);
 });
 
 test('a failed renderer disposes its unfinished view and preserves the previous content',async()=>{

@@ -7,14 +7,30 @@ import {createWorker} from '../server/app.js';
 import {blankLore} from '../public/lore/template.js';
 import {libraryKey} from '../server/library-targets.js';
 
-function setup(t){
+function setup(t,queries){
  const sqlite=new DatabaseSync(':memory:');t.after(()=>sqlite.close());for(const file of readdirSync('drizzle').filter(file=>file.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));
- const worker=createWorker({}),env={DB:d1Adapter(sqlite)},origin='https://beta.example';
+ const binding=d1Adapter(sqlite),worker=createWorker({}),env={DB:queries?{...binding,prepare(sql){queries.push(sql);return binding.prepare(sql);}}:binding},origin='https://beta.example';
  const request=(path,method='GET',body,owner='author',headers={})=>worker.fetch(new Request(origin+path,{method,headers:{'oai-authenticated-user-id':owner,origin,'content-type':'application/json',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
  const read=async(path,owner)=>{const response=await request(path,'GET',undefined,owner);assert.equal(response.status,200,await response.clone().text());return response.json();};
  const create=async(path,body,owner)=>{const response=await request(path,'POST',{id:crypto.randomUUID(),...body},owner);assert.equal(response.status,201,await response.clone().text());return response.json();};
  return {sqlite,request,read,create};
 }
+
+test('manual and smart collection entries share one owner-scoped catalog and current criteria labels',async t=>{
+ const queries=[],{request,read,create}=setup(t,queries),series=await create('/api/series',{title:'A series'}),novel=await create('/api/novels',{title:'A novel',seriesId:series.id}),character=await create('/api/characters',{name:'Linked cast'});
+ const manual=await create('/api/collections',{name:'Selected cast',kind:'manual'}),smart=await create('/api/collections',{name:'Series cast',kind:'smart',rules:{version:1,mode:'all',predicates:[{field:'entityType',value:'character'},{field:'linkedNovel',value:novel.id},{field:'series',value:series.id}]}});
+ await create('/api/novels/'+novel.id+'/associations',{targetKind:'character',targetId:character.id});
+ assert.equal((await request('/api/collections/'+manual.id+'/members','POST',{version:manual.version,ref:{kind:'character',id:character.id}})).status,200);
+ assert.equal((await request('/api/novels/'+novel.id,'PUT',{version:novel.version,title:'Renamed novel'})).status,200);
+ const currentSeries=await read('/api/series/'+series.id);
+ assert.equal((await request('/api/series/'+series.id,'PUT',{version:currentSeries.version,title:'Renamed series'})).status,200);
+ for(const collection of [manual,smart]){
+  queries.length=0;const payload=await read('/api/collections/'+collection.id+'/entries');
+  assert.deepEqual(payload.entries.map(entry=>entry.id),[character.id]);
+  if(collection.kind==='smart'){assert.match(payload.ruleSummary,/Renamed novel/);assert.match(payload.ruleSummary,/Renamed series/);}
+  for(const table of ['character_drafts','factions','faction_profiles','locations','country_profiles','city_profiles','location_details','lore_entries','story_arcs','novels','series'])assert.equal(queries.filter(sql=>new RegExp('\\bFROM '+table+'\\b','i').test(sql)).length,1,collection.kind+': '+table);
+ }
+});
 
 test('mixed manual collections keep canonical references, nested note identity and checked order',async t=>{
  const {sqlite,request,read,create}=setup(t),novel=await create('/api/novels',{title:'First'}),character=await create('/api/characters',{name:'Shared'}),second=await create('/api/characters',{name:'Other'}),lore=await create('/api/lore',{...blankLore('book'),name:'Lore book'}),collection=await create('/api/collections',{name:'Royal court',kind:'manual'});

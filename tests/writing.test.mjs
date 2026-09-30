@@ -5,6 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {writingRoute} from '../server/writing-routes.js';
 import {writingRepository} from '../server/writing-repository.js';
+import {repository} from '../server/db.js';
 import {d1Adapter} from '../scripts/sqlite-adapter.mjs';
 import {getSchema} from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -25,6 +26,49 @@ function setup(t){
  const scene=async(chapterId,extra={},owner='author')=>{const response=await request('/api/scenes','POST',{id:crypto.randomUUID(),chapterId,title:'First scene',summary:'',status:'draft',contentSchemaVersion:1,content:emptyWritingContent(),...extra},owner);assert.equal(response.status,201,await response.clone().text());return response.json();};
  return {request,get,chapter,scene,sqlite,env};
 }
+
+test('chapter profile metadata persists through older clients and keeps stale connections explicitly removable',async t=>{
+ const {request,get,chapter,scene,sqlite,env}=setup(t),legacy=await chapter(),library=repository(env.DB);
+ for(const key of ['status','chapterNumber','connectedArcIds'])assert.equal(Object.hasOwn(legacy,key),false,key);
+ const arc=await library.createStoryArc('author',crypto.randomUUID(),{name:'The treaty'});
+ const association=await library.createNovelAssociation('author',crypto.randomUUID(),legacy.novelId,'story_arc',arc.id,'referenced_by','');
+ const entry=await chapter({novelId:legacy.novelId,status:'revising',chapterNumber:14,connectedArcIds:[arc.id]});
+ assert.equal(entry.status,'revising');assert.equal(entry.chapterNumber,14);assert.deepEqual(entry.connectedArcIds,[arc.id]);
+ assert.deepEqual(await get('/api/chapters/'+entry.id),entry);
+ assert.deepEqual((await get('/api/chapters?novelId='+entry.novelId)).chapters.find(item=>item.id===entry.id),entry);
+ const stored=JSON.parse(sqlite.prepare('SELECT document FROM chapters WHERE id = ?').get(entry.id).document);
+ assertDocumentSchema('chapter',stored);assert.equal(Object.hasOwn(stored,'novelId'),false);
+ let response=await request('/api/chapters/'+entry.id,'PUT',{version:1,title:'Updated by an older client'});
+ assert.equal(response.status,200,await response.clone().text());let saved=await response.json();
+ for(const key of ['status','chapterNumber','connectedArcIds'])assert.deepEqual(saved[key],entry[key]);
+ await library.deleteNovelAssociation('author',association.id,association.version);
+ sqlite.prepare('DELETE FROM story_arcs WHERE id = ?').run(arc.id);
+ response=await request('/api/chapters/'+entry.id,'PUT',{version:saved.version,summary:'The prior connection is still visible.',connectedArcIds:[arc.id]});
+ assert.equal(response.status,200,await response.clone().text());saved=await response.json();assert.deepEqual(saved.connectedArcIds,[arc.id]);
+ response=await request('/api/chapters/'+entry.id,'PUT',{version:saved.version,status:'complete',chapterNumber:15,connectedArcIds:[]});
+ assert.equal(response.status,200,await response.clone().text());saved=await response.json();assert.equal(saved.status,'complete');assert.equal(saved.chapterNumber,15);assert.deepEqual(saved.connectedArcIds,[]);
+ assert.equal((await request('/api/chapters/'+entry.id,'PUT',{version:saved.version,connectedArcIds:[arc.id]})).status,400);
+ assert.deepEqual(await get('/api/chapters/'+entry.id),saved);
+ const child=await scene(entry.id,{status:'draft'});
+ assert.equal(child.status,'draft');for(const key of ['chapterNumber','connectedArcIds'])assert.equal(Object.hasOwn(child,key),false,key);
+});
+
+test('chapter metadata rejects invalid bounds and new arcs outside the owner and parent novel without losing stored data',async t=>{
+ const {request,get,chapter,env}=setup(t),parent=await chapter(),library=repository(env.DB);
+ const owned=await library.createStoryArc('author',crypto.randomUUID(),{name:'Unlinked arc'}),foreign=await library.createStoryArc('other',crypto.randomUUID(),{name:'Foreign arc'});
+ const otherNovel=await library.createNovel('author',crypto.randomUUID(),{title:'Another novel'});
+ await library.createNovelAssociation('author',crypto.randomUUID(),otherNovel.id,'story_arc',owned.id,'referenced_by','');
+ const path='/api/chapters/'+parent.id;
+ for(const bad of [{status:'published'},{status:null},{chapterNumber:0},{chapterNumber:10000},{chapterNumber:1.5},{chapterNumber:'2'},{chapterNumber:null},{connectedArcIds:null},{connectedArcIds:'arc'},{connectedArcIds:['bad']},{connectedArcIds:[owned.id,owned.id]},{connectedArcIds:Array.from({length:51},()=>crypto.randomUUID())},{connectedArcIds:[owned.id]},{connectedArcIds:[foreign.id]},{connectedArcIds:[crypto.randomUUID()]}]){
+  const response=await request(path,'PUT',{version:parent.version,...bad});
+  assert.equal(response.status,400,JSON.stringify(bad)+': '+await response.text());assert.deepEqual(await get(path),parent);
+ }
+ assert.equal((await request(path+'?novelId='+otherNovel.id,'PUT',{version:parent.version,status:'complete'})).status,404);
+ assert.equal((await request(path,'PUT',{version:parent.version,status:'complete'},'other')).status,404);
+ await library.createNovelAssociation('author',crypto.randomUUID(),parent.novelId,'story_arc',owned.id,'referenced_by','');
+ const response=await request(path,'PUT',{version:parent.version,status:'draft',chapterNumber:9999,connectedArcIds:[owned.id]});
+ assert.equal(response.status,200,await response.clone().text());const saved=await response.json();assert.equal(saved.chapterNumber,9999);assert.deepEqual(saved.connectedArcIds,[owned.id]);
+});
 
 test('deleting a chapter removes its scenes atomically and preserves other manuscripts',async t=>{
  const {request,get,chapter,scene,sqlite}=setup(t);

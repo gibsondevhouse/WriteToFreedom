@@ -58,3 +58,26 @@ test('place dropdowns retain existing custom values and accept reusable presets'
   const html=await (await req(page+id+'/')).text();assert.ok(html.includes('value="Council of Houses" selected'));assert.ok(html.includes('value="River speech · French"'));assert.ok(html.includes('value="Republic"'));assert.ok(html.includes('data-choice-field="officialLanguages" data-multiple="true"'));
  }
 });
+test('character and chapter adapters use the same article template and identity slots',async()=>{
+ const req=setup(),novelId=crypto.randomUUID(),chapterId=crypto.randomUUID();
+ assert.equal((await req('/api/novels','POST',{id:novelId,title:'A shared profile novel'})).status,201);
+ assert.equal((await req('/api/chapters','POST',{id:chapterId,novelId,title:'A shared article chapter',summary:'Chapter outline'})).status,201);
+ const character=await (await req('/characters/deepseek/')).text(),chapter=await (await req('/chapters/'+chapterId+'/')).text();
+ for(const html of [character,chapter]){
+  assert.match(html,/data-profile-template="article"/);
+  assert.equal((html.match(/href="\/profiles\/article\.css\?v=[^"]+"/g)||[]).length,1);
+  for(const slot of ['profile-form','editor-fields','identity','edit-name','overview','overview-body','profile-data'])assert.equal((html.match(new RegExp('id="'+slot+'"','g'))||[]).length,1,slot);
+  assert.match(html,/<aside[^>]*class="infobox [^"]*"[^>]*id="identity"/);
+  assert.match(html,/<div class="epithet-field">/);
+  assert.match(html,/<div class="identity-panel blue">/);
+  assert.match(html,/<span class="monogram" id="monogram"/);
+  assert.match(html,/<div class="card-group"><h3><button[^>]*class="collapse-toggle"/);
+  assert.match(html,/<div class="profile-content">/);
+ }
+ assert.match(chapter,/<div class="profile-overview-card"[^>]*role="group"[^>]*aria-label="Chapter overview"/);
+ assert.match(character,/name="firstName"/);assert.doesNotMatch(chapter,/name="firstName"|name="portraitUrl"/);
+ assert.match(chapter,/name="chapterNumber"/);assert.doesNotMatch(character,/name="chapterNumber"/);
+ assert.ok(chapter.indexOf('id="overview"')<chapter.indexOf('id="identity"'),'chapter overview occupies the leading article slot');
+ assert.ok(character.indexOf('id="identity"')<character.indexOf('id="overview"'),'character preserves its original identity and body order');
+ assert.match(chapter,/id="chapter-new-scene"/);assert.doesNotMatch(character,/id="chapter-new-scene"/);
+});

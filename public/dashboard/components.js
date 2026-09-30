@@ -2,10 +2,11 @@
 import {createLoreCard} from '../components/lore-card/card.js?v=__WTF_ASSET_REVISION__';
 import {createStoryCardMenu,storyCardTone} from '../components/story-card/card.js?v=__WTF_ASSET_REVISION__';
 import {createProfileStoryCard} from '../components/story-card/profile-card.js?v=__WTF_ASSET_REVISION__';
+import {displayImageSource} from '../components/image-source.js?v=__WTF_ASSET_REVISION__';
 export function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 export function tone(record){return storyCardTone(record);}
 export function initial(record){return record.name.trim().charAt(0).toLocaleUpperCase()||'?';}
-export function cover(record){const node=el('div','cover'),mark=el('span','monogram',initial(record));mark.setAttribute('aria-hidden','true');node.append(mark);if(record.image){try{const url=new URL(record.image);if(url.protocol==='https:'){const image=el('img');image.src=url.href;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove(),{once:true});node.append(image);}}catch{}}return node;}
+export function cover(record){const node=el('div','cover'),mark=el('span','monogram',initial(record));mark.setAttribute('aria-hidden','true');node.append(mark);const source=displayImageSource(record.image);if(source){const image=el('img');image.src=source;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove(),{once:true});node.append(image);}return node;}
 export function cardLink(record,cls){const link=el('a',`card ${cls} ${tone(record)}`);link.href=record.href;return link;}
 export function factionCard(record){
  const members=Number(record.members)||0;

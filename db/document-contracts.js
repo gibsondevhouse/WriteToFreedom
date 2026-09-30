@@ -46,6 +46,7 @@ function register(key,title,table,properties,required,extra={}){
 
 const characterFields=fields(templateSections);
 characterFields.portraitUrl.maxLength=2048;
+characterFields.portraitUrl.description='Empty, an HTTPS URL without embedded credentials, or an uploaded portrait URL for this character; domain validation checks uploaded image ownership.';
 for(const [key,values] of Object.entries(humanChoices))characterFields[key].enum=['',...values];
 characterFields.storyRole['x-current-options']=['',...storyRoles];
 characterFields.alignment['x-current-options']=['',...alignments];
@@ -111,7 +112,12 @@ register('storyArc','Story arc','story_arcs',{
 },[...Object.keys(fields([arcIdentity,...storyArcSections])),'pacing','keyEntities','connectedArcIds','keyScenes','hiddenFields']);
 
 const writingMetadata={title:{...text(160),minLength:1,pattern:'\\S',title:'Title'},summary:{...text(),title:'Summary'}};
-register('chapter','Manuscript chapter','chapters',writingMetadata,['title','summary']);
+register('chapter','Manuscript chapter','chapters',{
+ ...writingMetadata,
+ status:{type:'string',enum:['draft','revising','complete'],title:'Status','x-ui-section':'overview','x-ui-control':'select'},
+ chapterNumber:{type:'integer',minimum:1,maximum:9999,title:'Chapter number','x-ui-section':'overview','x-ui-control':'number',description:'Author-entered chapter number. Informational metadata; does not reorder the manuscript.'},
+ connectedArcIds:{...list({...uuid,...reference('storyArc',{within:'this chapter’s novel'})},50,{uniqueItems:true}),title:'Connected arcs','x-ui-section':'overview','x-ui-control':'multiselect',description:'Newly selected story arcs must belong to the same author and be linked to this chapter’s novel. Existing connections remain until removed, including unavailable arcs; omitted fields are preserved for older clients.'},
+},['title','summary']);
 register('scene','Manuscript scene','scenes',{
  ...writingMetadata,chapterId:{...uuid,...reference('chapter'),description:'Must equal scenes.chapter_id and refer to a chapter owned by the same author.'},
  status:{type:'string',enum:['draft','revising','complete']},contentSchemaVersion:{const:1},content:ref('writingContent'),

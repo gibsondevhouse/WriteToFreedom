@@ -57,7 +57,7 @@ function fakeDom(){
 function response(data){return {ok:true,headers:{get:key=>key==='content-type'?'application/json':null},async json(){return structuredClone(data);}};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
-test('character More opens accessible About, Ratings, and reserved Mentions tabs',async()=>{
+test('character More opens accessible About, Ratings, and populated Mentions tabs',async()=>{
  const previous={document:globalThis.document,window:globalThis.window,fetch:globalThis.fetch};
  const {document,window,opener}=fakeDom();globalThis.document=document;globalThis.window=window;
  const longBiography=('A careful archivist follows every clue through the margins. '.repeat(10)).trim();
@@ -73,7 +73,8 @@ test('character More opens accessible About, Ratings, and reserved Mentions tabs
  };
  try{
   const {openCharacter}=await import('../public/components/character-card/details.js?overlay-test='+Date.now());
-  openCharacter({id:'hero',name:'Avery Vale',href:'/characters/hero/',image:'',summary:'Card summary',mentions:[]},'attributes',record=>{onUpdate=record;});
+  const card={id:'hero',name:'Avery Vale',href:'/characters/hero/',image:'',summary:'Card summary',mentions:[{href:'/lore/note-1/',source:'Field notes',label:'Discovery',text:'Avery found the hidden archive.'}]};
+  openCharacter(card,'attributes',record=>{onUpdate=record;});
   await flush();
   const dialog=document.body.querySelector('.character-detail-overlay'),tabs=dialog.querySelectorAll('.character-detail-tab');
   assert.ok(dialog.open);assert.equal(calls.length,1);assert.deepEqual(tabs.map(tab=>tab.textContent),['About','Ratings','Mentions']);
@@ -124,8 +125,13 @@ test('character More opens accessible About, Ratings, and reserved Mentions tabs
 
   tabs[0].click();assert.equal(height.value,'180');assert.equal(heightUnit.value,'in');assert.equal(weight.value,'150');assert.equal(weightUnit.value,'lb');assert.equal(birthday.value,'First Dawn, Year 21');assert.equal(alignment.value,'Good');
 
-  tabs[2].click();assert.equal(mentions.hidden,false);assert.match(mentions.textContent,/Mentions will appear here/);assert.equal(save.hidden,true);assert.equal(calls.length,3);
+  tabs[2].click();assert.equal(mentions.hidden,false);assert.match(mentions.textContent,/Avery found the hidden archive/);assert.equal(mentions.querySelector('.mention-entry').href,'/lore/note-1/');assert.equal(save.hidden,true);assert.equal(calls.length,3);
   dialog.querySelector('.character-detail-close').click();assert.equal(document.body.querySelector('.character-detail-overlay'),null);assert.equal(document.activeElement,opener);
+
+  openCharacter(card,'mentions');
+  const standalone=document.body.querySelector('.character-detail-overlay');
+  assert.equal(standalone.querySelector('.mention-entry').href,'/lore/note-1/');assert.equal(calls.length,3,'standalone mentions use the card projection');
+  standalone.querySelector('.character-detail-close').click();
 
   const css=readFileSync('public/components/character-card/details.css','utf8');
   assert.match(css,/aspect-ratio:\s*3\s*\/\s*2/);assert.match(css,/object-fit:\s*cover/);assert.match(css,/-webkit-line-clamp:\s*5/);

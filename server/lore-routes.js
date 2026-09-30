@@ -1,3 +1,4 @@
+import {json,isSameOriginJson} from './http.js';
 import {validateSchemaVersion} from './document-storage.js';
 import {repository} from './db.js';
 import {characterCast} from './sample-characters.js';
@@ -12,7 +13,6 @@ import {loreDashboardData} from './lore.js';
 import {renderLore} from './render-lore.js';
 import {ratingGroupsFor,validateProfileRatings} from '../public/profiles/ratings.js';
 
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
 function validate(input,current,targets){
  if(input.type!==undefined&&input.type!==current.type)throw new Error('Keep this entry’s original type. Use collections to organize it.');
  const template=loreTemplates[current.type],document={type:current.type};
@@ -50,7 +50,7 @@ export async function loreRoute(request,env){
   if(!html&&request.method==='GET')return json(id?current:loreDashboardData(records,characterCast(await db.list(owner))));
   const [savedCast,factions,locations]=await Promise.all([db.list(owner),factionCatalog(db,owner),locationCatalog(db,owner)]),cast=characterCast(savedCast),targets=noteTargets(cast,factions,locations,records);
   if(html)return new Response(renderLore(current,targets,connectedNotes(cast,{kind:'lore',id},records)),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
-  if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'This request could not be verified.'},403);
+    if(!isSameOriginJson(request,url.origin))return json({error:'This request could not be verified.'},403);
   const raw=await request.text();if(raw.length>550000)return json({error:'This lore entry is too large to save.'},413);
   let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid lore data.'},400);}
   if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid lore data.'},400);

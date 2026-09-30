@@ -29,6 +29,7 @@ export function renderStoryArc(record,targets,otherArcs){
  const connected=renderSection({id:'connected-subplots',title:'Connected subplots',fields:[]},`<div id="connected-arc-list" class="connected-arc-list"></div><button type="button" id="add-connected-arc" class="quiet-button"${otherArcs.length?'':' disabled'}>Add connected arc</button><p class="section-note">Link another storyline that intersects with this arc.</p>`,record);
  const scenes=renderSection({id:'key-scenes',title:'Key scenes',fields:[]},`<div id="key-scene-list" class="key-scene-list"></div><button type="button" id="add-key-scene" class="quiet-button">Add key scene</button><p class="section-note">Track the chapter and narrative beat where each pivotal scene appears.</p>`,record);
  const narrative=arcBeats.map(renderBeat).join('');
- const content=pacingGraph(record)+render('overview')+narrative+render('stakes')+connected+scenes+render('questions');
- return renderProfilePage({record,type:'story-arc',collection:'Story Arcs',collectionUrl:'/story-arcs/',infobox,content,script:'/story-arcs/profile.js',styles:['/story-arcs/profile.css'],initial:{record,targets,otherArcs},boxClass:'story-arc-infobox'});
+ const leadingContent=pacingGraph(record);
+ const content=render('overview')+narrative+render('stakes')+connected+scenes+render('questions');
+ return renderProfilePage({record,type:'story-arc',collection:'Story Arcs',collectionUrl:'/story-arcs/',infobox,leadingContent,content,script:'/story-arcs/profile.js',styles:['/story-arcs/profile.css'],initial:{record,targets,otherArcs},boxClass:'story-arc-infobox'});
 }

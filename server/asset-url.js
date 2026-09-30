@@ -8,4 +8,9 @@ export function assetUrl(path){
  return url.pathname+url.search+url.hash;
 }
 
-export const assetRevision=revision;
+export function assetCacheControl(url,type,expectedRevision=revision){
+ if(type.split(';',1)[0].trim().toLowerCase()==='text/html')return 'no-cache';
+ const versioned=expectedRevision!=='dev'&&url.searchParams.get('v')===expectedRevision;
+ const fingerprinted=/^\/frontend\/assets\/[^/]+-[a-z0-9_-]{8}\.(?:js|css)$/i.test(url.pathname);
+ return versioned||fingerprinted?'public, max-age=31536000, immutable':'no-cache';
+}
